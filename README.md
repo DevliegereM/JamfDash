@@ -138,50 +138,6 @@ List of managed apps in your School environment.
 
 Jamf Dash checks for `jamf-cli` updates automatically. When a newer version is available, an update banner appears at the top of the app. You can also check manually from **Settings → CLI → Check for Updates**.
 
----
-
-## JamfCLI Bash Tool
-
-The `JamfCLI/` directory contains a standalone bash script that generates **self-contained HTML reports** for Jamf Pro environments — no app required.
-
-### Features
-
-- **Cleanup analysis** — surfaces unused categories, scripts, packages, policies, and smart groups
-- **History tracking** — compares each run against previous runs to highlight what changed
-- **Self-contained output** — produces a single `.html` file with no external dependencies
-- **swiftDialog UI wrapper** — optional macOS GUI for selecting options and displaying progress
-- **Demo mode** — generates a sample report without a live Jamf Pro connection
-
-### Usage
-
-See [`JamfCLI/README.md`](JamfCLI/README.md) for full usage instructions, prerequisites, and configuration options.
-
----
-
-## Project Structure
-
-```
-Jamf Dash/
-├── App/
-│   └── JamfDash/
-│       ├── App/                    # AppState, AppEnvironment, RootView
-│       ├── Features/
-│       │   ├── Onboarding/         # Setup wizard
-│       │   ├── Settings/           # Connection, profile, CLI, branding settings
-│       │   ├── Sidebar/            # NavigationSplitView sidebar
-│       │   ├── Overview/           # Jamf Pro overview
-│       │   ├── Security/           # Security posture + charts
-│       │   ├── Fleet/              # Policies, groups, categories, scripts, packages
-│       │   ├── Devices/            # Device inventory + stale check-in + OS chart
-│       │   ├── DeviceSearch/       # Device lookup + actions
-│       │   ├── Export/             # PDF report generation
-│       │   ├── Protect/            # All Jamf Protect views
-│       │   └── School/             # All Jamf School views
-│       ├── Models/                 # Codable data models
-│       ├── Services/               # CLIManager, KeychainService, CLIDownloader
-│       └── ViewModels/             # @Observable view models per feature
-└── JamfCLI/                        # Standalone bash HTML report tool
-```
 
 ## License
 
