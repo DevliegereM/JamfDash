@@ -2,11 +2,6 @@
 
 A native macOS dashboard for Jamf Pro, Jamf Protect, and Jamf School. Browse your fleet, review security posture, inspect analytics and configuration, and export reports — all from one app.
 
-This repository contains two independent tools:
-
-- **[Jamf Dash](#jamf-dash-app)** — a SwiftUI macOS app
-- **[JamfCLI](#jamfcli-bash-tool)** — a bash script that generates self-contained HTML reports
-
 ---
 
 ## Jamf Dash App
