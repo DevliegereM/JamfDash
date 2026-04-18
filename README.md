@@ -35,6 +35,14 @@ Jamf Dash guides you through a step-by-step onboarding flow on first launch:
 3. **Choose product** — Jamf Pro, Jamf Protect, or Jamf School
 4. **Authenticate** — product-specific credentials (see below)
 
+![Welcome screen](Images/JamfDashWelcome1.png)
+
+![Install jamf-cli](Images/JamfDashWelcome2.png)
+
+![Product picker](Images/JamfDashWelcome3.png)
+
+![Auth method](Images/JamfDashWelcome4.png)
+
 ### Jamf Pro — Local Admin Account
 
 If your instance has local admin accounts enabled, enter your server URL, admin username, and password. Jamf Dash will automatically create a dedicated API client.
@@ -73,11 +81,15 @@ Enter the server URL, Network ID, and API Key in Jamf Dash.
 **Overview**
 High-level statistics from the Jamf Pro overview endpoint — device counts, licence usage, health alerts, certificate expiry, and more.
 
+![Jamf Pro Overview](Images/JamfProOverview.png)
+
 **Security Posture**
 A full security compliance report including:
 - Compliance summary (FileVault, Gatekeeper, SIP, Firewall) with percentage bars
 - OS version distribution donut chart
 - Per-device security breakdown table with selectable serial numbers
+
+![Security Posture](Images/JamfProSecurity.png)
 
 **Fleet & Config**
 Browse all configuration objects in one place:
@@ -93,10 +105,13 @@ Three-tab Mac inventory view:
 Serial numbers and device names are text-selectable for easy copying.
 
 **Device Lookup**
+
 Look up any Mac by serial number and view full hardware, OS, security, location, storage, network, and configuration profile detail. Run management actions directly from the detail panel:
 - Safe: Blank Push, Renew MDM, DDM Sync, Flush Failed Commands, Flush All Commands
 - Moderate: Redeploy Framework, Enable/Disable Remote Desktop, Restart, Shutdown
 - Destructive (confirmation required): Remove MDM, Set Recovery Lock, Lock (with PIN), Erase
+
+![Device Lookup](Images/JamfProLookup.png)
 
 **Reports**
 Export a PDF summary of your Jamf Pro environment. Optionally add your company logo from **Settings → Branding** — it will appear in the report header.
