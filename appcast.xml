@@ -8,17 +8,6 @@
     <description>Jamf Dash releases</description>
     <language>en</language>
 
-    <!--
-      Add a new <item> block here for each release.
-      Steps for each release:
-        1. Build and export JamfDash.dmg (Archive → Export → Developer ID)
-        2. Run: /tmp/bin/sign_update JamfDash.dmg
-           (or wherever you have the sign_update tool from the Sparkle release assets)
-        3. Copy the printed edSignature and file length into the <enclosure> below.
-        4. Upload JamfDash.dmg to the GitHub Release assets.
-        5. Update this file and commit/push to main.
-    -->
-
     <item>
       <title>Version 0.2</title>
       <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.2</sparkle:releaseNotesLink>
