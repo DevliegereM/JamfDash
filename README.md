@@ -92,9 +92,13 @@ A full security compliance report including:
 ![Security Posture](Images/JamfProSecurity.png)
 
 **Fleet & Config**
-Browse all configuration objects in one place:
-- Policies, Smart Computer Groups, Categories, Scripts, Packages, Configuration Profiles
-- Each section is a sortable table with name and relevant metadata
+Browse all configuration objects in one place, with inline detail sheets:
+
+- **Policies** — grouped by category (fetched from Jamf Pro). Click any policy to see its full scope: included computer groups, computers, departments, buildings, and exclusions.
+- **Smart Computer Groups** — click any group to see its membership criteria (name, search type, value, and AND/OR logic).
+- **Scripts** — grouped by category.
+- **Packages** — full package inventory.
+- **Configuration Profiles** — grouped by category. Click any profile to see its scope.
 
 **Devices**
 Three-tab Mac inventory view:
@@ -106,7 +110,7 @@ Serial numbers and device names are text-selectable for easy copying.
 
 **Device Lookup**
 
-Look up any Mac by serial number and view full hardware, OS, security, location, storage, network, and configuration profile detail. Run management actions directly from the detail panel:
+Look up any Mac by serial number and view full hardware, OS, security, location, storage, network, and configuration profile detail. Smart Groups, Static Groups, Local Users, Configuration Profiles, and Extension Attributes are shown in collapsible sections. Run management actions directly from the detail panel:
 - Safe: Blank Push, Renew MDM, DDM Sync, Flush Failed Commands, Flush All Commands
 - Moderate: Redeploy Framework, Enable/Disable Remote Desktop, Restart, Shutdown
 - Destructive (confirmation required): Remove MDM, Set Recovery Lock, Lock (with PIN), Erase
