@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Jamf Dash</title>
+    <link>https://github.com/DevliegereM/JamfDash</link>
+    <description>Jamf Dash releases</description>
+    <language>en</language>
+
+    <!--
+      Add a new <item> block here for each release.
+      Steps for each release:
+        1. Build and export JamfDash.dmg (Archive → Export → Developer ID)
+        2. Run: /tmp/bin/sign_update JamfDash.dmg
+           (or wherever you have the sign_update tool from the Sparkle release assets)
+        3. Copy the printed edSignature and file length into the <enclosure> below.
+        4. Upload JamfDash.dmg to the GitHub Release assets.
+        5. Update this file and commit/push to main.
+    -->
+
+    <item>
+      <title>Version 0.2</title>
+      <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.2</sparkle:releaseNotesLink>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>0.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 24 Apr 2026 00:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.2/JamfDash.pkg"
+        sparkle:edSignature="buJey8vD35XBqCv/zsF6ZYstf6p+Zt1mpZNDsYv+5EVirZ/DolXS7hjETOARpoxSqC7sAk11lPsuhnKWTWsfCA=="
+        length="4643195"
+        type="application/octet-stream"
+      />
+    </item>
+
+  </channel>
+</rss>
