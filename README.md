@@ -100,6 +100,10 @@ Browse all configuration objects in one place, with inline detail sheets:
 - **Packages** — full package inventory.
 - **Configuration Profiles** — grouped by category. Click any profile to see its scope.
 
+![Policies](Images/JamfDashPolicies.png)
+![Smart Groups](Images/JamfDashSmartGroups.png)
+![Configuration Profiles](Images/JamfDashConfigProfiles.png)
+
 **Devices**
 Three-tab Mac inventory view:
 - *All Devices* — searchable list with name, serial, OS version, and last contact time
