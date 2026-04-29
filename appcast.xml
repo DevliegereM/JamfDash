@@ -19,7 +19,7 @@
         url="https://github.com/DevliegereM/JamfDash/releases/download/v0.3/JamfDash_v0.3.pkg"
         sparkle:edSignature="DWttWgt3hBWMy+kucNacATZGoy+IxhVOaoqedjKBOS4tdxER/qoG3+J/C/UMqSf9ARgmmMpq4MSjkRPQDkFSAA=="
         length="5440312"
-        type="application/vnd.apple.installer+xml"
+        type="application/octet-stream"
       />
     </item>
     <item>
@@ -33,7 +33,7 @@
         url="https://github.com/DevliegereM/JamfDash/releases/download/v0.2/JamfDash_v0.2.pkg"
         sparkle:edSignature="WqW24DPFLQqnh8l+mrkEqJtJ/pPbtnOBCeRj4KQ1La0BX7xjt6o6bTsz6sfGtS4nKFmammHyP27+SNocmInZAg=="
         length="4643034"
-        type="application/vnd.apple.installer+xml"
+        type="application/octet-stream"
       />
     </item>
 
