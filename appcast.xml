@@ -11,18 +11,17 @@
     <item>
       <title>Version 0.3</title>
       <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.3</sparkle:releaseNotesLink>
-      <sparkle:version>2</sparkle:version>
+      <sparkle:version>20260429</sparkle:version>
       <sparkle:shortVersionString>0.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Wed, 29 Apr 2026 00:00:00 +0000</pubDate>
       <enclosure
         url="https://github.com/DevliegereM/JamfDash/releases/download/v0.3/JamfDash_v0.3.pkg"
-        sparkle:edSignature="9lA5qvJSqrscx37UrgTQXhOtgn/eXYhfwCq6GIIZMzMJYQNKCdmLfc1DzG7wlQeGsagLNNbs0bs5/nwC7GxfCg=="
-        length="5439546"
+        sparkle:edSignature="uO4xfJKtJ8U5YAIxpsDSfK1QBe856GypkPdMZstUA/SEBApn8uOyZkFWaV+OjI/O6DFJweD/9lqxNCOJfbNEAA=="
+        length="5439465"
         type="application/octet-stream"
       />
     </item>
-
     <item>
       <title>Version 0.2</title>
       <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.2</sparkle:releaseNotesLink>
