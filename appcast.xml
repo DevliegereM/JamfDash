@@ -16,9 +16,9 @@
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Wed, 29 Apr 2026 00:00:00 +0000</pubDate>
       <enclosure
-        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.3/JamfDash_v0.3.pkg"
-        sparkle:edSignature="DWttWgt3hBWMy+kucNacATZGoy+IxhVOaoqedjKBOS4tdxER/qoG3+J/C/UMqSf9ARgmmMpq4MSjkRPQDkFSAA=="
-        length="5440312"
+        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.3/JamfDash_v0.3.zip"
+        sparkle:edSignature="qWUArYS8IHwXGc/TNp09idP3EKXF8CYxOGVzZYU7kHggHh4GqepF67dMr+4wD9IroiFJEFKf0is86c9udHiCCQ=="
+        length="660"
         type="application/octet-stream"
       />
     </item>
