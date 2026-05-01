@@ -1,0 +1,167 @@
+<svg viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>JamfDash — Native macOS Dashboard</title>
+  <desc>GitHub banner for JamfDash, a native macOS dashboard for Jamf Pro, Jamf Protect, and Jamf School</desc>
+
+  <defs>
+    <pattern id="dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#1C2128"/>
+    </pattern>
+    <clipPath id="winclip">
+      <rect x="650" y="100" width="578" height="438" rx="13"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0D1117"/>
+  <rect width="1280" height="640" fill="url(#dots)"/>
+
+  <!-- Vertical divider -->
+  <line x1="614" y1="80" x2="614" y2="560" stroke="#21262D" stroke-width="1"/>
+
+  <!-- ── LEFT: Branding ── -->
+
+  <!-- App icon -->
+  <rect x="80" y="190" width="90" height="90" rx="22" fill="#112240"/>
+  <rect x="80" y="190" width="90" height="90" rx="22" fill="none" stroke="#2F81F7" stroke-width="1.5"/>
+  <!-- Dashboard grid icon -->
+  <rect x="96" y="206" width="24" height="20" rx="4" fill="#2F81F7" opacity="0.9"/>
+  <rect x="124" y="206" width="14" height="20" rx="4" fill="#2F81F7" opacity="0.45"/>
+  <rect x="142" y="206" width="14" height="20" rx="4" fill="#2F81F7" opacity="0.65"/>
+  <rect x="96" y="231" width="14" height="20" rx="4" fill="#2F81F7" opacity="0.45"/>
+  <rect x="114" y="231" width="24" height="20" rx="4" fill="#2F81F7" opacity="0.8"/>
+  <rect x="142" y="231" width="14" height="20" rx="4" fill="#2F81F7" opacity="0.55"/>
+  <!-- Mini bar chart -->
+  <rect x="97"  y="260" width="9" height="12" rx="2" fill="#F5A623" opacity="0.7"/>
+  <rect x="110" y="255" width="9" height="17" rx="2" fill="#F5A623" opacity="0.85"/>
+  <rect x="123" y="250" width="9" height="22" rx="2" fill="#F5A623"/>
+  <rect x="136" y="253" width="9" height="19" rx="2" fill="#F5A623" opacity="0.8"/>
+  <rect x="149" y="257" width="9" height="15" rx="2" fill="#F5A623" opacity="0.6"/>
+
+  <!-- App name -->
+  <text x="80" y="348" font-family="ui-rounded, system-ui, -apple-system, sans-serif" font-size="76" font-weight="700" fill="#E6EDF3" letter-spacing="-3">JamfDash</text>
+
+  <!-- Tagline -->
+  <text x="82" y="393" font-family="system-ui, -apple-system, sans-serif" font-size="21" fill="#8B949E" letter-spacing="0.2">Native macOS dashboard for your Jamf ecosystem</text>
+
+  <!-- Product pills -->
+  <rect x="82" y="422" width="112" height="34" rx="17" fill="#0D2135"/>
+  <rect x="82" y="422" width="112" height="34" rx="17" fill="none" stroke="#2F81F7" stroke-width="1"/>
+  <text x="138" y="444" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#79B8FF" text-anchor="middle">Jamf Pro</text>
+
+  <rect x="206" y="422" width="132" height="34" rx="17" fill="#0D2A15"/>
+  <rect x="206" y="422" width="132" height="34" rx="17" fill="none" stroke="#3FB950" stroke-width="1"/>
+  <text x="272" y="444" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#56D364" text-anchor="middle">Jamf Protect</text>
+
+  <rect x="350" y="422" width="128" height="34" rx="17" fill="#2A1A00"/>
+  <rect x="350" y="422" width="128" height="34" rx="17" fill="none" stroke="#D29922" stroke-width="1"/>
+  <text x="414" y="444" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#E3B341" text-anchor="middle">Jamf School</text>
+
+  <!-- GitHub badge -->
+  <text x="82" y="520" font-family="ui-monospace, 'SF Mono', monospace" font-size="13" fill="#484F58">github.com/DevliegereM/JamfDash</text>
+
+  <!-- ── RIGHT: macOS window mockup ── -->
+
+  <!-- Window -->
+  <rect x="650" y="100" width="578" height="438" rx="13" fill="#161B22" stroke="#30363D" stroke-width="1"/>
+
+  <!-- Title bar -->
+  <rect x="650" y="100" width="578" height="44" rx="13" fill="#1C2128" clip-path="url(#winclip)"/>
+  <rect x="650" y="130" width="578" height="14" fill="#1C2128"/>
+  <!-- Separator -->
+  <line x1="650" y1="144" x2="1228" y2="144" stroke="#30363D" stroke-width="0.5"/>
+
+  <!-- Traffic lights -->
+  <circle cx="680" cy="122" r="7" fill="#FF5F57"/>
+  <circle cx="703" cy="122" r="7" fill="#FEBC2E"/>
+  <circle cx="726" cy="122" r="7" fill="#28C840"/>
+  <!-- Window title -->
+  <text x="939" y="127" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" fill="#8B949E" text-anchor="middle">JamfDash</text>
+
+  <!-- Sidebar bg -->
+  <rect x="650" y="144" width="155" height="394" fill="#0D1117" clip-path="url(#winclip)"/>
+  <!-- Sidebar/main separator -->
+  <line x1="805" y1="144" x2="805" y2="538" stroke="#30363D" stroke-width="0.5"/>
+
+  <!-- Sidebar nav items -->
+  <rect x="660" y="158" width="135" height="30" rx="7" fill="#112240"/>
+  <text x="678" y="178" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#79B8FF">Fleet</text>
+
+  <text x="678" y="214" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Security</text>
+  <text x="678" y="244" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Configuration</text>
+  <text x="678" y="274" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Analytics</text>
+  <text x="678" y="304" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Reports</text>
+
+  <!-- Sidebar section label -->
+  <text x="678" y="345" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#484F58">PRODUCTS</text>
+  <text x="678" y="367" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Jamf Pro</text>
+  <text x="678" y="391" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Jamf Protect</text>
+  <text x="678" y="415" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#58636E">Jamf School</text>
+
+  <!-- ── Main content ── -->
+
+  <!-- Stat cards -->
+  <!-- Devices -->
+  <rect x="822" y="160" width="120" height="70" rx="8" fill="#1C2128" stroke="#30363D" stroke-width="0.5"/>
+  <text x="834" y="179" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#8B949E">Managed devices</text>
+  <text x="834" y="208" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#E6EDF3">1,284</text>
+
+  <!-- Compliant -->
+  <rect x="954" y="160" width="120" height="70" rx="8" fill="#1C2128" stroke="#30363D" stroke-width="0.5"/>
+  <text x="966" y="179" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#8B949E">Compliant</text>
+  <text x="966" y="208" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#3FB950">96.4%</text>
+
+  <!-- Threats -->
+  <rect x="1086" y="160" width="120" height="70" rx="8" fill="#1C2128" stroke="#30363D" stroke-width="0.5"/>
+  <text x="1098" y="179" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#8B949E">Active threats</text>
+  <text x="1098" y="208" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#FF7B72">3</text>
+
+  <!-- Fleet list card -->
+  <rect x="822" y="246" width="384" height="222" rx="8" fill="#1C2128" stroke="#30363D" stroke-width="0.5"/>
+  <text x="836" y="268" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#E6EDF3">Fleet</text>
+  <line x1="822" y1="277" x2="1206" y2="277" stroke="#30363D" stroke-width="0.5"/>
+
+  <!-- Column headers -->
+  <text x="858" y="293" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#484F58">DEVICE</text>
+  <text x="1068" y="293" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#484F58">STATUS</text>
+  <text x="1155" y="293" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#484F58">OS</text>
+  <line x1="822" y1="299" x2="1206" y2="299" stroke="#21262D" stroke-width="0.5"/>
+
+  <!-- Row 1 -->
+  <circle cx="843" cy="318" r="7" fill="#112240"/>
+  <text x="857" y="322" font-family="ui-monospace, 'SF Mono', monospace" font-size="11" fill="#E6EDF3">MacBook-Pro-01</text>
+  <text x="1068" y="322" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#3FB950">Compliant</text>
+  <text x="1155" y="322" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#8B949E">macOS 26</text>
+
+  <!-- Row 2 -->
+  <circle cx="843" cy="346" r="7" fill="#1A0D2E"/>
+  <text x="857" y="350" font-family="ui-monospace, 'SF Mono', monospace" font-size="11" fill="#E6EDF3">MacBook-Air-17</text>
+  <text x="1068" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#3FB950">Compliant</text>
+  <text x="1155" y="350" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#8B949E">macOS 26</text>
+
+  <!-- Row 3 (at risk) -->
+  <circle cx="843" cy="374" r="7" fill="#2D1010"/>
+  <text x="857" y="378" font-family="ui-monospace, 'SF Mono', monospace" font-size="11" fill="#E6EDF3">MacBook-Pro-08</text>
+  <text x="1068" y="378" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#FF7B72">At risk</text>
+  <text x="1155" y="378" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#8B949E">macOS 25</text>
+
+  <!-- Row 4 -->
+  <circle cx="843" cy="402" r="7" fill="#112240"/>
+  <text x="857" y="406" font-family="ui-monospace, 'SF Mono', monospace" font-size="11" fill="#E6EDF3">iMac-Reception</text>
+  <text x="1068" y="406" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#3FB950">Compliant</text>
+  <text x="1155" y="406" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#8B949E">macOS 26</text>
+
+  <!-- Row 5 (faded) -->
+  <circle cx="843" cy="430" r="7" fill="#21262D"/>
+  <text x="857" y="434" font-family="ui-monospace, 'SF Mono', monospace" font-size="11" fill="#58636E">Mac-Mini-Lab-3</text>
+  <text x="1068" y="434" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#E3B341">Pending</text>
+  <text x="1155" y="434" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#58636E">macOS 25</text>
+
+  <!-- Fade overlay at bottom of list -->
+  <rect x="822" y="432" width="384" height="36" rx="0" fill="#1C2128" opacity="0.0"/>
+
+  <!-- ── Bottom accent bar ── -->
+  <rect x="0"    y="628" width="427" height="5" fill="#2F81F7"/>
+  <rect x="427"  y="628" width="426" height="5" fill="#3FB950"/>
+  <rect x="853"  y="628" width="427" height="5" fill="#D29922"/>
+
+</svg>
