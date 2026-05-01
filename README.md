@@ -1,8 +1,6 @@
 # Jamf Dash
 ![Welcome screen](Images/jamfdash-banner.svg)
 
-A native macOS dashboard for Jamf Pro, Jamf Protect, and Jamf School. Browse your fleet, review security posture, inspect configuration and analytics, and export reports — all from one app.
-
 ---
 
 ## Overview
