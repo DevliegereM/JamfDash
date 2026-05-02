@@ -1,0 +1,22 @@
+[
+  {"id": "1",  "name": "CORP - Enable FileVault",            "category": {"id": "5", "name": "Security"}},
+  {"id": "2",  "name": "CORP - Enable Firewall",             "category": {"id": "5", "name": "Security"}},
+  {"id": "3",  "name": "CORP - Enable SIP Check",            "category": {"id": "5", "name": "Security"}},
+  {"id": "4",  "name": "CORP - CrowdStrike Falcon - Install","category": {"id": "5", "name": "Security"}},
+  {"id": "5",  "name": "CORP - Jamf Connect - Install",      "category": {"id": "2", "name": "Identity & Access"}},
+  {"id": "6",  "name": "CORP - Jamf Connect - Remediate",    "category": {"id": "2", "name": "Identity & Access"}},
+  {"id": "7",  "name": "CORP - Google Chrome - Install",     "category": {"id": "8", "name": "Software"}},
+  {"id": "8",  "name": "CORP - Microsoft Edge - Install",    "category": {"id": "8", "name": "Software"}},
+  {"id": "9",  "name": "CORP - Zoom - Install",              "category": {"id": "8", "name": "Software"}},
+  {"id": "10", "name": "CORP - Slack - Install",             "category": {"id": "8", "name": "Software"}},
+  {"id": "11", "name": "CORP - macOS Upgrade Notification",  "category": {"id": "3", "name": "Maintenance"}},
+  {"id": "12", "name": "CORP - Rerun Enrollment",            "category": {"id": "3", "name": "Maintenance"}},
+  {"id": "13", "name": "CORP - Flush Policy Logs",           "category": {"id": "3", "name": "Maintenance"}},
+  {"id": "14", "name": "CORP - Health Check",                "category": {"id": "3", "name": "Maintenance"}},
+  {"id": "15", "name": "CORP - SwiftDialog - Install",       "category": {"id": "1", "name": "Deployment Tools"}},
+  {"id": "16", "name": "CORP - Nudge - Install",             "category": {"id": "1", "name": "Deployment Tools"}},
+  {"id": "17", "name": "CORP - Privileges - Install",        "category": {"id": "1", "name": "Deployment Tools"}},
+  {"id": "18", "name": "CORP - Rosetta - Install",           "category": {"id": "1", "name": "Deployment Tools"}},
+  {"id": "19", "name": "CORP - DEP Enroll - Bootstrap",      "category": {"id": "9", "name": "Enrollment"}},
+  {"id": "20", "name": "CORP - DEP Enroll - PostSetup",      "category": {"id": "9", "name": "Enrollment"}}
+]

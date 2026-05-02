@@ -1,0 +1,861 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0103F19C5D4D4B64AA329967 /* ProtectViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 678ED5FE2E5037995D69217C /* ProtectViews.swift */; };
+		06C683AD96013344491F2E04 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF24109F0390A8BB5B9CE979 /* AppEnvironment.swift */; };
+		0FA4D793D45D7F898D3123FD /* CLIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BA6CE2A38E8EFC87ACFB98 /* CLIError.swift */; };
+		1219FBA89D26E321BE583D67 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 39E9925EEB6C92A799BE2117 /* Assets.xcassets */; };
+		279203C5E78BF01A17F7E531 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D1FB11144A6B476A07A65D8 /* ProfileService.swift */; };
+		2B54617025756191F91E8EC7 /* JamfCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76104D1E55DDA989F1DDA35B /* JamfCredentials.swift */; };
+		3289A1254C61CE2EDD4BC615 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B3F1138012BC76185BD3F8 /* SecurityView.swift */; };
+		32C251FCF533FCDF7994C308 /* JamfDashApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A754F0CF54F07B6340158DE /* JamfDashApp.swift */; };
+		336A786F05E90B25D851AD7D /* OverviewRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 046D5D19F5AB57BB654920B1 /* OverviewRepository.swift */; };
+		36D4C8D4FD1EA5B736CDFABC /* OverviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B675944B17718FCFD903900 /* OverviewViewModel.swift */; };
+		37C10576B8C9651B91E24597 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328D68545790292DAA1BCC82 /* OverviewView.swift */; };
+		3853583EF387B4BB5A1B5921 /* LoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B4523F06193F2C2D2237AF /* LoadState.swift */; };
+		3C350E7B8706BAC8EE598448 /* OverviewItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70B891128FC5CF093DFE5598 /* OverviewItem.swift */; };
+		3F4F9E37FC794AE4F0D53BBF /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8663AE6BAA28E59A85B3AC6F /* ReportView.swift */; };
+		3F75BA147C03A8208CBA0FEB /* BrandingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85BE1475E583C5EDFCDEC602 /* BrandingService.swift */; };
+		44625331157216107A9C749F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB50A66360EC92E3FC979988 /* RootView.swift */; };
+		466E717768232782A682380E /* CLIVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA08AC8A88F0EEE747937BE3 /* CLIVersion.swift */; };
+		489FAD765C16B0159BE622DD /* ComplianceDonutChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110A2FC9AFB355EB767C9F18 /* ComplianceDonutChart.swift */; };
+		49365CD9AAEC1367EAA8319D /* FleetViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 122D1C3DA7468A4DBB598BD0 /* FleetViewModel.swift */; };
+		4F5A83B9D2F30B80DD6B19ED /* SchoolViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F322E1766F89EE01E6DB72B /* SchoolViews.swift */; };
+		4FA23D097EAB626A304CCBEA /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = DBCECC8C1B80F4327F75D5BD /* Sparkle */; };
+		4FB7C0B4BA9EA555B61CDF3E /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8295FFF278ACDEF29D9D1501 /* OnboardingView.swift */; };
+		522CE6ED9EBE9CE2EBB35DEF /* JamfProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFDFF28776F32F3744EE9C89 /* JamfProfile.swift */; };
+		5C571D739DA5783DEF3F68D3 /* DevicesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8CCE55195910A2FC21223E6 /* DevicesViewModel.swift */; };
+		6967C12DFB92C50339A9DB66 /* DemoCLIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */; };
+		6D102B1CDD9A53C6D70F949D /* SyncBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FDD39F52A288F77CA1CE74 /* SyncBar.swift */; };
+		6F79EF1356D65A9B9272FD7B /* SecurityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F38E6B5F7091E22D22EF91 /* SecurityViewModel.swift */; };
+		737F81F063CC977CD9729B65 /* MobileDevicesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B6EDA4485610CFEF3127C1 /* MobileDevicesViewModel.swift */; };
+		7A4FF0C1C73EF91E7EFE50FD /* ComputerDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3CD911E87878616E8AE684 /* ComputerDetail.swift */; };
+		7AFFCEF71FC0F59FA14775E5 /* DeviceSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593DEFAA86551BAAE2D3142D /* DeviceSearchViewModel.swift */; };
+		7BC0BF80C61F4B552FEBF1BC /* MobileDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CC1CD48B4A26B1C959B618C /* MobileDevicesView.swift */; };
+		8128539FBE7E2B5724623A59 /* FleetRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9AE5E2170DD1BF1E7B8E67 /* FleetRepository.swift */; };
+		830E383B5481FF815698E955 /* DeviceSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11104400C1207BCA192BA6A /* DeviceSearchView.swift */; };
+		880391F8059A3DE542B9DC0F /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 447D8E2BFE4215CBD3BF5FFC /* HelpView.swift */; };
+		8A34C52484E8AE50473F1346 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA72476386D56067F74E8649 /* DevicesView.swift */; };
+		903DBCB94E6BA078C9D1F9A8 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A6DA05E6B12A19B3C9E78CB /* SidebarView.swift */; };
+		9456C39D71CCBAF8D4AD74E0 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BE7D76996F833E0E179A7B9 /* OnboardingViewModel.swift */; };
+		94CA47A611E3124987F08A0C /* SchoolViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB95840FADB6D77AD7C263CB /* SchoolViewModel.swift */; };
+		953B82338107F00CC2CC41DC /* ModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD108C8D309D947048115E1 /* ModelDecodingTests.swift */; };
+		961F31FDD08C8F05D32F3F1A /* CLIExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653221465C4D79BEC6D18D31 /* CLIExecutor.swift */; };
+		98C91AF1A672AEDB59850E78 /* SecurityReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1F7CEB1B62559F7CE13A51 /* SecurityReport.swift */; };
+		AA7F82EBDEB4280C473299CB /* FleetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09F80C6C71219252D7627548 /* FleetView.swift */; };
+		AB228A3F9AF539CD01099042 /* StatCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF753970C444E49A60F45A9 /* StatCardView.swift */; };
+		AB85A29444EA8B6C4A2ECED6 /* OSDistributionChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6776F556AFF8D6E2DAB81DEC /* OSDistributionChart.swift */; };
+		B61544C2012C7E4712FDB3C4 /* JamfProduct.swift in Sources */ = {isa = PBXBuildFile; fileRef = A57655D2D81B3538CDA41FAA /* JamfProduct.swift */; };
+		B66F9DC4EDECAEE439DDB434 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F296E3F2BC4F04419299C8C /* AppState.swift */; };
+		BDD81120563B8650AFCC4CA9 /* FleetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67645110CD028E2CE7C68EAE /* FleetModels.swift */; };
+		CCA76A4B2FA2965A00DE4D55 /* JamfDash.icon in Resources */ = {isa = PBXBuildFile; fileRef = CCA76A4A2FA2965A00DE4D55 /* JamfDash.icon */; };
+		D18EA39AE88554B905A2DC8D /* CLIManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 847A23970E6D828FFF13343C /* CLIManager.swift */; };
+		D621CF428DDC1E3FCF0300DB /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C12273E515071ACE087C7BF /* MainView.swift */; };
+		D7955D8F525F31204E80EE05 /* ProtectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD9E1C7BDF2FE95296B6228 /* ProtectViewModel.swift */; };
+		DC7E4B155F66E1FBDFF83F0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8B40B6D7FB2B01CCB191F7 /* SettingsView.swift */; };
+		E088377AA55370E9B3A92DB8 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759585A030F63F374BD6FEA9 /* AppUpdater.swift */; };
+		E23DC4DD7CBEB22C2731662F /* CLIDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF8646BC2548A6FFCC1CB88F /* CLIDownloader.swift */; };
+		E55978CC0D18BA02DA815D15 /* SecurityRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276906C92A73944DF3BA9869 /* SecurityRepository.swift */; };
+		E57CCA9CF046B3BF3FA0FAA8 /* LoadingStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92E7FF6814276E89C88BE2EB /* LoadingStateView.swift */; };
+		E8D3C86A2671FC2F5BC00A0D /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3426E233CE0E0184B813A629 /* SettingsViewModel.swift */; };
+		F31D12AF003587121C1DAB15 /* PDFExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 228A2C5DF5787E1FF50A2411 /* PDFExporter.swift */; };
+		FD4A82A2DB5E955F8B872E01 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40B9C78E574926244BB00B74 /* KeychainService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7D1C8111935199FC95BCBB64 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 25378913B90D1F81C3A7DADC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FFD699B2870E59FDFA5F1413;
+			remoteInfo = JamfDash;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		046D5D19F5AB57BB654920B1 /* OverviewRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewRepository.swift; sourceTree = "<group>"; };
+		09F80C6C71219252D7627548 /* FleetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetView.swift; sourceTree = "<group>"; };
+		0F296E3F2BC4F04419299C8C /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		110A2FC9AFB355EB767C9F18 /* ComplianceDonutChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplianceDonutChart.swift; sourceTree = "<group>"; };
+		122D1C3DA7468A4DBB598BD0 /* FleetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetViewModel.swift; sourceTree = "<group>"; };
+		228A2C5DF5787E1FF50A2411 /* PDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFExporter.swift; sourceTree = "<group>"; };
+		276906C92A73944DF3BA9869 /* SecurityRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityRepository.swift; sourceTree = "<group>"; };
+		2BD108C8D309D947048115E1 /* ModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodingTests.swift; sourceTree = "<group>"; };
+		2FD9E1C7BDF2FE95296B6228 /* ProtectViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectViewModel.swift; sourceTree = "<group>"; };
+		328D68545790292DAA1BCC82 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
+		32B4523F06193F2C2D2237AF /* LoadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadState.swift; sourceTree = "<group>"; };
+		3426E233CE0E0184B813A629 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		39E9925EEB6C92A799BE2117 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3B675944B17718FCFD903900 /* OverviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewViewModel.swift; sourceTree = "<group>"; };
+		3EF753970C444E49A60F45A9 /* StatCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatCardView.swift; sourceTree = "<group>"; };
+		3F322E1766F89EE01E6DB72B /* SchoolViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolViews.swift; sourceTree = "<group>"; };
+		40B9C78E574926244BB00B74 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		447D8E2BFE4215CBD3BF5FFC /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		4C12273E515071ACE087C7BF /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		4D3CD911E87878616E8AE684 /* ComputerDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerDetail.swift; sourceTree = "<group>"; };
+		593DEFAA86551BAAE2D3142D /* DeviceSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSearchViewModel.swift; sourceTree = "<group>"; };
+		653221465C4D79BEC6D18D31 /* CLIExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIExecutor.swift; sourceTree = "<group>"; };
+		67645110CD028E2CE7C68EAE /* FleetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetModels.swift; sourceTree = "<group>"; };
+		6776F556AFF8D6E2DAB81DEC /* OSDistributionChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSDistributionChart.swift; sourceTree = "<group>"; };
+		678ED5FE2E5037995D69217C /* ProtectViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtectViews.swift; sourceTree = "<group>"; };
+		6A6DA05E6B12A19B3C9E78CB /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		6C1F7CEB1B62559F7CE13A51 /* SecurityReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityReport.swift; sourceTree = "<group>"; };
+		70B891128FC5CF093DFE5598 /* OverviewItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewItem.swift; sourceTree = "<group>"; };
+		759585A030F63F374BD6FEA9 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
+		76104D1E55DDA989F1DDA35B /* JamfCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfCredentials.swift; sourceTree = "<group>"; };
+		7A754F0CF54F07B6340158DE /* JamfDashApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfDashApp.swift; sourceTree = "<group>"; };
+		7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCLIManager.swift; sourceTree = "<group>"; };
+		8295FFF278ACDEF29D9D1501 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		8422EACA00873AA3FC6DA4A3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		847A23970E6D828FFF13343C /* CLIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIManager.swift; sourceTree = "<group>"; };
+		85BE1475E583C5EDFCDEC602 /* BrandingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandingService.swift; sourceTree = "<group>"; };
+		8663AE6BAA28E59A85B3AC6F /* ReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportView.swift; sourceTree = "<group>"; };
+		8ADD262AAB540E4AA8DC6AC8 /* JamfDash.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JamfDash.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8BE7D76996F833E0E179A7B9 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
+		92E7FF6814276E89C88BE2EB /* LoadingStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStateView.swift; sourceTree = "<group>"; };
+		97BA6CE2A38E8EFC87ACFB98 /* CLIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIError.swift; sourceTree = "<group>"; };
+		9CC1CD48B4A26B1C959B618C /* MobileDevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileDevicesView.swift; sourceTree = "<group>"; };
+		9D1FB11144A6B476A07A65D8 /* ProfileService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileService.swift; sourceTree = "<group>"; };
+		9F9AE5E2170DD1BF1E7B8E67 /* FleetRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetRepository.swift; sourceTree = "<group>"; };
+		A3F38E6B5F7091E22D22EF91 /* SecurityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityViewModel.swift; sourceTree = "<group>"; };
+		A57655D2D81B3538CDA41FAA /* JamfProduct.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfProduct.swift; sourceTree = "<group>"; };
+		A6FDD39F52A288F77CA1CE74 /* SyncBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncBar.swift; sourceTree = "<group>"; };
+		AA08AC8A88F0EEE747937BE3 /* CLIVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIVersion.swift; sourceTree = "<group>"; };
+		AF24109F0390A8BB5B9CE979 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		AF8646BC2548A6FFCC1CB88F /* CLIDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIDownloader.swift; sourceTree = "<group>"; };
+		BA72476386D56067F74E8649 /* DevicesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesView.swift; sourceTree = "<group>"; };
+		BB8B40B6D7FB2B01CCB191F7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		BCFECCCC57248344DE3EAF4A /* JamfDashTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JamfDashTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCA76A4A2FA2965A00DE4D55 /* JamfDash.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = JamfDash.icon; sourceTree = "<group>"; };
+		D11104400C1207BCA192BA6A /* DeviceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSearchView.swift; sourceTree = "<group>"; };
+		E8B6EDA4485610CFEF3127C1 /* MobileDevicesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileDevicesViewModel.swift; sourceTree = "<group>"; };
+		E8CCE55195910A2FC21223E6 /* DevicesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesViewModel.swift; sourceTree = "<group>"; };
+		EB50A66360EC92E3FC979988 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		EB95840FADB6D77AD7C263CB /* SchoolViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchoolViewModel.swift; sourceTree = "<group>"; };
+		F6B3F1138012BC76185BD3F8 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
+		FFDFF28776F32F3744EE9C89 /* JamfProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfProfile.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B2B3427256B550E70E1A3931 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4FA23D097EAB626A304CCBEA /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		05553320472324A5B6A4BCF5 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				BB8B40B6D7FB2B01CCB191F7 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		069341E99477BB0B5F61922C /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				593DEFAA86551BAAE2D3142D /* DeviceSearchViewModel.swift */,
+				E8CCE55195910A2FC21223E6 /* DevicesViewModel.swift */,
+				122D1C3DA7468A4DBB598BD0 /* FleetViewModel.swift */,
+				32B4523F06193F2C2D2237AF /* LoadState.swift */,
+				E8B6EDA4485610CFEF3127C1 /* MobileDevicesViewModel.swift */,
+				8BE7D76996F833E0E179A7B9 /* OnboardingViewModel.swift */,
+				3B675944B17718FCFD903900 /* OverviewViewModel.swift */,
+				2FD9E1C7BDF2FE95296B6228 /* ProtectViewModel.swift */,
+				EB95840FADB6D77AD7C263CB /* SchoolViewModel.swift */,
+				A3F38E6B5F7091E22D22EF91 /* SecurityViewModel.swift */,
+				3426E233CE0E0184B813A629 /* SettingsViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		2F2BF3A6FDFD2DC1A173B613 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				759585A030F63F374BD6FEA9 /* AppUpdater.swift */,
+				85BE1475E583C5EDFCDEC602 /* BrandingService.swift */,
+				AF8646BC2548A6FFCC1CB88F /* CLIDownloader.swift */,
+				97BA6CE2A38E8EFC87ACFB98 /* CLIError.swift */,
+				653221465C4D79BEC6D18D31 /* CLIExecutor.swift */,
+				847A23970E6D828FFF13343C /* CLIManager.swift */,
+				7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */,
+				40B9C78E574926244BB00B74 /* KeychainService.swift */,
+				9D1FB11144A6B476A07A65D8 /* ProfileService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		3484E56A8E7261DE2F40EED7 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AA08AC8A88F0EEE747937BE3 /* CLIVersion.swift */,
+				4D3CD911E87878616E8AE684 /* ComputerDetail.swift */,
+				67645110CD028E2CE7C68EAE /* FleetModels.swift */,
+				76104D1E55DDA989F1DDA35B /* JamfCredentials.swift */,
+				A57655D2D81B3538CDA41FAA /* JamfProduct.swift */,
+				FFDFF28776F32F3744EE9C89 /* JamfProfile.swift */,
+				70B891128FC5CF093DFE5598 /* OverviewItem.swift */,
+				6C1F7CEB1B62559F7CE13A51 /* SecurityReport.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4F784BB8BE0F459403FFA26F /* JamfDash */ = {
+			isa = PBXGroup;
+			children = (
+				8422EACA00873AA3FC6DA4A3 /* Info.plist */,
+				7A754F0CF54F07B6340158DE /* JamfDashApp.swift */,
+				CF7FE495659A8B5CD06EB9CF /* App */,
+				F3DB48AFA69EAC8BADA1F7A2 /* Features */,
+				3484E56A8E7261DE2F40EED7 /* Models */,
+				6DA4CA775E2F48E5A64A1FCC /* Repositories */,
+				96596F0E2F4F0389754C9A5C /* Resources */,
+				2F2BF3A6FDFD2DC1A173B613 /* Services */,
+				B32BD77625B75C114CB70043 /* UI */,
+				069341E99477BB0B5F61922C /* ViewModels */,
+			);
+			path = JamfDash;
+			sourceTree = "<group>";
+		};
+		5630D58D9E350E30E2B6CDD3 /* Devices */ = {
+			isa = PBXGroup;
+			children = (
+				BA72476386D56067F74E8649 /* DevicesView.swift */,
+			);
+			path = Devices;
+			sourceTree = "<group>";
+		};
+		622D7AAC29E68E9611717409 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				228A2C5DF5787E1FF50A2411 /* PDFExporter.swift */,
+				8663AE6BAA28E59A85B3AC6F /* ReportView.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
+		6DA4CA775E2F48E5A64A1FCC /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+				9F9AE5E2170DD1BF1E7B8E67 /* FleetRepository.swift */,
+				046D5D19F5AB57BB654920B1 /* OverviewRepository.swift */,
+				276906C92A73944DF3BA9869 /* SecurityRepository.swift */,
+			);
+			path = Repositories;
+			sourceTree = "<group>";
+		};
+		775317B4FFBF2A4523AA297C /* Protect */ = {
+			isa = PBXGroup;
+			children = (
+				678ED5FE2E5037995D69217C /* ProtectViews.swift */,
+			);
+			path = Protect;
+			sourceTree = "<group>";
+		};
+		8B6AF1684D57A7B117EFD40A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8ADD262AAB540E4AA8DC6AC8 /* JamfDash.app */,
+				BCFECCCC57248344DE3EAF4A /* JamfDashTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		948D60A8B6F66326782C4817 /* Help */ = {
+			isa = PBXGroup;
+			children = (
+				447D8E2BFE4215CBD3BF5FFC /* HelpView.swift */,
+			);
+			path = Help;
+			sourceTree = "<group>";
+		};
+		95854B5A87447F7AA602A73E /* MobileDevices */ = {
+			isa = PBXGroup;
+			children = (
+				9CC1CD48B4A26B1C959B618C /* MobileDevicesView.swift */,
+			);
+			path = MobileDevices;
+			sourceTree = "<group>";
+		};
+		96596F0E2F4F0389754C9A5C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				39E9925EEB6C92A799BE2117 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		9706ADDC35B93E092D4E78F1 /* JamfDashTests */ = {
+			isa = PBXGroup;
+			children = (
+				2BD108C8D309D947048115E1 /* ModelDecodingTests.swift */,
+			);
+			path = JamfDashTests;
+			sourceTree = "<group>";
+		};
+		9BCBD9B866C5E6C043FF6C4F /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				8295FFF278ACDEF29D9D1501 /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		AB0CD62AA2DE76B7D9F7E3F9 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				110A2FC9AFB355EB767C9F18 /* ComplianceDonutChart.swift */,
+				6776F556AFF8D6E2DAB81DEC /* OSDistributionChart.swift */,
+				F6B3F1138012BC76185BD3F8 /* SecurityView.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		AEDEDC195E6B850A147CE8B9 /* Overview */ = {
+			isa = PBXGroup;
+			children = (
+				328D68545790292DAA1BCC82 /* OverviewView.swift */,
+				3EF753970C444E49A60F45A9 /* StatCardView.swift */,
+			);
+			path = Overview;
+			sourceTree = "<group>";
+		};
+		B32BD77625B75C114CB70043 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				92E7FF6814276E89C88BE2EB /* LoadingStateView.swift */,
+				A6FDD39F52A288F77CA1CE74 /* SyncBar.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		B60E5B9BB75469AEBD4C617C /* Fleet */ = {
+			isa = PBXGroup;
+			children = (
+				09F80C6C71219252D7627548 /* FleetView.swift */,
+			);
+			path = Fleet;
+			sourceTree = "<group>";
+		};
+		BEAC2074B0D23F1996E5F1ED /* School */ = {
+			isa = PBXGroup;
+			children = (
+				3F322E1766F89EE01E6DB72B /* SchoolViews.swift */,
+			);
+			path = School;
+			sourceTree = "<group>";
+		};
+		CF7FE495659A8B5CD06EB9CF /* App */ = {
+			isa = PBXGroup;
+			children = (
+				AF24109F0390A8BB5B9CE979 /* AppEnvironment.swift */,
+				0F296E3F2BC4F04419299C8C /* AppState.swift */,
+				4C12273E515071ACE087C7BF /* MainView.swift */,
+				EB50A66360EC92E3FC979988 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		ECC6438486424B86DA9FC485 /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+				6A6DA05E6B12A19B3C9E78CB /* SidebarView.swift */,
+			);
+			path = Sidebar;
+			sourceTree = "<group>";
+		};
+		F2EBD438F3024C06EFDFB359 = {
+			isa = PBXGroup;
+			children = (
+				CCA76A4A2FA2965A00DE4D55 /* JamfDash.icon */,
+				4F784BB8BE0F459403FFA26F /* JamfDash */,
+				9706ADDC35B93E092D4E78F1 /* JamfDashTests */,
+				8B6AF1684D57A7B117EFD40A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F3DB48AFA69EAC8BADA1F7A2 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				5630D58D9E350E30E2B6CDD3 /* Devices */,
+				F682F10ACE8B5AA7E49EB0F5 /* DeviceSearch */,
+				622D7AAC29E68E9611717409 /* Export */,
+				B60E5B9BB75469AEBD4C617C /* Fleet */,
+				948D60A8B6F66326782C4817 /* Help */,
+				95854B5A87447F7AA602A73E /* MobileDevices */,
+				9BCBD9B866C5E6C043FF6C4F /* Onboarding */,
+				AEDEDC195E6B850A147CE8B9 /* Overview */,
+				775317B4FFBF2A4523AA297C /* Protect */,
+				BEAC2074B0D23F1996E5F1ED /* School */,
+				AB0CD62AA2DE76B7D9F7E3F9 /* Security */,
+				05553320472324A5B6A4BCF5 /* Settings */,
+				ECC6438486424B86DA9FC485 /* Sidebar */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		F682F10ACE8B5AA7E49EB0F5 /* DeviceSearch */ = {
+			isa = PBXGroup;
+			children = (
+				D11104400C1207BCA192BA6A /* DeviceSearchView.swift */,
+			);
+			path = DeviceSearch;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		24E7ABEF355A8CE40DBEB69B /* JamfDashTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6CF5761C7A7297D11DA34E72 /* Build configuration list for PBXNativeTarget "JamfDashTests" */;
+			buildPhases = (
+				FBB4B4B420F8302E0A0A312D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				66FC8C79CFC9A3D6DE9134B6 /* PBXTargetDependency */,
+			);
+			name = JamfDashTests;
+			packageProductDependencies = (
+			);
+			productName = JamfDashTests;
+			productReference = BCFECCCC57248344DE3EAF4A /* JamfDashTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		FFD699B2870E59FDFA5F1413 /* JamfDash */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 09A61E5592338F88D1D9C1D3 /* Build configuration list for PBXNativeTarget "JamfDash" */;
+			buildPhases = (
+				7C0967F8753ED919246889AD /* Sources */,
+				EE735B113D63D7EF01F31AD4 /* Resources */,
+				B2B3427256B550E70E1A3931 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = JamfDash;
+			packageProductDependencies = (
+				DBCECC8C1B80F4327F75D5BD /* Sparkle */,
+			);
+			productName = JamfDash;
+			productReference = 8ADD262AAB540E4AA8DC6AC8 /* JamfDash.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		25378913B90D1F81C3A7DADC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					24E7ABEF355A8CE40DBEB69B = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+					FFD699B2870E59FDFA5F1413 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 290A2107AECBD44BE9136CCC /* Build configuration list for PBXProject "JamfDash" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = F2EBD438F3024C06EFDFB359;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				66530262C2A602F864A5698B /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8B6AF1684D57A7B117EFD40A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FFD699B2870E59FDFA5F1413 /* JamfDash */,
+				24E7ABEF355A8CE40DBEB69B /* JamfDashTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EE735B113D63D7EF01F31AD4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CCA76A4B2FA2965A00DE4D55 /* JamfDash.icon in Resources */,
+				1219FBA89D26E321BE583D67 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7C0967F8753ED919246889AD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06C683AD96013344491F2E04 /* AppEnvironment.swift in Sources */,
+				B66F9DC4EDECAEE439DDB434 /* AppState.swift in Sources */,
+				E088377AA55370E9B3A92DB8 /* AppUpdater.swift in Sources */,
+				3F75BA147C03A8208CBA0FEB /* BrandingService.swift in Sources */,
+				E23DC4DD7CBEB22C2731662F /* CLIDownloader.swift in Sources */,
+				0FA4D793D45D7F898D3123FD /* CLIError.swift in Sources */,
+				961F31FDD08C8F05D32F3F1A /* CLIExecutor.swift in Sources */,
+				D18EA39AE88554B905A2DC8D /* CLIManager.swift in Sources */,
+				466E717768232782A682380E /* CLIVersion.swift in Sources */,
+				489FAD765C16B0159BE622DD /* ComplianceDonutChart.swift in Sources */,
+				7A4FF0C1C73EF91E7EFE50FD /* ComputerDetail.swift in Sources */,
+				6967C12DFB92C50339A9DB66 /* DemoCLIManager.swift in Sources */,
+				830E383B5481FF815698E955 /* DeviceSearchView.swift in Sources */,
+				7AFFCEF71FC0F59FA14775E5 /* DeviceSearchViewModel.swift in Sources */,
+				8A34C52484E8AE50473F1346 /* DevicesView.swift in Sources */,
+				5C571D739DA5783DEF3F68D3 /* DevicesViewModel.swift in Sources */,
+				BDD81120563B8650AFCC4CA9 /* FleetModels.swift in Sources */,
+				8128539FBE7E2B5724623A59 /* FleetRepository.swift in Sources */,
+				AA7F82EBDEB4280C473299CB /* FleetView.swift in Sources */,
+				49365CD9AAEC1367EAA8319D /* FleetViewModel.swift in Sources */,
+				880391F8059A3DE542B9DC0F /* HelpView.swift in Sources */,
+				2B54617025756191F91E8EC7 /* JamfCredentials.swift in Sources */,
+				32C251FCF533FCDF7994C308 /* JamfDashApp.swift in Sources */,
+				B61544C2012C7E4712FDB3C4 /* JamfProduct.swift in Sources */,
+				522CE6ED9EBE9CE2EBB35DEF /* JamfProfile.swift in Sources */,
+				FD4A82A2DB5E955F8B872E01 /* KeychainService.swift in Sources */,
+				3853583EF387B4BB5A1B5921 /* LoadState.swift in Sources */,
+				E57CCA9CF046B3BF3FA0FAA8 /* LoadingStateView.swift in Sources */,
+				D621CF428DDC1E3FCF0300DB /* MainView.swift in Sources */,
+				7BC0BF80C61F4B552FEBF1BC /* MobileDevicesView.swift in Sources */,
+				737F81F063CC977CD9729B65 /* MobileDevicesViewModel.swift in Sources */,
+				AB85A29444EA8B6C4A2ECED6 /* OSDistributionChart.swift in Sources */,
+				4FB7C0B4BA9EA555B61CDF3E /* OnboardingView.swift in Sources */,
+				9456C39D71CCBAF8D4AD74E0 /* OnboardingViewModel.swift in Sources */,
+				3C350E7B8706BAC8EE598448 /* OverviewItem.swift in Sources */,
+				336A786F05E90B25D851AD7D /* OverviewRepository.swift in Sources */,
+				37C10576B8C9651B91E24597 /* OverviewView.swift in Sources */,
+				36D4C8D4FD1EA5B736CDFABC /* OverviewViewModel.swift in Sources */,
+				F31D12AF003587121C1DAB15 /* PDFExporter.swift in Sources */,
+				279203C5E78BF01A17F7E531 /* ProfileService.swift in Sources */,
+				D7955D8F525F31204E80EE05 /* ProtectViewModel.swift in Sources */,
+				0103F19C5D4D4B64AA329967 /* ProtectViews.swift in Sources */,
+				3F4F9E37FC794AE4F0D53BBF /* ReportView.swift in Sources */,
+				44625331157216107A9C749F /* RootView.swift in Sources */,
+				94CA47A611E3124987F08A0C /* SchoolViewModel.swift in Sources */,
+				4F5A83B9D2F30B80DD6B19ED /* SchoolViews.swift in Sources */,
+				98C91AF1A672AEDB59850E78 /* SecurityReport.swift in Sources */,
+				E55978CC0D18BA02DA815D15 /* SecurityRepository.swift in Sources */,
+				3289A1254C61CE2EDD4BC615 /* SecurityView.swift in Sources */,
+				6F79EF1356D65A9B9272FD7B /* SecurityViewModel.swift in Sources */,
+				DC7E4B155F66E1FBDFF83F0B /* SettingsView.swift in Sources */,
+				E8D3C86A2671FC2F5BC00A0D /* SettingsViewModel.swift in Sources */,
+				903DBCB94E6BA078C9D1F9A8 /* SidebarView.swift in Sources */,
+				AB228A3F9AF539CD01099042 /* StatCardView.swift in Sources */,
+				6D102B1CDD9A53C6D70F949D /* SyncBar.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FBB4B4B420F8302E0A0A312D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				953B82338107F00CC2CC41DC /* ModelDecodingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		66FC8C79CFC9A3D6DE9134B6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FFD699B2870E59FDFA5F1413 /* JamfDash */;
+			targetProxy = 7D1C8111935199FC95BCBB64 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4EB1D246736B8C4830616532 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = JamfDash;
+				CODE_SIGN_ENTITLEMENTS = JamfDash/JamfDash.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 4FZ2H85CA5;
+				INFOPLIST_FILE = JamfDash/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		7D187A6CBF724B88E9EB06F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = JamfDash;
+				CODE_SIGN_ENTITLEMENTS = JamfDash/JamfDash.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 4FZ2H85CA5;
+				INFOPLIST_FILE = JamfDash/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		9820D8F2B9AADF45DDEA9C6E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 20260429.10;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.3;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		9F99EDBC46C21CD64F579886 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 20260429.10;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.3;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B90D2906D4C937937814DA5B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JamfDash.app/Contents/MacOS/JamfDash";
+			};
+			name = Release;
+		};
+		FF540715E799F8A3246EA679 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JamfDash.app/Contents/MacOS/JamfDash";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		09A61E5592338F88D1D9C1D3 /* Build configuration list for PBXNativeTarget "JamfDash" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7D187A6CBF724B88E9EB06F0 /* Debug */,
+				4EB1D246736B8C4830616532 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		290A2107AECBD44BE9136CCC /* Build configuration list for PBXProject "JamfDash" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9F99EDBC46C21CD64F579886 /* Debug */,
+				9820D8F2B9AADF45DDEA9C6E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6CF5761C7A7297D11DA34E72 /* Build configuration list for PBXNativeTarget "JamfDashTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF540715E799F8A3246EA679 /* Debug */,
+				B90D2906D4C937937814DA5B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		66530262C2A602F864A5698B /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DBCECC8C1B80F4327F75D5BD /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 66530262C2A602F864A5698B /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 25378913B90D1F81C3A7DADC /* Project object */;
+}

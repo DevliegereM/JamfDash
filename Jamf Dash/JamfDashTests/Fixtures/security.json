@@ -1,0 +1,27 @@
+[
+  {
+    "section": "summary",
+    "data": {
+      "total_devices": 1247,
+      "filevault_encrypted": 1228,
+      "filevault_encrypted_pct": "98.5%",
+      "gatekeeper_enabled": 1247,
+      "gatekeeper_enabled_pct": "100.0%",
+      "sip_enabled": 1241,
+      "sip_enabled_pct": "99.5%",
+      "firewall_enabled": 1209,
+      "firewall_enabled_pct": "97.0%"
+    }
+  },
+  {"section": "os_version", "os_version": "15.4.1", "count": 412, "pct": "33.0%"},
+  {"section": "os_version", "os_version": "15.3.2", "count": 288, "pct": "23.1%"},
+  {"section": "os_version", "os_version": "15.2.0", "count": 195, "pct": "15.6%"},
+  {"section": "os_version", "os_version": "14.7.5", "count": 176, "pct": "14.1%"},
+  {"section": "os_version", "os_version": "14.6.1", "count": 98,  "pct": "7.9%"},
+  {"section": "os_version", "os_version": "13.7.4", "count": 52,  "pct": "4.2%"},
+  {"section": "os_version", "os_version": "13.6.0", "count": 26,  "pct": "2.1%"},
+  {"section": "device", "name": "Demo-MacBook-001", "serial": "C02X1AABCDEF", "os_version": "14.6.1", "filevault": "NOT_ENCRYPTED", "gatekeeper": "APP_STORE_AND_IDENTIFIED_DEVELOPERS", "sip": "ENABLED",  "firewall": false},
+  {"section": "device", "name": "Demo-MacBook-002", "serial": "C02X2AABCDEF", "os_version": "13.6.0", "filevault": "ENCRYPTED",    "gatekeeper": "DISABLED",                              "sip": "ENABLED",  "firewall": true},
+  {"section": "device", "name": "Demo-MacBook-003", "serial": "C02X3AABCDEF", "os_version": "15.2.0", "filevault": "ENCRYPTED",    "gatekeeper": "APP_STORE_AND_IDENTIFIED_DEVELOPERS", "sip": "DISABLED", "firewall": true},
+  {"section": "device", "name": "Demo-MacBook-004", "serial": "C02X4AABCDEF", "os_version": "14.7.5", "filevault": "NOT_ENCRYPTED","gatekeeper": "DISABLED",                              "sip": "DISABLED", "firewall": false}
+]
