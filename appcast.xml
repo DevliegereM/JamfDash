@@ -9,6 +9,21 @@
     <language>en</language>
 
     <item>
+      <title>Version 0.4</title>
+      <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.4</sparkle:releaseNotesLink>
+      <sparkle:version>20260517.15</sparkle:version>
+      <sparkle:shortVersionString>0.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 17 May 2026 00:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.4/JamfDash_v0.4.zip"
+        sparkle:edSignature="OuyP5b4XdGIMKbPFpmMxgnmNZ3Avj5nT3ZVsXKowoH2y5Sp1AvHhabALg/bVZY9JyXriocEYgc+LYg+WoaMhDQ=="
+        length="6614685"
+        type="application/octet-stream"
+      />
+    </item>
+
+    <item>
       <title>Version 0.3</title>
       <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.3</sparkle:releaseNotesLink>
       <sparkle:version>20260429.10</sparkle:version>
