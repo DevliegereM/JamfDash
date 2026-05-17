@@ -3,6 +3,7 @@ import SwiftUI
 struct DeviceSearchView: View {
     @Bindable var vm: DeviceSearchViewModel
     @Environment(AppEnvironment.self) private var env
+    @FocusState private var isSearchFocused: Bool
 
     private var isDestructiveAllowed: Bool {
         env.currentScope == .fullAdmin
@@ -17,6 +18,9 @@ struct DeviceSearchView: View {
                 .frame(minWidth: 480)
         }
         .navigationTitle("Device Lookup")
+        .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
+            isSearchFocused = true
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { vm.clearSearch() } label: {
@@ -37,6 +41,7 @@ struct DeviceSearchView: View {
                     .imageScale(.small)
                 TextField("Serial number or device name…", text: $vm.searchText)
                     .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
                     .onSubmit {
                         if let first = vm.localResults.first {
                             vm.selectDevice(first)
@@ -134,11 +139,37 @@ struct DeviceSearchView: View {
         case .loaded(let detail):
             DeviceDetailView(detail: detail, vm: vm, isDestructiveAllowed: isDestructiveAllowed)
 
-        case .failed:
-            if let device = vm.selectedDevice {
-                basicDeviceDetail(device)
-            } else {
-                emptyDetailPrompt
+        case .failed(let message):
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if let device = vm.selectedDevice {
+                        DeviceHeroHeader(
+                            name: device.name,
+                            serial: device.serialNumber ?? "—",
+                            model: nil,
+                            isManaged: device.managed ?? false
+                        )
+                    }
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Could not load full details").font(.callout.weight(.semibold))
+                            Text(message).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if let device = vm.selectedDevice, let serial = device.serialNumber {
+                            Button("Retry") {
+                                Task { await vm.fetchDetail(id: device.id, serial: serial) }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.25)))
+                }
+                .padding(24)
             }
         }
     }
@@ -522,6 +553,8 @@ struct DeviceDetailView: View {
                         }
                     }
                 }
+
+                DeviceHistoryPanel(detail: detail)
             }
             .padding(24)
         }
@@ -1168,5 +1201,170 @@ private struct BoolDetailRow: View {
         .padding(.horizontal, 12)
 
         Divider().padding(.horizontal, 12)
+    }
+}
+
+// MARK: - Device History Panel
+
+private struct DeviceHistoryPanel: View {
+    let detail: ComputerDetail
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            enrollmentTimeline
+            enrollmentMethodRow
+            mdmCommandHistorySection
+            userHistorySection
+        }
+    }
+
+    private var enrollmentTimeline: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("ENROLLMENT HISTORY")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 6)
+                .padding(.horizontal, 12)
+
+            VStack(alignment: .leading, spacing: 0) {
+                let entries = timelineEntries
+                ForEach(Array(entries.enumerated()), id: \.offset) { index, entry in
+                    TimelineEntryRow(
+                        label: entry.label,
+                        dateString: entry.dateString,
+                        isLast: index == entries.count - 1
+                    )
+                }
+            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.06)))
+        }
+    }
+
+    private var timelineEntries: [(label: String, dateString: String)] {
+        let formatter = ISO8601DateFormatter()
+        let dateStyle = Date.FormatStyle(date: .abbreviated, time: .omitted)
+
+        func format(_ raw: String?) -> String {
+            guard let raw, !raw.isEmpty else { return "Unknown" }
+            if let date = formatter.date(from: raw) {
+                return date.formatted(dateStyle)
+            }
+            return raw
+        }
+
+        let initial = detail.general?.initialEntryDate
+        let enrolled = detail.general?.lastEnrolledDate
+        let contact  = detail.general?.lastContactTime
+
+        var entries: [(label: String, dateString: String)] = []
+
+        entries.append((label: "First Enrolled", dateString: format(initial)))
+
+        let initialNormalized: Date?  = initial.flatMap { formatter.date(from: $0) }
+        let enrolledNormalized: Date? = enrolled.flatMap { formatter.date(from: $0) }
+
+        let datesAreDifferent: Bool = {
+            guard let i = initialNormalized, let e = enrolledNormalized else {
+                return initial != enrolled
+            }
+            return !Calendar.current.isDate(i, inSameDayAs: e)
+        }()
+
+        if datesAreDifferent {
+            entries.append((label: "Last Re-enrolled", dateString: format(enrolled)))
+        }
+
+        entries.append((label: "Last Check-in", dateString: format(contact)))
+
+        return entries
+    }
+
+    private var enrollmentMethodRow: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("ENROLLMENT METHOD")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 6)
+                .padding(.horizontal, 12)
+
+            HStack {
+                Text("Enrollment Method").foregroundStyle(.secondary)
+                Spacer()
+                Text(detail.general?.enrollmentMethod ?? "Unknown")
+                    .foregroundStyle(detail.general?.enrollmentMethod != nil ? .primary : .secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+            .font(.callout)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.primary.opacity(0.06)))
+        }
+    }
+
+    private var mdmCommandHistorySection: some View {
+        GroupBox("MDM Command History") {
+            Label("MDM command history is not available via jamf-cli.", systemImage: "info.circle")
+                .foregroundStyle(.secondary)
+                .font(.callout)
+        }
+    }
+
+    private var userHistorySection: some View {
+        GroupBox("User Assignment History") {
+            Label("User assignment history is not available via jamf-cli.", systemImage: "info.circle")
+                .foregroundStyle(.secondary)
+                .font(.callout)
+        }
+    }
+}
+
+private struct TimelineEntryRow: View {
+    let label: String
+    let dateString: String
+    let isLast: Bool
+
+    private var isKnown: Bool { dateString != "Unknown" }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                Circle()
+                    .strokeBorder(isKnown ? Color.accentColor : Color.secondary.opacity(0.4), lineWidth: 2)
+                    .background(
+                        Circle().fill(isKnown ? Color.accentColor : Color.clear)
+                    )
+                    .frame(width: 10, height: 10)
+                    .padding(.top, 5)
+
+                if !isLast {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.25))
+                        .frame(width: 1.5)
+                        .frame(maxHeight: .infinity)
+                }
+            }
+            .frame(width: 14)
+
+            HStack {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(dateString)
+                    .foregroundStyle(isKnown ? .primary : .secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+            .font(.callout)
+            .padding(.vertical, 7)
+        }
+        .padding(.horizontal, 12)
+        .fixedSize(horizontal: false, vertical: true)
+
+        if !isLast {
+            Color.clear.frame(height: 0)
+        } else {
+            Divider().opacity(0).frame(height: 0)
+        }
     }
 }

@@ -51,6 +51,8 @@ struct ReportView: View {
     @State private var overviewVM: OverviewViewModel?
     @State private var securityVM: SecurityViewModel?
     @State private var isExporting = false
+    @State private var selectedFormat: ReportOutputFormat = .json
+    @State private var rawTextContent: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -85,10 +87,24 @@ struct ReportView: View {
                         .padding(.trailing, 16)
                         .onChange(of: includeFailures) { _, _ in Task { await loadReport(.updateStatus) } }
                 }
+                if selectedReport != .pdfExport {
+                    Picker("Format", selection: $selectedFormat) {
+                        ForEach(ReportOutputFormat.allCases) { format in
+                            Text(format.rawValue.capitalized).tag(format)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .controlSize(.small)
+                    .frame(maxWidth: 180)
+                    .padding(.trailing, 20)
+                    .onChange(of: selectedFormat) { _, _ in Task { await loadReport(selectedReport) } }
+                }
                 Button { Task { await loadReport(selectedReport) } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .padding(.trailing, 16)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
             .padding(.vertical, 8)
             .background(.regularMaterial)
@@ -101,6 +117,7 @@ struct ReportView: View {
                 reportContentPanel
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Reports")
         .task {
             let ovm = env.makeReportOverviewVM()
@@ -117,6 +134,15 @@ struct ReportView: View {
 
     @ViewBuilder
     private var reportContentPanel: some View {
+        if selectedFormat == .json {
+            jsonReportPanel
+        } else {
+            rawTextPanel
+        }
+    }
+
+    @ViewBuilder
+    private var jsonReportPanel: some View {
         switch reportState {
         case .idle:
             Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -155,6 +181,57 @@ struct ReportView: View {
                     Divider()
 
                     reportTable(rows)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var rawTextPanel: some View {
+        switch reportState {
+        case .idle:
+            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .loading:
+            SyncingIndicator()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .failed(let msg):
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange)
+                Text("Report failed").font(.headline)
+                Text(msg).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 400)
+                Button("Retry") { Task { await loadReport(selectedReport) } }.buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .loaded:
+            if rawTextContent.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.circle").font(.system(size: 36)).foregroundStyle(.green)
+                    Text("No data returned for this report.").foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 0) {
+                    HStack {
+                        Label(selectedFormat.rawValue.uppercased(), systemImage: "doc.text")
+                            .font(.caption.weight(.semibold))
+                        Spacer()
+                        Button { saveRawText() } label: {
+                            Label("Save…", systemImage: "arrow.down.doc")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+
+                    Divider()
+
+                    ScrollView {
+                        Text(rawTextContent)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .textSelection(.enabled)
+                    }
                 }
             }
         }
@@ -260,10 +337,18 @@ struct ReportView: View {
             case .softwareInstalls: cmd = .reportSoftwareInstalls
             case .pdfExport:        return
             }
-            let data = try await env.cliManager.run(cmd)
-            let rows = try parseReportData(data)
-            columnKeys = rows.first.map { Array($0.keys.sorted()) } ?? []
-            reportState = .loaded(rows)
+
+            if selectedFormat == .json {
+                let data = try await env.cliManager.run(cmd)
+                let rows = try parseReportData(data)
+                columnKeys = rows.first.map { Array($0.keys.sorted()) } ?? []
+                rawTextContent = ""
+                reportState = .loaded(rows)
+            } else {
+                let data = try await env.cliManager.run(cmd, outputFormat: selectedFormat)
+                rawTextContent = String(data: data, encoding: .utf8) ?? ""
+                reportState = .loaded([])
+            }
         } catch {
             reportState = .failed(error.localizedDescription)
         }
@@ -299,6 +384,15 @@ struct ReportView: View {
         panel.allowedContentTypes = [.commaSeparatedText]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         try? csv.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private func saveRawText() {
+        guard !rawTextContent.isEmpty else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(selectedReport.rawValue.replacingOccurrences(of: " ", with: "_")).\(selectedFormat.fileExtension)"
+        panel.allowedContentTypes = [selectedFormat.contentType]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        try? rawTextContent.write(to: url, atomically: true, encoding: .utf8)
     }
 
     private func exportPDF() async {

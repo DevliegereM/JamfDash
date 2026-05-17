@@ -17,6 +17,11 @@ enum SidebarItem: String, Identifiable {
     case extensionAttributes = "pro.extensionAttributes"
     case patchManagement     = "pro.patchManagement"
     case enrollment          = "pro.enrollment"
+    case ddmMonitor = "pro.ddmMonitor"
+    case blueprints = "pro.blueprints"
+    case settingsInspector = "pro.settingsInspector"
+    case complianceBenchmarks = "pro.complianceBenchmarks"
+    case aiAssistant = "pro.aiAssistant"
 
     // Jamf Protect — existing
     case protectOverview  = "protect.overview"
@@ -62,6 +67,11 @@ enum SidebarItem: String, Identifiable {
         case .extensionAttributes: return "Extension Attributes"
         case .patchManagement:   return "Patch Management"
         case .enrollment:        return "Enrollment"
+        case .ddmMonitor:            return "DDM Monitor"
+        case .blueprints:            return "Blueprints"
+        case .complianceBenchmarks:  return "Compliance Benchmarks"
+        case .aiAssistant:           return "AI Assistant"
+        case .settingsInspector:     return "Settings Inspector"
         case .protectOverview:   return "Overview"
         case .protectEvents:     return "Alerts"
         case .protectComputers:  return "Computers"
@@ -101,6 +111,11 @@ enum SidebarItem: String, Identifiable {
         case .extensionAttributes: return "function"
         case .patchManagement:   return "bandage"
         case .enrollment:        return "person.badge.plus"
+        case .ddmMonitor:            return "arrow.triangle.2.circlepath.circle"
+        case .blueprints:            return "square.3.layers.3d"
+        case .complianceBenchmarks:  return "checkmark.shield"
+        case .aiAssistant:           return "brain.head.profile"
+        case .settingsInspector:     return "slider.horizontal.3"
         case .protectOverview:   return "chart.bar.doc.horizontal"
         case .protectEvents:     return "exclamationmark.triangle"
         case .protectComputers:  return "laptopcomputer"
@@ -131,10 +146,12 @@ enum SidebarItem: String, Identifiable {
         switch product {
         case .pro:
             return [
-                .overview, .security, .fleet, .devices, .deviceSearch,
+                .overview, .security, .fleet, .devices, .deviceSearch, .ddmMonitor,
+                .blueprints, .complianceBenchmarks,
                 .mobileDevices,
                 .orgBrowser, .extensionAttributes, .patchManagement, .enrollment,
-                .reports
+                .settingsInspector,
+                .reports, .aiAssistant
             ]
         case .protect:
             return [
@@ -157,9 +174,11 @@ struct SidebarView: View {
     @Binding var selection: SidebarItem?
     @Environment(AppEnvironment.self) private var env
     @State private var showSwitchError = false
+    @AppStorage("jamfDash.aiEnabled") private var isAIEnabled = false
 
     var body: some View {
-        List(SidebarItem.items(for: env.currentProduct), selection: $selection) { item in
+        let items = SidebarItem.items(for: env.currentProduct).filter { $0 != .aiAssistant || isAIEnabled }
+        List(items, selection: $selection) { item in
             Label(item.title, systemImage: item.icon)
                 .tag(item)
         }

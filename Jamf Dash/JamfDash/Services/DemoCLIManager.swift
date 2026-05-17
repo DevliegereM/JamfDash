@@ -14,6 +14,22 @@ struct DemoCLIManager: CLIRunning, Sendable {
         return data
     }
 
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
+        try await Task.sleep(nanoseconds: 350_000_000)
+        if outputFormat == .json {
+            let json = demoJSON(for: command)
+            guard let data = json.data(using: .utf8) else {
+                throw CLIError.decodingFailed("Failed to encode demo payload")
+            }
+            return data
+        }
+        let text = demoRawText(for: command, format: outputFormat)
+        guard let data = text.data(using: .utf8) else {
+            throw CLIError.decodingFailed("Failed to encode demo payload")
+        }
+        return data
+    }
+
     // MARK: - Route
 
     private func demoJSON(for command: CLICommand) -> String {
@@ -31,6 +47,9 @@ struct DemoCLIManager: CLIRunning, Sendable {
         case .configProfileDetail(let id): return demoConfigProfileDetailJSON(id: id)
         case .computers:             return computersJSON
         case .computerDetail:        return computerDetailJSON
+        case .ddmStatusItems(let managementId):
+            return ddmStatusItemsJSON(for: managementId)
+        case .ddmComputers:          return ddmComputersJSON
         case .smartGroupDetail:      return smartGroupDetailJSON
         case .mobileDeviceList:      return mobileDevicesJSON
         case .computerExtensionAttributes: return extensionAttributesJSON
@@ -71,9 +90,33 @@ struct DemoCLIManager: CLIRunning, Sendable {
         case .schoolUserGroups:      return schoolUserGroupsJSON
         case .schoolClasses:         return schoolClassesJSON
         case .schoolApps:            return schoolAppsJSON
-        // Device actions — return a simple success payload
+        // Reports
+        case .reportPatchStatus:     return reportPatchStatusJSON
+        case .reportPolicyStatus:    return reportPolicyStatusJSON
+        case .reportProfileStatus:   return reportProfileStatusJSON
+        case .reportAppStatus:       return reportAppStatusJSON
+        case .reportUpdateStatus:    return reportUpdateStatusJSON
+        case .reportDeviceCompliance:    return reportDeviceComplianceJSON
+        case .reportInventorySummary:    return reportInventorySummaryJSON
+        case .reportSoftwareInstalls:    return reportSoftwareInstallsJSON
+        // Device actions - return a simple success payload
         default:
             return #"{"status":"success","message":"Action simulated in demo mode"}"#
+        }
+    }
+
+    private func demoRawText(for command: CLICommand, format: ReportOutputFormat) -> String {
+        switch format {
+        case .csv:
+            return "name,status,count,updated\nPatch Status,healthy,45,2025-05-03\nPolicy Deployment,warning,3,2025-05-02"
+        case .yaml:
+            return "reports:\n- name: Patch Status\n  status: healthy\n  count: 45\n- name: Policy Deployment\n  status: warning\n  count: 3"
+        case .table:
+            return "NAME                STATUS    COUNT   UPDATED\nPatch Status        Healthy   45      2025-05-03\nPolicy Deployment   Warning   3       2025-05-02"
+        case .plain:
+            return "Patch Status: 45 devices healthy\nPolicy Deployment: 3 devices with warnings"
+        case .json:
+            return "{}"
         }
     }
 }
@@ -162,14 +205,14 @@ private let smartGroupsJSON = """
   {"id":"1","name":"All Managed Macs"},
   {"id":"2","name":"All Intel Macs"},
   {"id":"3","name":"All Apple Silicon Macs"},
-  {"id":"4","name":"macOS 15 — Current"},
-  {"id":"5","name":"macOS 14 — Supported"},
-  {"id":"6","name":"macOS 13 — Legacy"},
+  {"id":"4","name":"macOS 15 - Current"},
+  {"id":"5","name":"macOS 14 - Supported"},
+  {"id":"6","name":"macOS 13 - Legacy"},
   {"id":"7","name":"FileVault Disabled"},
   {"id":"8","name":"SIP Disabled"},
   {"id":"9","name":"Firewall Disabled"},
   {"id":"10","name":"No 1Password"},
-  {"id":"11","name":"Stale — Not Checked In 30d"},
+  {"id":"11","name":"Stale - Not Checked In 30d"},
   {"id":"12","name":"Finance Department"},
   {"id":"13","name":"Engineering Department"},
   {"id":"14","name":"Marketing Department"},
@@ -237,7 +280,7 @@ private let configProfilesJSON = """
   {"id":7,"name":"Login Window"},
   {"id":8,"name":"System Preferences Restrictions"},
   {"id":9,"name":"Password Policy"},
-  {"id":10,"name":"Certificates — Internal CA"},
+  {"id":10,"name":"Certificates - Internal CA"},
   {"id":11,"name":"Software Update Deferrals"},
   {"id":12,"name":"Privacy Preferences (PPPC)"}
 ]
@@ -359,7 +402,7 @@ private let computerDetailJSON = """
   "groupMemberships": [
     {"groupId": "1", "groupName": "All Managed Macs", "smartGroup": true},
     {"groupId": "3", "groupName": "All Apple Silicon Macs", "smartGroup": true},
-    {"groupId": "4", "groupName": "macOS 15 — Current", "smartGroup": true},
+    {"groupId": "4", "groupName": "macOS 15 - Current", "smartGroup": true},
     {"groupId": "13", "groupName": "Engineering Department", "smartGroup": true}
   ],
   "localUserAccounts": [
@@ -371,7 +414,7 @@ private let computerDetailJSON = """
     {"profileId": "1", "displayName": "Security Baseline", "state": "Installed"},
     {"profileId": "2", "displayName": "FileVault Enforcement", "state": "Installed"},
     {"profileId": "3", "displayName": "Firewall Configuration", "state": "Installed"},
-    {"profileId": "10", "displayName": "Certificates — Internal CA", "state": "Installed"}
+    {"profileId": "10", "displayName": "Certificates - Internal CA", "state": "Installed"}
   ]
 }
 """
@@ -408,7 +451,7 @@ private func demoPolicyDetailJSON(id: Int) -> String {
           "users": [], "user_groups": [], "network_segments": [], "ibeacons": []
         },
         "exclusions": {
-          "computers": [], "computer_groups": [{"id": 11, "name": "Stale — Not Checked In 30d"}],
+          "computers": [], "computer_groups": [{"id": 11, "name": "Stale - Not Checked In 30d"}],
           "departments": [], "buildings": [], "users": [], "user_groups": [], "network_segments": []
         }
       }
@@ -437,7 +480,7 @@ private func demoConfigProfileDetailJSON(id: Int) -> String {
           "users": [], "user_groups": [], "network_segments": [], "ibeacons": []
         },
         "exclusions": {
-          "computers": [], "computer_groups": [{"id": 11, "name": "Dev Machines — Exception"}],
+          "computers": [], "computer_groups": [{"id": 11, "name": "Dev Machines - Exception"}],
           "departments": [], "buildings": [], "users": [], "user_groups": [], "network_segments": []
         }
       }
@@ -561,7 +604,7 @@ private let protectExceptionSetDetailJSON = """
 {
   "uuid": "4722390a-f279-4fbe-9dad-b922e9c92289",
   "name": "Approved Security Tools",
-  "description": "Whitelisted internal security and IT tooling — reviewed quarterly by Security team."
+  "description": "Whitelisted internal security and IT tooling - reviewed quarterly by Security team."
 }
 """
 
@@ -756,7 +799,7 @@ private let schoolClassesJSON = """
   {"id":"7","name":"9C - Art & Design"},
   {"id":"8","name":"10D - Physics"},
   {"id":"9","name":"10D - Chemistry"},
-  {"id":"10","name":"Computer Lab — Open Access"}
+  {"id":"10","name":"Computer Lab - Open Access"}
 ]
 """
 
@@ -830,13 +873,13 @@ private let patchTitlesJSON = """
 private let patchPoliciesJSON = """
 [
   {"id":"1","name":"Sonoma Auto-Update","enabled":true,"target_version":"14.4.1","patch_title":{"id":1,"name":"macOS Sonoma"}},
-  {"id":"2","name":"Chrome — Latest","enabled":true,"target_version":"124.0.6367.60","patch_title":{"id":3,"name":"Google Chrome"}},
-  {"id":"3","name":"Firefox — Latest","enabled":true,"target_version":"125.0.2","patch_title":{"id":4,"name":"Mozilla Firefox"}},
+  {"id":"2","name":"Chrome - Latest","enabled":true,"target_version":"124.0.6367.60","patch_title":{"id":3,"name":"Google Chrome"}},
+  {"id":"3","name":"Firefox - Latest","enabled":true,"target_version":"125.0.2","patch_title":{"id":4,"name":"Mozilla Firefox"}},
   {"id":"4","name":"Office 365 Quarterly","enabled":true,"target_version":"16.84.0","patch_title":{"id":5,"name":"Microsoft Office 365"}},
-  {"id":"5","name":"Zoom — Latest","enabled":true,"target_version":"6.0.2","patch_title":{"id":6,"name":"Zoom"}},
-  {"id":"6","name":"Slack — Latest","enabled":false,"target_version":"4.38.125","patch_title":{"id":7,"name":"Slack"}},
-  {"id":"7","name":"Acrobat — Latest","enabled":true,"target_version":"24.002.20736","patch_title":{"id":8,"name":"Adobe Acrobat"}},
-  {"id":"8","name":"1Password — Latest","enabled":true,"target_version":"8.10.28","patch_title":{"id":9,"name":"1Password 8"}}
+  {"id":"5","name":"Zoom - Latest","enabled":true,"target_version":"6.0.2","patch_title":{"id":6,"name":"Zoom"}},
+  {"id":"6","name":"Slack - Latest","enabled":false,"target_version":"4.38.125","patch_title":{"id":7,"name":"Slack"}},
+  {"id":"7","name":"Acrobat - Latest","enabled":true,"target_version":"24.002.20736","patch_title":{"id":8,"name":"Adobe Acrobat"}},
+  {"id":"8","name":"1Password - Latest","enabled":true,"target_version":"8.10.28","patch_title":{"id":9,"name":"1Password 8"}}
 ]
 """
 
@@ -858,7 +901,7 @@ private let patchPolicyDetailJSON = """
 {
   "general": {
     "id": 2,
-    "name": "Chrome — Latest",
+    "name": "Chrome - Latest",
     "enabled": true,
     "target_version": "124.0.6367.60",
     "patch_title": {"id": 3, "name": "Google Chrome"}
@@ -871,23 +914,146 @@ private let patchPolicyDetailJSON = """
 private let depTokensJSON = """
 [
   {"id":"A1B2C3D4-E5F6-7890-ABCD-EF1234567890","orgName":"Acme Corporation","tokenExpiration":"2025-06-15T00:00:00Z"},
-  {"id":"B2C3D4E5-F6A7-8901-BCDE-F12345678901","orgName":"Acme Corp — Education","tokenExpiration":"2025-09-30T00:00:00Z"}
+  {"id":"B2C3D4E5-F6A7-8901-BCDE-F12345678901","orgName":"Acme Corp - Education","tokenExpiration":"2025-09-30T00:00:00Z"}
 ]
 """
 
 private let computerPrestagesJSON = """
 [
-  {"id":"1","displayName":"MacBook Pro — Standard","mdmRemovable":false,"enrollmentSiteId":"-1"},
-  {"id":"2","displayName":"MacBook Air — Education","mdmRemovable":false,"enrollmentSiteId":"-1"},
-  {"id":"3","displayName":"Mac mini — Lab","mdmRemovable":true,"enrollmentSiteId":"-1"},
-  {"id":"4","displayName":"iMac — Creative","mdmRemovable":false,"enrollmentSiteId":"-1"}
+  {"id":"1","displayName":"MacBook Pro - Standard","mdmRemovable":false,"enrollmentSiteId":"-1"},
+  {"id":"2","displayName":"MacBook Air - Education","mdmRemovable":false,"enrollmentSiteId":"-1"},
+  {"id":"3","displayName":"Mac mini - Lab","mdmRemovable":true,"enrollmentSiteId":"-1"},
+  {"id":"4","displayName":"iMac - Creative","mdmRemovable":false,"enrollmentSiteId":"-1"}
 ]
 """
 
 private let mobileDevicePrestagesJSON = """
 [
-  {"id":"1","displayName":"iPad — Classroom Shared","enrollmentSiteId":"-1"},
-  {"id":"2","displayName":"iPhone — Corporate Standard","enrollmentSiteId":"-1"},
-  {"id":"3","displayName":"iPad — Lab Shared","enrollmentSiteId":"-1"}
+  {"id":"1","displayName":"iPad - Classroom Shared","enrollmentSiteId":"-1"},
+  {"id":"2","displayName":"iPhone - Corporate Standard","enrollmentSiteId":"-1"},
+  {"id":"3","displayName":"iPad - Lab Shared","enrollmentSiteId":"-1"}
 ]
 """
+
+// MARK: - Reports
+
+private let reportPatchStatusJSON = """
+[
+  {"device_id":"ABC123","device_name":"MacBook Pro - Alice","patch_title":"macOS Sonoma","current_version":"14.2.0","target_version":"14.4.1","status":"Pending"},
+  {"device_id":"XYZ789","device_name":"iMac - Bob","patch_title":"macOS Sonoma","current_version":"14.4.1","target_version":"14.4.1","status":"Completed"},
+  {"device_id":"PQR345","device_name":"Mac mini - Chris","patch_title":"Google Chrome","current_version":"123.0","target_version":"124.0.6367.60","status":"Failed"},
+  {"device_id":"MNO901","device_name":"MacBook Air - Diana","patch_title":"macOS Sonoma","current_version":"14.4.1","target_version":"14.4.1","status":"Completed"},
+  {"device_id":"DEF567","device_name":"Mac Studio - Eve","patch_title":"Microsoft Office 365","current_version":"16.83","target_version":"16.84.0","status":"Pending"}
+]
+"""
+
+private let reportPolicyStatusJSON = """
+[
+  {"policy_id":"1","policy_name":"MacBook Pro Baseline","enabled":true,"assigned_count":45,"failed_count":2,"success_rate":95.6},
+  {"policy_id":"2","policy_name":"Security Posture Update","enabled":true,"assigned_count":120,"failed_count":5,"success_rate":95.8},
+  {"policy_id":"3","policy_name":"Office 365 Configuration","enabled":true,"assigned_count":89,"failed_count":1,"success_rate":98.9},
+  {"policy_id":"4","policy_name":"VPN Deployment","enabled":true,"assigned_count":150,"failed_count":12,"success_rate":92.0},
+  {"policy_id":"5","policy_name":"Nightly Maintenance","enabled":false,"assigned_count":200,"failed_count":0,"success_rate":0.0}
+]
+"""
+
+private let reportProfileStatusJSON = """
+[
+  {"profile_id":"1","profile_name":"WiFi - Corporate","assigned_count":180,"installed_count":175,"failure_count":5,"compliance":97.2},
+  {"profile_id":"2","profile_name":"VPN Settings","assigned_count":150,"installed_count":148,"failure_count":2,"compliance":98.7},
+  {"profile_id":"3","profile_name":"Certificate Authority","assigned_count":200,"installed_count":198,"failure_count":2,"compliance":99.0},
+  {"profile_id":"4","profile_name":"Email Configuration","assigned_count":120,"installed_count":115,"failure_count":5,"compliance":95.8},
+  {"profile_id":"5","profile_name":"Restrictions & Parental Controls","assigned_count":50,"installed_count":48,"failure_count":2,"compliance":96.0}
+]
+"""
+
+private let reportAppStatusJSON = """
+[
+  {"app_id":"1","app_name":"Microsoft Teams","version":"24.01.35","assigned_count":200,"installed_count":195,"latest_version":"24.02.10"},
+  {"app_id":"2","app_name":"Google Chrome","version":"124.0.6367.60","assigned_count":180,"installed_count":180,"latest_version":"124.0.6367.60"},
+  {"app_id":"3","app_name":"Zoom","version":"6.0.1","assigned_count":150,"installed_count":145,"latest_version":"6.0.2"},
+  {"app_id":"4","app_name":"Slack","version":"4.37.125","assigned_count":120,"installed_count":110,"latest_version":"4.38.125"},
+  {"app_id":"5","app_name":"Adobe Acrobat Reader","version":"24.001.20629","assigned_count":100,"installed_count":98,"latest_version":"24.002.20736"}
+]
+"""
+
+private let reportUpdateStatusJSON = """
+[
+  {"device_id":"ABC123","device_name":"MacBook Pro - Alice","os":"macOS","current_version":"14.2.0","latest_version":"14.4.1","days_behind":10,"status":"Pending"},
+  {"device_id":"XYZ789","device_name":"iMac - Bob","os":"macOS","current_version":"14.4.1","latest_version":"14.4.1","days_behind":0,"status":"Current"},
+  {"device_id":"PQR345","device_name":"Mac mini - Chris","os":"macOS","current_version":"13.6.5","latest_version":"14.4.1","days_behind":45,"status":"Failed"},
+  {"device_id":"MNO901","device_name":"MacBook Air - Diana","os":"macOS","current_version":"14.4.0","latest_version":"14.4.1","days_behind":1,"status":"Pending"},
+  {"device_id":"DEF567","device_name":"Mac Studio - Eve","os":"macOS","current_version":"14.4.1","latest_version":"14.4.1","days_behind":0,"status":"Current"}
+]
+"""
+
+private let reportDeviceComplianceJSON = """
+[
+  {"device_id":"ABC123","device_name":"MacBook Pro - Alice","device_type":"Mac","compliance_status":"Compliant","last_checkin":"2025-05-03T10:30:00Z","os_version":"14.4.1"},
+  {"device_id":"XYZ789","device_name":"iMac - Bob","device_type":"Mac","compliance_status":"Compliant","last_checkin":"2025-05-03T09:15:00Z","os_version":"14.4.1"},
+  {"device_id":"PQR345","device_name":"Mac mini - Chris","device_type":"Mac","compliance_status":"Non-Compliant","last_checkin":"2025-05-02T14:45:00Z","os_version":"13.6.5"},
+  {"device_id":"MNO901","device_name":"MacBook Air - Diana","device_type":"Mac","compliance_status":"Compliant","last_checkin":"2025-05-03T08:20:00Z","os_version":"14.4.0"},
+  {"device_id":"DEF567","device_name":"Mac Studio - Eve","device_type":"Mac","compliance_status":"Compliant","last_checkin":"2025-05-03T11:00:00Z","os_version":"14.4.1"}
+]
+"""
+
+private let reportInventorySummaryJSON = """
+[
+  {"category":"macOS Versions","macOS Sonoma":45,"macOS Ventura":28,"macOS Monterey":12,"Total":85},
+  {"category":"Device Models","MacBook Pro":38,"iMac":15,"Mac mini":18,"MacBook Air":10,"Mac Studio":4,"Total":85},
+  {"category":"Memory","8GB":10,"16GB":35,"32GB":30,"64GB":10,"Total":85},
+  {"category":"Storage","256GB":15,"512GB":40,"1TB":25,"2TB":5,"Total":85},
+  {"category":"Network Status","WiFi":"78","Ethernet":"5","Offline":"2","Total":"85"}
+]
+"""
+
+private let reportSoftwareInstallsJSON = """
+[
+  {"app_name":"Microsoft Teams","installed_count":195,"failed_count":5,"success_rate":97.5,"last_updated":"2025-05-03T10:30:00Z"},
+  {"app_name":"Google Chrome","installed_count":180,"failed_count":0,"success_rate":100.0,"last_updated":"2025-05-03T09:45:00Z"},
+  {"app_name":"Zoom","installed_count":145,"failed_count":5,"success_rate":96.7,"last_updated":"2025-05-02T14:20:00Z"},
+  {"app_name":"Slack","installed_count":110,"failed_count":10,"success_rate":91.7,"last_updated":"2025-05-02T11:15:00Z"},
+  {"app_name":"Adobe Acrobat Reader","installed_count":98,"failed_count":2,"success_rate":98.0,"last_updated":"2025-05-01T16:40:00Z"},
+  {"app_name":"1Password","installed_count":75,"failed_count":0,"success_rate":100.0,"last_updated":"2025-04-30T13:25:00Z"}
+]
+"""
+
+// Returns computers-inventory GENERAL section; only DDM-enabled devices have a managementId
+private let ddmComputersJSON = """
+{
+  "totalCount": 4,
+  "results": [
+    {"id":"1","general":{"name":"Alice's MacBook Pro","managementId":"aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb","serialNumber":"C02XA001DEMO","declarativeDeviceManagementEnabled":true}},
+    {"id":"2","general":{"name":"Bob's MacBook Air","managementId":"bbbbbbbb-2222-3333-4444-cccccccccccc","serialNumber":"C02XA002DEMO","declarativeDeviceManagementEnabled":true}},
+    {"id":"3","general":{"name":"Charlie's MacBook Pro","managementId":"cccccccc-3333-4444-5555-dddddddddddd","serialNumber":"C02XA003DEMO","declarativeDeviceManagementEnabled":true}},
+    {"id":"8","general":{"name":"Henry's Mac Studio","managementId":"dddddddd-4444-5555-6666-eeeeeeeeeeee","serialNumber":"C02XA008DEMO","declarativeDeviceManagementEnabled":true}}
+  ]
+}
+"""
+
+private let ddmAllStatusItems: [(managementId: String, key: String, value: String)] = [
+    ("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb", "device.identifier.serial-number",         "C02XA001DEMO"),
+    ("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb", "management.declarations.activations",      "{active=true, valid=valid, identifier=e537799f-aaaa-bbbb-cccc-dddddddddddd}"),
+    ("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb", "device.operating-system.version",          "15.4"),
+    ("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb", "device.operating-system.build-version",    "24E248"),
+    ("bbbbbbbb-2222-3333-4444-cccccccccccc", "device.identifier.serial-number",         "C02XA002DEMO"),
+    ("bbbbbbbb-2222-3333-4444-cccccccccccc", "management.declarations.activations",      "{active=true, valid=valid, identifier=f648800e-bbbb-cccc-dddd-eeeeeeeeeeee}"),
+    ("bbbbbbbb-2222-3333-4444-cccccccccccc", "device.operating-system.version",          "15.4"),
+    ("cccccccc-3333-4444-5555-dddddddddddd", "device.identifier.serial-number",         "C02XA003DEMO"),
+    ("cccccccc-3333-4444-5555-dddddddddddd", "management.declarations.activations",      "{active=true, valid=valid, identifier=a759911d-cccc-dddd-eeee-ffffffffffff}"),
+    ("dddddddd-4444-5555-6666-eeeeeeeeeeee", "device.identifier.serial-number",         "C02XA008DEMO"),
+    ("dddddddd-4444-5555-6666-eeeeeeeeeeee", "management.declarations.activations",      "{active=true, valid=valid, identifier=b860022c-dddd-eeee-ffff-000000000000}"),
+    ("dddddddd-4444-5555-6666-eeeeeeeeeeee", "device.operating-system.version",          "15.4"),
+]
+
+private func ddmStatusItemsJSON(for managementId: String) -> String {
+    let items = ddmAllStatusItems
+        .filter { $0.managementId == managementId }
+        .map { item in
+            """
+            {"key":"\(item.key)","value":"\(item.value)","lastUpdateTime":"2026-04-24T15:56:17.198"}
+            """
+        }
+        .joined(separator: ",\n    ")
+    return "{\n  \"statusItems\": [\n    \(items)\n  ]\n}"
+}

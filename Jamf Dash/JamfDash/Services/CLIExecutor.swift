@@ -184,10 +184,15 @@ actor CLIExecutor {
 
             do {
                 try process.run()
-                // Write to master; the slave side (process stdin) sees it as keyboard input
-                stdinData.withUnsafeBytes { buf in
+                // Write to master; the slave side (process stdin) sees it as keyboard input.
+                // Zero the buffer immediately after writing to minimise the credential's
+                // time-in-memory window (memset_s is guaranteed not to be elided by the
+                // compiler, unlike plain memset).
+                var mutableStdin = stdinData
+                mutableStdin.withUnsafeMutableBytes { buf in
                     if let ptr = buf.baseAddress, buf.count > 0 {
                         _ = Darwin.write(masterFD, ptr, buf.count)
+                        memset_s(ptr, buf.count, 0, buf.count)
                     }
                 }
             } catch {
@@ -201,6 +206,47 @@ actor CLIExecutor {
                 if process.isRunning { process.terminate() }
             }
         }
+    }
+}
+
+// MARK: - CLIExecuting Protocol
+
+/// Shared interface implemented by both the in-process executor and the XPC executor.
+/// `CLIManager` depends on this abstraction so the execution backend is swappable.
+protocol CLIExecuting: Sendable {
+    func execute(
+        binary: URL,
+        arguments: [String],
+        environment: [String: String],
+        stdinData: Data?,
+        timeout: TimeInterval
+    ) async throws -> Data
+
+    func executeInteractive(
+        binary: URL,
+        arguments: [String],
+        environment: [String: String],
+        stdinData: Data,
+        timeout: TimeInterval
+    ) async throws -> Data
+}
+
+extension CLIExecutor: CLIExecuting {}
+
+extension CLIExecuting {
+    func execute(
+        binary: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: TimeInterval
+    ) async throws -> Data {
+        try await execute(
+            binary: binary,
+            arguments: arguments,
+            environment: environment,
+            stdinData: nil,
+            timeout: timeout
+        )
     }
 }
 

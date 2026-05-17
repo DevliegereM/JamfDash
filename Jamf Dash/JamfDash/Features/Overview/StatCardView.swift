@@ -40,7 +40,7 @@ struct StatCard: View {
             }
         }
         .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .glassCard()
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .stroke(color.opacity(0.18), lineWidth: 1)

@@ -35,7 +35,7 @@ actor KeychainService {
         if updateStatus == errSecItemNotFound {
             var addQuery = query
             addQuery[kSecValueData as String] = payload
-            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
             let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
             guard addStatus == errSecSuccess else { throw KeychainError.osStatus(addStatus) }
             return

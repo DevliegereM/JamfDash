@@ -1,6 +1,8 @@
 import Foundation
+import OSLog
 
 struct FleetRepository: Sendable {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "FleetRepository")
     let cli: any CLIRunning
 
     func fetchPolicies() async throws -> [Policy] {
@@ -162,14 +164,21 @@ struct FleetRepository: Sendable {
 
     /// Decodes a JSON array from data, treating JSON `null` as an empty array.
     /// Tries flat array first, then UAPI `{"results":[...]}` wrapper.
+    /// Logs a warning when the decoded array is empty (possible schema change).
     private func decodeArray<T: Decodable>(_ data: Data) throws -> [T] {
         if isNull(data) { return [] }
         let decoder = JSONDecoder()
-        if let flat = try? decoder.decode([T].self, from: data) { return flat }
+        if let flat = try? decoder.decode([T].self, from: data) {
+            if flat.isEmpty { Self.logger.warning("Decoded empty array for \(T.self) — CLI may have returned no records") }
+            return flat
+        }
         if let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let results = raw["results"],
            let resultsData = try? JSONSerialization.data(withJSONObject: results),
-           let paged = try? decoder.decode([T].self, from: resultsData) { return paged }
+           let paged = try? decoder.decode([T].self, from: resultsData) {
+            if paged.isEmpty { Self.logger.warning("Decoded empty paged array for \(T.self) — CLI may have returned no records") }
+            return paged
+        }
         do { return try decoder.decode([T].self, from: data) }
         catch { throw CLIError.decodingFailed(error.localizedDescription) }
     }

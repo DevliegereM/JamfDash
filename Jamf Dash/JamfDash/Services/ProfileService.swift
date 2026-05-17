@@ -104,6 +104,10 @@ final class ProfileService: @unchecked Sendable {
         process.standardOutput = pipe
         process.standardError = Pipe()
         do { try process.run() } catch { return [] }
+        let timeoutDeadline = DispatchTime.now() + .seconds(10)
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: timeoutDeadline) {
+            if process.isRunning { process.terminate() }
+        }
         process.waitUntilExit()
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard process.terminationStatus == 0,

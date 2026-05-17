@@ -23,6 +23,12 @@ final class AppEnvironment {
     let protectVM: ProtectViewModel
     let schoolVM: SchoolViewModel
 
+    let ddmMonitorVM: DDMMonitorViewModel
+    let platformVM: PlatformViewModel
+    let aiAssistantVM: AIAssistantViewModel
+    let settingsInspectorVM: SettingsInspectorViewModel
+    let digestService: DigestService
+
     /// Profiles discovered from the system keychain.
     private(set) var availableProfiles: [String] = []
 
@@ -31,11 +37,14 @@ final class AppEnvironment {
     private(set) var syncStepLabels: [String] = []
     private(set) var syncCompletedSteps: Int = 0
     private(set) var isSyncing: Bool = false
+    private var currentLoadTask: Task<Void, Never>?
 
     // MARK: - Profile switching state
 
     private(set) var isSwitchingProfile = false
     private(set) var switchError: String?
+    /// Incremented each time a profile switch succeeds; lets MainView reset navigation.
+    private(set) var profileSwitchCount = 0
 
     /// The name of the currently active jamf-cli profile.
     var currentProfileName: String {
@@ -90,7 +99,12 @@ final class AppEnvironment {
         self.deviceSearchVM   = DeviceSearchViewModel(cli: cliManager, devicesVM: devicesVM)
         self.mobileDevicesVM  = MobileDevicesViewModel(cli: cliManager)
         self.protectVM        = ProtectViewModel(cli: cliManager)
-        self.schoolVM         = SchoolViewModel(cli: cliManager)
+        self.ddmMonitorVM           = DDMMonitorViewModel(cli: cliManager)
+        self.platformVM             = PlatformViewModel(cli: cliManager)
+        self.aiAssistantVM          = AIAssistantViewModel(cli: cliManager)
+        self.schoolVM               = SchoolViewModel(cli: cliManager)
+        self.settingsInspectorVM    = SettingsInspectorViewModel(cli: cliManager)
+        self.digestService          = DigestService(cli: cliManager)
 
         self.currentProduct = profileService.currentProduct
     }
@@ -135,7 +149,12 @@ final class AppEnvironment {
         self.deviceSearchVM   = DeviceSearchViewModel(cli: demoCLI, devicesVM: devicesVM)
         self.mobileDevicesVM  = MobileDevicesViewModel(cli: demoCLI)
         self.protectVM        = ProtectViewModel(cli: demoCLI)
-        self.schoolVM         = SchoolViewModel(cli: demoCLI)
+        self.schoolVM               = SchoolViewModel(cli: demoCLI)
+        self.ddmMonitorVM           = DDMMonitorViewModel(cli: demoCLI)
+        self.platformVM             = PlatformViewModel(cli: demoCLI)
+        self.aiAssistantVM          = AIAssistantViewModel(cli: demoCLI)
+        self.settingsInspectorVM    = SettingsInspectorViewModel(cli: demoCLI)
+        self.digestService          = DigestService(cli: demoCLI)
 
         self.currentProduct = .pro  // demo always starts with Jamf Pro
     }
@@ -143,6 +162,13 @@ final class AppEnvironment {
     // MARK: - Load / Refresh
 
     func loadMainData() {
+        // Cancel any in-flight load so stale results from a previous profile don't land.
+        currentLoadTask?.cancel()
+        if isSyncing {
+            isSyncing = false
+            syncCompletedSteps = 0
+        }
+
         // Sync current product from profile service on every data load.
         // In demo mode the product is driven by switchDemoProduct(), not the profile service.
         if !isDemoMode {
@@ -154,7 +180,7 @@ final class AppEnvironment {
                               "Policies", "Smart Groups", "Scripts", "Packages", "Configuration Profiles"]
             syncCompletedSteps = 0
             isSyncing = true
-            Task {
+            currentLoadTask = Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { await self.overviewVM.load(force: true) }
                     group.addTask { await self.securityVM.load(force: true) }
@@ -167,13 +193,13 @@ final class AppEnvironment {
                     group.addTask { await self.fleetVM.loadConfigProfiles(force: true) }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                self.isSyncing = false
+                if !Task.isCancelled { self.isSyncing = false }
             }
         case .protect:
             syncStepLabels = ["Overview", "Computers", "Plans", "Analytics", "Analytic Sets", "Exception Sets"]
             syncCompletedSteps = 0
             isSyncing = true
-            Task {
+            currentLoadTask = Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { await self.protectVM.loadOverview(force: true) }
                     group.addTask { await self.protectVM.loadComputers(force: true) }
@@ -183,13 +209,13 @@ final class AppEnvironment {
                     group.addTask { await self.protectVM.loadExceptionSets(force: true) }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                self.isSyncing = false
+                if !Task.isCancelled { self.isSyncing = false }
             }
         case .school:
             syncStepLabels = ["Overview", "Devices", "Device Groups", "Users", "User Groups", "Classes", "Apps"]
             syncCompletedSteps = 0
             isSyncing = true
-            Task {
+            currentLoadTask = Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { await self.schoolVM.loadOverview(force: true) }
                     group.addTask { await self.schoolVM.loadDevices(force: true) }
@@ -200,7 +226,7 @@ final class AppEnvironment {
                     group.addTask { await self.schoolVM.loadApps(force: true) }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                self.isSyncing = false
+                if !Task.isCancelled { self.isSyncing = false }
             }
         }
     }
@@ -240,6 +266,7 @@ final class AppEnvironment {
             do {
                 try await cliManager.verifyConnection()
                 loadMainData()
+                profileSwitchCount += 1
             } catch {
                 profileService.selectedProfile = previousProfile
                 currentProduct = previousProduct

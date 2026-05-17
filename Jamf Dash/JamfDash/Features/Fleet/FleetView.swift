@@ -7,6 +7,8 @@ struct FleetView: View {
     @State private var selectedSmartGroup: SmartComputerGroup? = nil
     @State private var selectedPolicy: Policy? = nil
     @State private var selectedConfigProfile: ConfigProfile? = nil
+    @State private var selectedScript: JamfScript? = nil
+    @State private var selectedPackage: JamfPackage? = nil
 
     private func consoleURL(_ path: String) -> URL? {
         guard let base = env.currentServerURL else { return nil }
@@ -90,6 +92,16 @@ struct FleetView: View {
                 .onAppear { Task { await vm.loadConfigProfileScope(id: profile.id) } }
                 .onDisappear { selectedConfigProfile = nil }
         }
+        .sheet(item: $selectedScript) { script in
+            ScriptDetailSheet(script: script, vm: vm)
+                .onAppear { Task { await vm.loadScriptDetail(id: script.id) } }
+                .onDisappear { selectedScript = nil }
+        }
+        .sheet(item: $selectedPackage) { pkg in
+            PackageDetailSheet(package: pkg, vm: vm)
+                .onAppear { Task { await vm.loadPackageDetail(id: pkg.id) } }
+                .onDisappear { selectedPackage = nil }
+        }
     }
 
     // MARK: - Policies
@@ -167,11 +179,17 @@ struct FleetView: View {
             } else {
                 CategorySection(title: "Scripts", count: vm.scripts.count) {
                     ForEach(vm.scripts) { script in
-                        FleetRow(
-                            name: script.name,
-                            detail: script.category?.name,
-                            consoleURL: consoleURL("/view/settings/computer-management/scripts/\(script.id)")
-                        )
+                        Button {
+                            selectedScript = script
+                        } label: {
+                            FleetRow(
+                                name: script.name,
+                                detail: script.category?.name,
+                                consoleURL: consoleURL("/view/settings/computer-management/scripts/\(script.id)"),
+                                hasDetail: true
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -191,7 +209,12 @@ struct FleetView: View {
             } else {
                 CategorySection(title: "Packages", count: vm.packages.count) {
                     ForEach(vm.packages) { pkg in
-                        FleetRow(name: pkg.name, detail: nil)
+                        Button {
+                            selectedPackage = pkg
+                        } label: {
+                            FleetRow(name: pkg.name, detail: nil, hasDetail: true)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -313,7 +336,7 @@ private struct FleetRow: View {
     }
 }
 
-// MARK: - Smart Group Criteria Sheet
+// MARK: - Smart Group Inspector Sheet
 
 private struct SmartGroupMemberSheet: View {
     let group: SmartComputerGroup
@@ -322,86 +345,180 @@ private struct SmartGroupMemberSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(group.name).font(.title2).bold()
-                    Text("Membership Criteria").font(.subheadline).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            .padding(20)
-
+            sheetHeader
             Divider()
-
-            switch vm.smartGroupDetailState {
-            case .loading, .idle:
-                SyncingIndicator().frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            case .failed(let msg):
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange)
-                    Text("Could not load criteria").font(.headline)
-                    Text(msg).font(.caption).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center).frame(maxWidth: 300)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity).padding()
-
-            case .loaded(let detail):
-                if detail.criteria.isEmpty {
-                    VStack(spacing: 8) {
-                        Image(systemName: "questionmark.circle").font(.system(size: 32)).foregroundStyle(.secondary)
-                        Text("No criteria defined for this group").foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(detail.criteria) { criterion in
-                                criterionRow(criterion)
-                                Divider().padding(.horizontal, 20)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                }
-            }
+            readOnlyBanner
+            Divider()
+            sheetContent
         }
-        .frame(minWidth: 500, minHeight: 320)
+        .frame(minWidth: 500, minHeight: 400)
+    }
+
+    private var sheetHeader: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(group.name)
+                    .font(.title2)
+                    .bold()
+                Text("Smart Computer Group")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Done") { dismiss() }
+                .keyboardShortcut(.cancelAction)
+        }
+        .padding(20)
+    }
+
+    private var readOnlyBanner: some View {
+        Label(
+            "Criteria are read-only — editing smart groups requires the Jamf Pro web console.",
+            systemImage: "info.circle"
+        )
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.03))
     }
 
     @ViewBuilder
-    private func criterionRow(_ c: SmartGroupCriterion) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            if c.priority > 0 {
-                Text(c.andOr.uppercased())
-                    .font(.caption.weight(.semibold))
+    private var sheetContent: some View {
+        switch vm.smartGroupDetailState {
+        case .loading, .idle:
+            SyncingIndicator().frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        case .failed(let msg):
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 36))
+                    .foregroundStyle(.orange)
+                Text("Could not load criteria").font(.headline)
+                Text(msg)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(width: 30, alignment: .trailing)
-            } else {
-                Text("IF")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, alignment: .trailing)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 300)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(c.name).fontWeight(.medium)
-                HStack(spacing: 4) {
-                    Text(c.searchType)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+
+        case .loaded(let detail):
+            if detail.criteria.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary)
+                    Text("No criteria defined for this group")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        criteriaSection(detail.criteria)
+                    }
+                    .padding(20)
+                }
+            }
+        }
+    }
+
+    private func criteriaSection(_ criteria: [SmartGroupCriterion]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Membership Criteria")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(criteria.enumerated()), id: \.element.id) { index, criterion in
+                    SmartGroupCriterionRow(criterion: criterion, isFirst: index == 0)
+                    if index < criteria.count - 1 {
+                        Divider().padding(.horizontal, 12)
+                    }
+                }
+            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.08)))
+        }
+    }
+}
+
+private struct SmartGroupCriterionRow: View {
+    let criterion: SmartGroupCriterion
+    let isFirst: Bool
+
+    private var connectorLabel: String {
+        isFirst ? "IF" : criterion.andOr.uppercased()
+    }
+
+    private var connectorColor: Color {
+        if isFirst { return .secondary }
+        return criterion.andOr.lowercased() == "or" ? .orange : .accentColor
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(connectorLabel)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(connectorColor)
+                .frame(width: 28, alignment: .center)
+                .padding(.vertical, 3)
+                .padding(.horizontal, 6)
+                .background(connectorColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
+
+            if criterion.openingParen {
+                Text("(")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(criterion.name)
+                    .font(.callout.weight(.medium))
+                HStack(spacing: 6) {
+                    Text(criterion.searchType)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
-                    Text(c.value.isEmpty ? "—" : c.value)
+                    Text(criterion.value.isEmpty ? "—" : criterion.value)
                         .font(.caption)
-                        .foregroundStyle(c.value.isEmpty ? .tertiary : .primary)
+                        .monospaced()
+                        .foregroundStyle(criterion.value.isEmpty ? .tertiary : .primary)
+                        .textSelection(.enabled)
                 }
             }
+
             Spacer()
+
+            if criterion.closingParen {
+                Text(")")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        var parts: [String] = []
+        if isFirst {
+            parts.append("If")
+        } else {
+            parts.append(criterion.andOr.capitalized)
+        }
+        if criterion.openingParen { parts.append("open parenthesis") }
+        parts.append(criterion.name)
+        parts.append(criterion.searchType)
+        if !criterion.value.isEmpty { parts.append(criterion.value) }
+        if criterion.closingParen { parts.append("close parenthesis") }
+        return parts.joined(separator: " ")
     }
 }
 
@@ -1236,6 +1353,259 @@ struct WebhooksView: View {
             }
         }
         .task { await vm.loadWebhooks() }
+    }
+}
+
+// MARK: - Script Detail Sheet
+
+private struct ScriptDetailSheet: View {
+    let script: JamfScript
+    @Bindable var vm: FleetViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(script.name).font(.title2).bold()
+                    if let cat = script.category?.name {
+                        Text(cat).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            .padding(20)
+
+            Divider()
+
+            switch vm.scriptDetailState {
+            case .loading, .idle:
+                SyncingIndicator().frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .failed(let msg):
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange)
+                    Text("Could not load script").font(.headline)
+                    Text(msg).font(.caption).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center).frame(maxWidth: 300)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+
+            case .loaded(let detail):
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Metadata grid
+                        if detail.filename != nil || detail.priority != nil ||
+                           detail.osRequirements != nil || detail.categoryName != nil {
+                            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 20, verticalSpacing: 8) {
+                                if let cat = detail.categoryName, !cat.isEmpty {
+                                    GridRow {
+                                        Text("Category").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                        Text(cat)
+                                    }
+                                }
+                                if let fn = detail.filename, !fn.isEmpty {
+                                    GridRow {
+                                        Text("Filename").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                        Text(fn).textSelection(.enabled)
+                                    }
+                                }
+                                if let p = detail.priority, !p.isEmpty {
+                                    GridRow {
+                                        Text("Priority").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                        Text(p.capitalized)
+                                    }
+                                }
+                                if let os = detail.osRequirements, !os.isEmpty {
+                                    GridRow {
+                                        Text("OS Requirements").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                        Text(os).textSelection(.enabled)
+                                    }
+                                }
+                                GridRow {
+                                    Text("ID").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                    Text(detail.id).foregroundStyle(.secondary)
+                                }
+                            }
+                            .font(.callout)
+                        }
+
+                        // Parameters
+                        let params = (detail.parameters ?? [:]).filter { !$0.value.isEmpty }.sorted(by: { $0.key < $1.key })
+                        if !params.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Parameters")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 20, verticalSpacing: 6) {
+                                    ForEach(params, id: \.key) { key, value in
+                                        GridRow {
+                                            Text(key).foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                            Text(value).textSelection(.enabled)
+                                        }
+                                    }
+                                }
+                                .font(.callout)
+                            }
+                        }
+
+                        // Info / Notes
+                        if let info = detail.info, !info.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Info").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(info).font(.callout).textSelection(.enabled)
+                            }
+                        }
+                        if let notes = detail.notes, !notes.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(notes).font(.callout).textSelection(.enabled)
+                            }
+                        }
+
+                        // Script contents
+                        if let contents = detail.scriptContents, !contents.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Script Contents")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                ScrollView(.vertical) {
+                                    Text(contents)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .textSelection(.enabled)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(12)
+                                }
+                                .frame(maxHeight: 360)
+                                .background(Color.primary.opacity(0.05),
+                                            in: RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(minWidth: 560, minHeight: 400)
+    }
+}
+
+// MARK: - Package Detail Sheet
+
+private struct PackageDetailSheet: View {
+    let package: JamfPackage
+    @Bindable var vm: FleetViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(package.name).font(.title2).bold()
+                    Text("Package · ID \(package.id)").font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            .padding(20)
+
+            Divider()
+
+            switch vm.packageDetailState {
+            case .loading, .idle:
+                SyncingIndicator().frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .failed(let msg):
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange)
+                    Text("Could not load package").font(.headline)
+                    Text(msg).font(.caption).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center).frame(maxWidth: 300)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity).padding()
+
+            case .loaded(let detail):
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 20, verticalSpacing: 8) {
+                            if let cat = detail.category, !cat.isEmpty, cat != "None" {
+                                GridRow {
+                                    Text("Category").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                    Text(cat)
+                                }
+                            }
+                            if let fn = detail.filename, !fn.isEmpty {
+                                GridRow {
+                                    Text("Filename").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                    Text(fn).textSelection(.enabled)
+                                }
+                            }
+                            if let p = detail.priority {
+                                GridRow {
+                                    Text("Priority").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                    Text("\(p)")
+                                }
+                            }
+                            if let os = detail.osRequirements, !os.isEmpty {
+                                GridRow {
+                                    Text("OS Requirements").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                    Text(os).textSelection(.enabled)
+                                }
+                            }
+                            if let proc = detail.requiredProcessor, !proc.isEmpty, proc != "None" {
+                                GridRow {
+                                    Text("Required Processor").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                    Text(proc)
+                                }
+                            }
+                            GridRow {
+                                Text("Reboot Required").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                Text(detail.rebootRequired == true ? "Yes" : "No")
+                            }
+                            GridRow {
+                                Text("Allow Uninstall").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                Text(detail.allowUninstalled == true ? "Yes" : "No")
+                            }
+                            GridRow {
+                                Text("Fill User Template").foregroundStyle(.secondary).gridColumnAlignment(.trailing)
+                                Text(detail.fillUserTemplate == true ? "Yes" : "No")
+                            }
+                        }
+                        .font(.callout)
+
+                        if let sw = detail.switchWithPackage, !sw.isEmpty, sw != "Do Not Install" {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Switch With Package").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(sw).font(.callout).textSelection(.enabled)
+                            }
+                        }
+
+                        if let info = detail.info, !info.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Info").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(info).font(.callout).textSelection(.enabled)
+                            }
+                        }
+                        if let notes = detail.notes, !notes.isEmpty {
+                            Divider()
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                Text(notes).font(.callout).textSelection(.enabled)
+                            }
+                        }
+                    }
+                    .padding(20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(minWidth: 480, minHeight: 360)
     }
 }
 

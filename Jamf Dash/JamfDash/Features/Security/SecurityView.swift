@@ -66,6 +66,7 @@ struct SecurityView: View {
                 .disabled(vm.devices.isEmpty)
             }
         }
+        .liquidGlassToolbar()
     }
 
     // MARK: - Compliance donuts

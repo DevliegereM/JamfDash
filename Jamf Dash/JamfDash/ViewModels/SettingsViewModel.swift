@@ -8,7 +8,7 @@ final class SettingsViewModel {
 
     // MARK: - Product & Setup Method
     var selectedProduct: JamfProduct = .pro
-    enum SetupMethod { case localAccount, sso }
+    enum SetupMethod { case localAccount, sso, platform }
     var setupMethod = SetupMethod.localAccount
 
     // Pro — local account fields
@@ -23,6 +23,13 @@ final class SettingsViewModel {
     var ssoProfileName  = "Jamf-CLI - SSO"
     var ssoClientID     = ""
     var ssoClientSecret = ""
+
+    // Pro — Platform API fields
+    var platformGatewayURL   = "https://us.apigw.jamf.com"
+    var platformTenantID     = ""
+    var platformClientID     = ""
+    var platformClientSecret = ""
+    var platformProfileName  = "Jamf Platform"
 
     // Protect — OAuth fields
     var protectServerURL    = ""
@@ -93,6 +100,11 @@ final class SettingsViewModel {
                 return !ssoServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                        !ssoClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                        !ssoClientSecret.isEmpty
+            case .platform:
+                return !platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                       !platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                       !platformClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                       !platformClientSecret.isEmpty
             }
         case .protect:
             return !protectServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -142,6 +154,21 @@ final class SettingsViewModel {
                         clientSecret: ssoClientSecret
                     )
                     profileService.setServerURL(trimURL, for: name)
+                case .platform:
+                    name = platformProfileName.trimmingCharacters(in: .whitespaces).isEmpty
+                               ? "Jamf Platform"
+                               : platformProfileName.trimmingCharacters(in: .whitespaces)
+                    scopeForProfile = .fullAdmin
+                    let trimURL    = platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimTenant = platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines)
+                    _ = try await cliManager.setupPlatform(
+                        gatewayURL:   trimURL,
+                        tenantID:     trimTenant,
+                        profileName:  name,
+                        clientID:     platformClientID.trimmingCharacters(in: .whitespacesAndNewlines),
+                        clientSecret: platformClientSecret
+                    )
+                    profileService.setServerURL(trimURL, for: name)
                 }
                 profileService.setProduct(.pro, for: name)
                 profileService.setScope(scopeForProfile, for: name)
@@ -180,6 +207,8 @@ final class SettingsViewModel {
             setupSuccess      = true
             availableProfiles = await keychain.jamfCLIProfiles()
             onProfilesChanged?()
+            // Best-effort: Swift String provides no guaranteed heap-zeroing, but clearing
+            // immediately after use minimizes the credential's time-in-memory window.
             clearSetupForm()
         } catch {
             setupError = error.localizedDescription
@@ -217,6 +246,7 @@ final class SettingsViewModel {
     private func clearSetupForm() {
         serverURLText = ""; username = ""; password = ""
         ssoServerURL = ""; ssoClientID = ""; ssoClientSecret = ""
+        platformTenantID = ""; platformClientID = ""; platformClientSecret = ""
         protectServerURL = ""; protectClientID = ""; protectClientSecret = ""
         schoolServerURL = ""; schoolNetworkID = ""; schoolAPIKey = ""
     }

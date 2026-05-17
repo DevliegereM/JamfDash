@@ -8,6 +8,7 @@ struct MainView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 360)
         } detail: {
             switch selection {
             // MARK: Jamf Pro
@@ -31,9 +32,19 @@ struct MainView: View {
                 ExtensionAttributesView(vm: env.fleetVM)
             case .patchManagement:
                 PatchView(vm: env.fleetVM)
+
             case .enrollment:
                 EnrollmentView(vm: env.fleetVM)
-
+            case .settingsInspector:
+                SettingsInspectorView(vm: env.settingsInspectorVM)
+            case .ddmMonitor:
+                DDMMonitorView(vm: env.ddmMonitorVM)
+            case .blueprints:
+                BlueprintsView(vm: env.platformVM)
+            case .complianceBenchmarks:
+                ComplianceBenchmarksView(vm: env.platformVM)
+            case .aiAssistant:
+                AIAssistantView(vm: env.aiAssistantVM)
             // MARK: Jamf Protect
             case .protectOverview:
                 ProtectOverviewView(vm: env.protectVM)
@@ -97,6 +108,22 @@ struct MainView: View {
         .onChange(of: env.currentProduct) { _, newProduct in
             selection = SidebarItem.items(for: newProduct).first
         }
+        .onChange(of: env.profileSwitchCount) { _, _ in
+            selection = SidebarItem.items(for: env.currentProduct).first
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .refreshCurrentView)) { _ in
+            refreshCurrentView()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openDeviceSearch)) { _ in
+            selection = .deviceSearch
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToSidebarItem)) { notification in
+            guard let index = notification.userInfo?["index"] as? Int else { return }
+            let items = SidebarItem.items(for: env.currentProduct)
+            if index < items.count {
+                selection = items[index]
+            }
+        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if appState.isDemoMode {
@@ -130,6 +157,40 @@ struct MainView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func refreshCurrentView() {
+        switch selection {
+        case .overview:
+            Task { await env.overviewVM.load(force: true) }
+        case .security:
+            Task { await env.securityVM.load(force: true) }
+        case .fleet, .orgBrowser, .extensionAttributes, .patchManagement, .enrollment:
+            Task { await env.fleetVM.loadAll(force: true) }
+        case .devices:
+            Task { await env.devicesVM.load(force: true) }
+        case .mobileDevices:
+            Task { await env.mobileDevicesVM.load(force: true) }
+        case .ddmMonitor:
+            Task { await env.ddmMonitorVM.load(force: true) }
+        case .blueprints:
+            Task { await env.platformVM.loadBlueprints(force: true) }
+        case .complianceBenchmarks:
+            Task { await env.platformVM.loadComplianceBenchmarks(force: true) }
+        case .protectOverview, .protectEvents, .protectComputers, .protectPlans,
+             .protectAlerts, .protectInsights, .protectAuditLogs, .protectRemovableStorage,
+             .protectUnifiedLogging, .protectActionConfigs, .protectTelemetry,
+             .protectPreventLists, .protectRoles, .protectUsers, .protectGroups,
+             .protectAPIClients:
+            Task { await env.protectVM.load() }
+        case .schoolOverview, .schoolDevices, .schoolDeviceGroups, .schoolUsers,
+             .schoolUserGroups, .schoolClasses, .schoolApps:
+            Task { await env.schoolVM.load() }
+        case .settingsInspector:
+            Task { await env.settingsInspectorVM.load(force: true) }
+        case .deviceSearch, .reports, .aiAssistant, nil:
+            break
         }
     }
 }

@@ -1,7 +1,11 @@
 import SwiftUI
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 struct SettingsView: View {
     @Bindable var vm: SettingsViewModel
+    @AppStorage("jamfDash.aiEnabled") private var isAIEnabled = false
 
     var body: some View {
         TabView {
@@ -16,6 +20,9 @@ struct SettingsView: View {
 
             BackupTab(vm: vm)
                 .tabItem { Label("Backup", systemImage: "arrow.counterclockwise.icloud") }
+
+            AITab(isEnabled: $isAIEnabled)
+                .tabItem { Label("AI", systemImage: "brain") }
         }
         .padding(20)
         .frame(minWidth: 620, minHeight: 520)
@@ -225,21 +232,30 @@ private struct AddConnectionSheet: View {
     private var proForm: some View {
         VStack(spacing: 16) {
             Picker("Authentication", selection: $vm.setupMethod) {
-                Text("Local Admin Account").tag(SettingsViewModel.SetupMethod.localAccount)
-                Text("SSO / No Local Accounts").tag(SettingsViewModel.SetupMethod.sso)
+                Text("Platform API").tag(SettingsViewModel.SetupMethod.platform)
+                Text("Local Admin").tag(SettingsViewModel.SetupMethod.localAccount)
+                Text("SSO").tag(SettingsViewModel.SetupMethod.sso)
             }
             .pickerStyle(.segmented)
 
-            Text(vm.setupMethod == .localAccount
-                 ? "Uses your admin credentials to automatically create a dedicated API client in Jamf Pro."
-                 : "Requires an API role and client created manually in Jamf Pro → Settings → System → API Roles and Clients.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            if vm.setupMethod == .localAccount {
+            switch vm.setupMethod {
+            case .platform:
+                Text("Routes all Pro API traffic through the Jamf Platform Gateway. Requires API client credentials from account.jamf.com.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                platformForm
+            case .localAccount:
+                Text("Uses your admin credentials to automatically create a dedicated API client in Jamf Pro.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 localAccountForm
-            } else {
+            case .sso:
+                Text("Requires an API role and client created manually in Jamf Pro → Settings → System → API Roles and Clients.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 ssoForm
             }
         }
@@ -298,6 +314,36 @@ private struct AddConnectionSheet: View {
             GridRow {
                 Text("Client Secret").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
                 SecureField("Client Secret", text: $vm.ssoClientSecret)
+                    .textFieldStyle(.roundedBorder).textContentType(.password)
+            }
+        }
+    }
+
+    private var platformForm: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+            GridRow {
+                Text("Gateway URL").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                TextField("https://us.apigw.jamf.com", text: $vm.platformGatewayURL)
+                    .textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                Text("Tenant ID").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                TextField("Tenant ID from account.jamf.com", text: $vm.platformTenantID)
+                    .textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                Text("Profile Name").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                TextField("Jamf Platform", text: $vm.platformProfileName)
+                    .textFieldStyle(.roundedBorder)
+            }
+            GridRow {
+                Text("Client ID").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                TextField("xxxxxxxx-xxxx-…", text: $vm.platformClientID)
+                    .textFieldStyle(.roundedBorder).textContentType(.username)
+            }
+            GridRow {
+                Text("Client Secret").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                SecureField("Client Secret", text: $vm.platformClientSecret)
                     .textFieldStyle(.roundedBorder).textContentType(.password)
             }
         }
@@ -667,3 +713,145 @@ private struct BrandingTab: View {
         .formStyle(.grouped)
     }
 }
+
+// MARK: - AI Assistant
+
+private struct AITab: View {
+    @Binding var isEnabled: Bool
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable AI Assistant", isOn: $isEnabled)
+            } header: {
+                Text("AI Assistant")
+            } footer: {
+                Text("Powered by Apple Intelligence — on-device, private, and requires macOS 26.")
+                    .foregroundStyle(.secondary)
+            }
+
+            if #available(macOS 26, *) {
+                AIStatusSection()
+            } else {
+                Section {
+                    HStack {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(.orange)
+                        Text("Requires macOS 26 or later")
+                    }
+                } header: {
+                    Text("System Requirements")
+                }
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    tipRow(icon: "text.bubble",
+                           title: "Ask one thing at a time",
+                           body: "Focus each message on a single task. \"Show me devices running macOS 15\" works better than a multi-part question.")
+                    Divider()
+                    tipRow(icon: "magnifyingglass",
+                           title: "Use plain language",
+                           body: "Ask in conversational questions or commands — \"Which devices haven't checked in for 30 days?\" or \"Send a blank push to C02XG2JCJG5J\".")
+                    Divider()
+                    tipRow(icon: "cpu",
+                           title: "Hardware lookups need a serial",
+                           body: "For CPU, RAM, disk, or installed apps on a specific Mac, include the serial number. For fleet-wide breakdowns, just ask — Dashie uses the inventory summary.")
+                    Divider()
+                    tipRow(icon: "arrow.counterclockwise",
+                           title: "Start a new chat when things slow down",
+                           body: "The on-device model has a 4 096-token context window (~12 000 characters). Long conversations fill it up — tap \"New Chat\" to reset and keep responses fast.")
+                    Divider()
+                    tipRow(icon: "lock.shield",
+                           title: "Everything stays on your Mac",
+                           body: "Dashie uses Apple Intelligence, which runs entirely on-device. No data is sent to external servers.")
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Prompting Tips")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func tipRow(icon: String, title: String, body: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .frame(width: 20)
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.callout).fontWeight(.medium)
+                Text(body).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - AI Status Section (macOS 26+)
+
+#if canImport(FoundationModels)
+@available(macOS 26, *)
+private struct AIStatusSection: View {
+    private let model = SystemLanguageModel.default
+
+    var body: some View {
+        Section {
+            switch model.availability {
+            case .available:
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    Text("Apple Intelligence is ready")
+                }
+            case .unavailable(let reason):
+                unavailableRow(for: reason)
+            @unknown default:
+                HStack(spacing: 8) {
+                    Image(systemName: "questionmark.circle.fill").foregroundStyle(.secondary)
+                    Text("Apple Intelligence status unknown")
+                }
+            }
+        } header: {
+            Text("Apple Intelligence Status")
+        }
+    }
+
+    @ViewBuilder
+    private func unavailableRow(for reason: SystemLanguageModel.Availability.UnavailableReason) -> some View {
+        switch reason {
+        case .deviceNotEligible:
+            HStack(spacing: 8) {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Device not eligible for Apple Intelligence")
+                    Text("Apple Intelligence requires a Mac with Apple silicon and macOS 26.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        case .appleIntelligenceNotEnabled:
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Apple Intelligence is not enabled")
+                    Text("Go to System Settings → Apple Intelligence & Siri to turn it on.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        case .modelNotReady:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Model is downloading…")
+                    Text("Apple Intelligence will be available once the download completes.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        @unknown default:
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                Text("Apple Intelligence is currently unavailable")
+            }
+        }
+    }
+}
+#endif

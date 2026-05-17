@@ -8,18 +8,20 @@ final class OnboardingViewModel {
     enum Step {
         case welcome
         case cliSetup
-        case productPicker  // choose Pro / Protect / School
-        case authMethod     // Pro only: Local Account vs SSO
-        case proSetup       // Pro local account
-        case ssoSetup       // Pro SSO/OAuth
-        case protectSetup   // Protect OAuth
-        case schoolSetup    // School API key
+        case productPicker     // choose Pro / Protect / School
+        case authMethod        // Pro only: Local Account vs SSO vs Platform API
+        case proSetup          // Pro local account
+        case ssoSetup          // Pro SSO/OAuth
+        case platformSetup     // Pro Platform Gateway
+        case protectSetup      // Protect OAuth
+        case schoolSetup       // School API key
         case complete
     }
 
     enum AuthMethod {
         case localAccount
         case sso
+        case platform
     }
 
     enum APIScope: Int, CaseIterable, Identifiable {
@@ -58,6 +60,13 @@ final class OnboardingViewModel {
     var ssoProfileName  = "Jamf-CLI - SSO"
     var ssoClientID     = ""
     var ssoClientSecret = ""
+
+    // Pro — Platform API fields
+    var platformGatewayURL   = "https://us.apigw.jamf.com"
+    var platformTenantID     = ""
+    var platformClientID     = ""
+    var platformClientSecret = ""
+    var platformProfileName  = "Jamf Platform"
 
     // Protect — OAuth fields
     var protectServerURL    = ""
@@ -100,7 +109,11 @@ final class OnboardingViewModel {
     }
 
     func chooseAuthMethod(_ method: AuthMethod) {
-        step = method == .localAccount ? .proSetup : .ssoSetup
+        switch method {
+        case .localAccount: step = .proSetup
+        case .sso:          step = .ssoSetup
+        case .platform:     step = .platformSetup
+        }
     }
 
     // MARK: - CLI Download
@@ -175,6 +188,42 @@ final class OnboardingViewModel {
                 profileName:  name,
                 clientID:     ssoClientID.trimmingCharacters(in: .whitespacesAndNewlines),
                 clientSecret: ssoClientSecret
+            )
+            profileService.setProduct(.pro, for: name)
+            profileService.setScope(.fullAdmin, for: name)
+            profileService.setServerURL(trimmedURL, for: name)
+            try await verifyAndCleanup(profileName: name, product: .pro)
+            step = .complete
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isRunningSetup = false
+    }
+
+    // MARK: - Platform API Setup
+
+    var canRunPlatformSetup: Bool {
+        !platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !platformClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !platformClientSecret.isEmpty
+    }
+
+    func runPlatformSetup() async {
+        isRunningSetup = true
+        error          = nil
+        do {
+            let name = platformProfileName.trimmingCharacters(in: .whitespaces).isEmpty
+                           ? "Jamf Platform"
+                           : platformProfileName.trimmingCharacters(in: .whitespaces)
+            let trimmedURL    = platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedTenant = platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines)
+            _ = try await cliManager.setupPlatform(
+                gatewayURL:   trimmedURL,
+                tenantID:     trimmedTenant,
+                profileName:  name,
+                clientID:     platformClientID.trimmingCharacters(in: .whitespacesAndNewlines),
+                clientSecret: platformClientSecret
             )
             profileService.setProduct(.pro, for: name)
             profileService.setScope(.fullAdmin, for: name)

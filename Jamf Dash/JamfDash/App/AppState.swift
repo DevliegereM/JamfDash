@@ -44,6 +44,7 @@ final class AppState {
         if phase == .main {
             env.loadMainData()
             await env.loadProfiles()
+            Task { await env.digestService.runIfNeeded() }
             Task.detached(priority: .background) { [weak self] in
                 guard let self else { return }
                 _ = try? await self.checkForCLIUpdate()

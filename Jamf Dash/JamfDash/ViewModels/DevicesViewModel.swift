@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 
 // MARK: - Bulk action types
@@ -24,6 +25,7 @@ struct BulkActionSummary: Identifiable, Sendable {
 @MainActor
 @Observable
 final class DevicesViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "DevicesViewModel")
     private(set) var state: LoadState<[Computer]> = .idle
     var bulkActionSummary: BulkActionSummary? = nil
     private(set) var isBulkRunning: Bool = false
@@ -43,17 +45,21 @@ final class DevicesViewModel {
     func load(force: Bool = false) async {
         guard force || state.value == nil else { return }
         guard force || !state.isLoading else { return }
+        Self.logger.debug("Loading computers")
         state = .loading
         do {
             let data = try await cli.run(.computers)
             if isNull(data) {
+                Self.logger.debug("Loaded 0 computers (null response)")
                 state = .loaded([])
                 return
             }
             let computers = try Self.decodeComputers(from: data)
+            Self.logger.debug("Loaded \(computers.count) computers")
             state = .loaded(computers)
         } catch {
-            state = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load computers: \(error)")
+            state = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 
 // MARK: - School data models
@@ -72,6 +73,7 @@ struct SchoolNamedItem: Codable, Sendable, Hashable, Identifiable {
 @MainActor
 @Observable
 final class SchoolViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "SchoolViewModel")
     private let cli: CLIRunning
 
     private(set) var overviewState:      LoadState<[OverviewItem]>      = .idle
@@ -105,91 +107,112 @@ final class SchoolViewModel {
     func loadOverview(force: Bool = false) async {
         guard force || overviewState.value == nil else { return }
         guard force || !overviewState.isLoading else { return }
+        Self.logger.debug("Loading school overview")
         overviewState = .loading
         do {
             let data  = try await cli.run(.schoolOverview)
             let items = try JSONDecoder().decode([OverviewItem].self, from: data)
+            Self.logger.debug("Loaded \(items.count) school overview items")
             overviewState = .loaded(items)
         } catch {
-            overviewState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school overview: \(error)")
+            overviewState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadDevices(force: Bool = false) async {
         guard force || devicesState.value == nil else { return }
         guard force || !devicesState.isLoading else { return }
+        Self.logger.debug("Loading school devices")
         devicesState = .loading
         do {
             let data  = try await cli.run(.schoolDevices)
             let items = try decodeList(SchoolDevice.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school devices")
             devicesState = .loaded(items)
         } catch {
-            devicesState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school devices: \(error)")
+            devicesState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadDeviceGroups(force: Bool = false) async {
         guard force || deviceGroupsState.value == nil else { return }
         guard force || !deviceGroupsState.isLoading else { return }
+        Self.logger.debug("Loading school device groups")
         deviceGroupsState = .loading
         do {
             let data  = try await cli.run(.schoolDeviceGroups)
             let items = try decodeList(SchoolNamedItem.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school device groups")
             deviceGroupsState = .loaded(items)
         } catch {
-            deviceGroupsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school device groups: \(error)")
+            deviceGroupsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadUsers(force: Bool = false) async {
         guard force || usersState.value == nil else { return }
         guard force || !usersState.isLoading else { return }
+        Self.logger.debug("Loading school users")
         usersState = .loading
         do {
             let data  = try await cli.run(.schoolUsers)
             let items = try decodeList(SchoolUser.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school users")
             usersState = .loaded(items)
         } catch {
-            usersState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school users: \(error)")
+            usersState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadUserGroups(force: Bool = false) async {
         guard force || userGroupsState.value == nil else { return }
         guard force || !userGroupsState.isLoading else { return }
+        Self.logger.debug("Loading school user groups")
         userGroupsState = .loading
         do {
             let data  = try await cli.run(.schoolUserGroups)
             let items = try decodeList(SchoolNamedItem.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school user groups")
             userGroupsState = .loaded(items)
         } catch {
-            userGroupsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school user groups: \(error)")
+            userGroupsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadClasses(force: Bool = false) async {
         guard force || classesState.value == nil else { return }
         guard force || !classesState.isLoading else { return }
+        Self.logger.debug("Loading school classes")
         classesState = .loading
         do {
             let data  = try await cli.run(.schoolClasses)
             let items = try decodeList(SchoolNamedItem.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school classes")
             classesState = .loaded(items)
         } catch {
-            classesState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school classes: \(error)")
+            classesState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadApps(force: Bool = false) async {
         guard force || appsState.value == nil else { return }
         guard force || !appsState.isLoading else { return }
+        Self.logger.debug("Loading school apps")
         appsState = .loading
         do {
             let data  = try await cli.run(.schoolApps)
             let items = try decodeList(SchoolNamedItem.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school apps")
             appsState = .loaded(items)
         } catch {
-            appsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load school apps: \(error)")
+            appsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

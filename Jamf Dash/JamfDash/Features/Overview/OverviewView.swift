@@ -32,6 +32,7 @@ struct OverviewView: View {
                 .disabled(vm.state.isLoading)
             }
         }
+        .liquidGlassToolbar()
     }
 
     // MARK: - Header hero cards
@@ -43,8 +44,10 @@ struct OverviewView: View {
         let devices = vm.value(for: "Managed Devices") ?? "—"
         let version = vm.value(for: "Jamf Pro Version") ?? "—"
         let alerts = vm.value(for: "Active Alerts") ?? "None"
-        // jamf-cli returns "ok" for a healthy instance
-        let isHealthy = health == "ok" || health == "online"
+        // Treat the instance as online unless it explicitly reports an offline/error state.
+        // Numeric values (e.g. "1") indicate a notification count, not an outage.
+        let knownOffline: Set<String> = ["offline", "error", "down", "unreachable", "failed"]
+        let isHealthy = health != "—" && !knownOffline.contains(health.lowercased())
 
         VStack(alignment: .leading, spacing: 12) {
             HStack {

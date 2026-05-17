@@ -86,7 +86,7 @@ final class ModelDecodingTests: XCTestCase {
         let data = try XCTUnwrap(Fixtures.policies.data(using: .utf8))
         let policies = try JSONDecoder().decode([Policy].self, from: data)
         XCTAssertFalse(policies.isEmpty)
-        XCTAssertTrue(policies.allSatisfy { !$0.id.isEmpty && !$0.name.isEmpty })
+        XCTAssertTrue(policies.allSatisfy { $0.id > 0 && !$0.name.isEmpty })
     }
 
     func testPolicyCategoryDecoding() throws {
@@ -155,10 +155,10 @@ private enum Fixtures {
 
     static let policies = """
     [
-      {"id": "1",  "name": "CORP - Enable FileVault",   "category": {"id": "5", "name": "Security"}},
-      {"id": "2",  "name": "CORP - Enable Firewall",    "category": {"id": "5", "name": "Security"}},
-      {"id": "7",  "name": "CORP - Google Chrome",      "category": {"id": "8", "name": "Software"}},
-      {"id": "15", "name": "CORP - SwiftDialog Install","category": {"id": "1", "name": "Deployment Tools"}}
+      {"id": 1,  "name": "CORP - Enable FileVault",   "category": {"id": 5, "name": "Security"}},
+      {"id": 2,  "name": "CORP - Enable Firewall",    "category": {"id": 5, "name": "Security"}},
+      {"id": 7,  "name": "CORP - Google Chrome",      "category": {"id": 8, "name": "Software"}},
+      {"id": 15, "name": "CORP - SwiftDialog Install","category": {"id": 1, "name": "Deployment Tools"}}
     ]
     """
 }

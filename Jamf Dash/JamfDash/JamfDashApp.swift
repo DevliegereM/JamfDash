@@ -38,6 +38,36 @@ struct JamfDashApp: App {
                 .keyboardShortcut("?", modifiers: .command)
             }
 
+            CommandGroup(after: .appVisibility) {
+                Button("Refresh") {
+                    NotificationCenter.default.post(name: .refreshCurrentView, object: nil)
+                }
+                .keyboardShortcut("r", modifiers: .command)
+
+                Button("Device Search") {
+                    NotificationCenter.default.post(name: .openDeviceSearch, object: nil)
+                }
+                .keyboardShortcut("k", modifiers: .command)
+
+                Button("Focus Search") {
+                    NotificationCenter.default.post(name: .focusSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
+            }
+
+            CommandMenu("Navigate") {
+                ForEach(1...9, id: \.self) { index in
+                    Button("Item \(index)") {
+                        NotificationCenter.default.post(
+                            name: .navigateToSidebarItem,
+                            object: nil,
+                            userInfo: ["index": index - 1]
+                        )
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character(String(index))), modifiers: .command)
+                }
+            }
+
             CommandGroup(after: .appInfo) {
                 Button("Check for App Updates…") {
                     AppUpdater.shared.checkForUpdates()

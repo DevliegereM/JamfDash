@@ -1,17 +1,21 @@
 import Foundation
+import OSLog
 import Observation
 
 @MainActor
 @Observable
 final class FleetViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "FleetViewModel")
     private(set) var policiesState:       LoadState<[Policy]> = .idle
     private(set) var groupsState:         LoadState<[SmartComputerGroup]> = .idle
     private(set) var scriptsState:        LoadState<[JamfScript]> = .idle
     private(set) var packagesState:       LoadState<[JamfPackage]> = .idle
     private(set) var configProfilesState: LoadState<[ConfigProfile]> = .idle
-    private(set) var smartGroupDetailState:    LoadState<SmartGroupDetail> = .idle
-    private(set) var policyDetailState:        LoadState<JamfScope>        = .idle
-    private(set) var configProfileDetailState: LoadState<JamfScope>        = .idle
+    private(set) var smartGroupDetailState:    LoadState<SmartGroupDetail>  = .idle
+    private(set) var policyDetailState:        LoadState<JamfScope>         = .idle
+    private(set) var configProfileDetailState: LoadState<JamfScope>         = .idle
+    private(set) var scriptDetailState:        LoadState<JamfScriptDetail>  = .idle
+    private(set) var packageDetailState:       LoadState<JamfPackageDetail> = .idle
 
     // MARK: New Pro resources
     private(set) var buildingsState:              LoadState<[Building]>              = .idle
@@ -51,70 +55,135 @@ final class FleetViewModel {
     func loadPolicies(force: Bool = false) async {
         guard force || policiesState.value == nil else { return }
         guard force || !policiesState.isLoading else { return }
+        Self.logger.debug("Loading policies")
         policiesState = .loading
         do {
             let policies = try await repository.fetchPolicies()
+            Self.logger.debug("Loaded \(policies.count) policies")
             policiesState = .loaded(policies)
             let uncategorized = policies.filter { $0.category == nil }
             if !uncategorized.isEmpty {
                 Task { policyCategoryMap = await repository.fetchPolicyCategoryMap(for: uncategorized) }
             }
         }
-        catch { policiesState = .failed(error.localizedDescription) }
+        catch {
+            Self.logger.error("Failed to load policies: \(error)")
+            policiesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadGroups(force: Bool = false) async {
         guard force || groupsState.value == nil else { return }
         guard force || !groupsState.isLoading else { return }
+        Self.logger.debug("Loading smart groups")
         groupsState = .loading
-        do { groupsState = .loaded(try await repository.fetchSmartGroups()) }
-        catch { groupsState = .failed(error.localizedDescription) }
+        do {
+            let groups = try await repository.fetchSmartGroups()
+            Self.logger.debug("Loaded \(groups.count) smart groups")
+            groupsState = .loaded(groups)
+        }
+        catch {
+            Self.logger.error("Failed to load smart groups: \(error)")
+            groupsState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadScripts(force: Bool = false) async {
         guard force || scriptsState.value == nil else { return }
         guard force || !scriptsState.isLoading else { return }
+        Self.logger.debug("Loading scripts")
         scriptsState = .loading
-        do { scriptsState = .loaded(try await repository.fetchScripts()) }
-        catch { scriptsState = .failed(error.localizedDescription) }
+        do {
+            let scripts = try await repository.fetchScripts()
+            Self.logger.debug("Loaded \(scripts.count) scripts")
+            scriptsState = .loaded(scripts)
+        }
+        catch {
+            Self.logger.error("Failed to load scripts: \(error)")
+            scriptsState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadPackages(force: Bool = false) async {
         guard force || packagesState.value == nil else { return }
         guard force || !packagesState.isLoading else { return }
+        Self.logger.debug("Loading packages")
         packagesState = .loading
-        do { packagesState = .loaded(try await repository.fetchPackages()) }
-        catch { packagesState = .failed(error.localizedDescription) }
+        do {
+            let packages = try await repository.fetchPackages()
+            Self.logger.debug("Loaded \(packages.count) packages")
+            packagesState = .loaded(packages)
+        }
+        catch {
+            Self.logger.error("Failed to load packages: \(error)")
+            packagesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadConfigProfiles(force: Bool = false) async {
         guard force || configProfilesState.value == nil else { return }
         guard force || !configProfilesState.isLoading else { return }
+        Self.logger.debug("Loading config profiles")
         configProfilesState = .loading
         do {
             let profiles = try await repository.fetchConfigProfiles()
+            Self.logger.debug("Loaded \(profiles.count) config profiles")
             configProfilesState = .loaded(profiles)
             Task { configProfileCategoryMap = await repository.fetchConfigProfileCategoryMap(for: profiles) }
         }
-        catch { configProfilesState = .failed(error.localizedDescription) }
+        catch {
+            Self.logger.error("Failed to load config profiles: \(error)")
+            configProfilesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadSmartGroupDetail(id: String) async {
         smartGroupDetailState = .loading
         do { smartGroupDetailState = .loaded(try await repository.fetchSmartGroupDetail(id: id)) }
-        catch { smartGroupDetailState = .failed(error.localizedDescription) }
+        catch {
+            Self.logger.error("Failed to load smart group detail (\(id)): \(error)")
+            smartGroupDetailState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadPolicyScope(id: Int) async {
         policyDetailState = .loading
         do { policyDetailState = .loaded(try await repository.fetchPolicyScope(id: id)) }
-        catch { policyDetailState = .failed(error.localizedDescription) }
+        catch {
+            Self.logger.error("Failed to load policy scope (\(id)): \(error)")
+            policyDetailState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadConfigProfileScope(id: Int) async {
         configProfileDetailState = .loading
         do { configProfileDetailState = .loaded(try await repository.fetchConfigProfileScope(id: id)) }
-        catch { configProfileDetailState = .failed(error.localizedDescription) }
+        catch {
+            Self.logger.error("Failed to load config profile scope (\(id)): \(error)")
+            configProfileDetailState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadScriptDetail(id: String) async {
+        scriptDetailState = .loading
+        do {
+            let data = try await repository.cli.run(.scriptDetail(id: id))
+            scriptDetailState = .loaded(try JSONDecoder().decode(JamfScriptDetail.self, from: data))
+        } catch {
+            Self.logger.error("Failed to load script detail (\(id)): \(error)")
+            scriptDetailState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadPackageDetail(id: Int) async {
+        packageDetailState = .loading
+        do {
+            let data = try await repository.cli.run(.packageDetail(id: id))
+            packageDetailState = .loaded(try JSONDecoder().decode(JamfPackageDetail.self, from: data))
+        } catch {
+            Self.logger.error("Failed to load package detail (\(id)): \(error)")
+            packageDetailState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     // MARK: - New Pro resource loaders
@@ -124,7 +193,7 @@ final class FleetViewModel {
         guard force || !buildingsState.isLoading else { return }
         buildingsState = .loading
         do { buildingsState = .loaded(try await repository.fetchList(Building.self, command: .buildings)) }
-        catch { buildingsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load buildings: \(error)"); buildingsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadDepartments(force: Bool = false) async {
@@ -132,7 +201,7 @@ final class FleetViewModel {
         guard force || !departmentsState.isLoading else { return }
         departmentsState = .loading
         do { departmentsState = .loaded(try await repository.fetchList(Department.self, command: .departments)) }
-        catch { departmentsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load departments: \(error)"); departmentsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadNetworkSegments(force: Bool = false) async {
@@ -140,7 +209,7 @@ final class FleetViewModel {
         guard force || !networkSegmentsState.isLoading else { return }
         networkSegmentsState = .loading
         do { networkSegmentsState = .loaded(try await repository.fetchList(NetworkSegment.self, command: .networkSegments)) }
-        catch { networkSegmentsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load network segments: \(error)"); networkSegmentsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadExtensionAttributes(force: Bool = false) async {
@@ -148,7 +217,7 @@ final class FleetViewModel {
         guard force || !extensionAttributesState.isLoading else { return }
         extensionAttributesState = .loading
         do { extensionAttributesState = .loaded(try await repository.fetchList(ExtensionAttribute.self, command: .computerExtensionAttributes)) }
-        catch { extensionAttributesState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load extension attributes: \(error)"); extensionAttributesState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadPatchTitles(force: Bool = false) async {
@@ -156,7 +225,7 @@ final class FleetViewModel {
         guard force || !patchTitlesState.isLoading else { return }
         patchTitlesState = .loading
         do { patchTitlesState = .loaded(try await repository.fetchList(PatchTitle.self, command: .patchTitles)) }
-        catch { patchTitlesState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load patch titles: \(error)"); patchTitlesState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadPatchPolicies(force: Bool = false) async {
@@ -164,7 +233,7 @@ final class FleetViewModel {
         guard force || !patchPoliciesState.isLoading else { return }
         patchPoliciesState = .loading
         do { patchPoliciesState = .loaded(try await repository.fetchList(PatchPolicy.self, command: .patchPolicies)) }
-        catch { patchPoliciesState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load patch policies: \(error)"); patchPoliciesState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadPatchTitleDetail(id: String) async {
@@ -174,7 +243,8 @@ final class FleetViewModel {
             let detail = try JSONDecoder().decode(PatchTitleDetail.self, from: data)
             patchTitleDetailState = .loaded(detail)
         } catch {
-            patchTitleDetailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load patch title detail (\(id)): \(error)")
+            patchTitleDetailState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
@@ -185,7 +255,8 @@ final class FleetViewModel {
             let detail = try JSONDecoder().decode(PatchPolicyDetail.self, from: data)
             patchPolicyDetailState = .loaded(detail)
         } catch {
-            patchPolicyDetailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load patch policy detail (\(id)): \(error)")
+            patchPolicyDetailState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
@@ -194,7 +265,7 @@ final class FleetViewModel {
         guard force || !depTokensState.isLoading else { return }
         depTokensState = .loading
         do { depTokensState = .loaded(try await repository.fetchList(DEPToken.self, command: .depTokens)) }
-        catch { depTokensState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load DEP tokens: \(error)"); depTokensState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadComputerPrestages(force: Bool = false) async {
@@ -202,7 +273,7 @@ final class FleetViewModel {
         guard force || !computerPrestagesState.isLoading else { return }
         computerPrestagesState = .loading
         do { computerPrestagesState = .loaded(try await repository.fetchList(ComputerPrestage.self, command: .computerPrestages)) }
-        catch { computerPrestagesState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load computer prestages: \(error)"); computerPrestagesState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadMobileDevicePrestages(force: Bool = false) async {
@@ -210,7 +281,7 @@ final class FleetViewModel {
         guard force || !mobileDevicePrestagesState.isLoading else { return }
         mobileDevicePrestagesState = .loading
         do { mobileDevicePrestagesState = .loaded(try await repository.fetchList(MobileDevicePrestage.self, command: .mobileDevicePrestages)) }
-        catch { mobileDevicePrestagesState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load mobile device prestages: \(error)"); mobileDevicePrestagesState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadWebhooks(force: Bool = false) async {
@@ -218,7 +289,7 @@ final class FleetViewModel {
         guard force || !webhooksState.isLoading else { return }
         webhooksState = .loading
         do { webhooksState = .loaded(try await repository.fetchList(JamfWebhook.self, command: .webhooks)) }
-        catch { webhooksState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load webhooks: \(error)"); webhooksState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     @discardableResult

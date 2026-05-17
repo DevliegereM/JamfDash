@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 
 // MARK: - Mobile Device Models
@@ -78,6 +79,7 @@ struct MobileDevice: Decodable, Sendable, Hashable, Identifiable {
 @MainActor
 @Observable
 final class MobileDevicesViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "MobileDevicesViewModel")
     private(set) var state: LoadState<[MobileDevice]> = .idle
     var searchText = ""
     var staleThresholdDays: Int = {
@@ -99,13 +101,16 @@ final class MobileDevicesViewModel {
     func load(force: Bool = false) async {
         guard force || state.value == nil else { return }
         guard force || !state.isLoading else { return }
+        Self.logger.debug("Loading mobile devices")
         state = .loading
         do {
             let data = try await cli.run(.mobileDeviceList)
             let devices = try Self.decodeDevices(from: data)
+            Self.logger.debug("Loaded \(devices.count) mobile devices")
             state = .loaded(devices)
         } catch {
-            state = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load mobile devices: \(error)")
+            state = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

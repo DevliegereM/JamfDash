@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 
 // MARK: - Action result
@@ -11,6 +12,7 @@ enum DeviceActionResult: Equatable {
 @MainActor
 @Observable
 final class DeviceSearchViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "DeviceSearchViewModel")
 
     var searchText = ""
     var selectedDevice: Computer? = nil
@@ -44,35 +46,81 @@ final class DeviceSearchViewModel {
 
     func selectDevice(_ device: Computer) {
         selectedDevice = device
-        guard let serial = device.serialNumber, !serial.isEmpty else {
-            // No serial — can't fetch rich detail, build a best-effort detail from what we have
+        // Prefer ID-based lookup (always works); fall back to serial filter
+        Task { await fetchDetail(id: device.id, serial: device.serialNumber) }
+    }
+
+    /// Primary entry point: use numeric ID when available, otherwise fall back to serial filter.
+    func fetchDetail(id: String? = nil, serial: String? = nil) async {
+        guard id != nil || serial != nil else {
             detailState = .idle
             return
         }
-        Task { await fetchDetail(serial: serial) }
+        detailState = .loading
+
+        // Try by ID first (more reliable; works even if hardware section is empty)
+        if let deviceId = id, !deviceId.isEmpty {
+            if await tryFetchById(deviceId) { return }
+        }
+        // Fall back to RSQL serial filter
+        if let s = serial, !s.isEmpty {
+            await tryFetchBySerial(s)
+        } else {
+            detailState = .failed("Could not retrieve device details.")
+        }
     }
 
+    /// Direct serial search (used when user types a serial and presses Return).
     func fetchDetail(serial: String) async {
-        detailState = .loading
+        await fetchDetail(id: nil, serial: serial)
+    }
+
+    private func tryFetchById(_ id: String) async -> Bool {
+        do {
+            let data = try await cli.run(.computerDetailById(id: id))
+            return decode(data: data, paged: false)
+        } catch {
+            return false
+        }
+    }
+
+    private func tryFetchBySerial(_ serial: String) async {
         do {
             let data = try await cli.run(.computerDetail(serial: serial))
-            // jamf-cli may return `null` for not-found
-            let trimmed = (String(data: data, encoding: .utf8) ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed == "null" || trimmed.isEmpty {
+            if !decode(data: data, paged: true) {
                 detailState = .failed("Device not found — verify the serial number and profile permissions.")
-                return
             }
-            let detail = try JSONDecoder().decode(ComputerDetail.self, from: data)
-            detailState = .loaded(detail)
         } catch {
-            detailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to fetch device detail by serial (\(serial)): \(error)")
+            detailState = .failed(ErrorMessageFormatter.message(for: error))
         }
+    }
+
+    /// Decodes `data` into a `ComputerDetail`. Returns `true` on success.
+    @discardableResult
+    private func decode(data: Data, paged: Bool) -> Bool {
+        let trimmed = (String(data: data, encoding: .utf8) ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != "null" else { return false }
+
+        let decoder = JSONDecoder()
+        // Paged: {"totalCount": N, "results": [...]}
+        struct PagedResponse: Decodable { let results: [ComputerDetail] }
+        if paged, let paged = try? decoder.decode(PagedResponse.self, from: data) {
+            guard let detail = paged.results.first else { return false }
+            detailState = .loaded(detail)
+            return true
+        }
+        // Single object
+        if let detail = try? decoder.decode(ComputerDetail.self, from: data) {
+            detailState = .loaded(detail)
+            return true
+        }
+        return false
     }
 
     // MARK: - Device actions
 
-    /// Execute any device action command. The `name` is shown in the UI while running.
     func runAction(_ command: CLICommand, name: String) async {
         guard !isRunningAction else { return }
         isRunningAction = true
@@ -105,4 +153,3 @@ final class DeviceSearchViewModel {
         clearSelection()
     }
 }
-

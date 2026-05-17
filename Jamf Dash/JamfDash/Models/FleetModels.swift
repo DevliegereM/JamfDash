@@ -70,9 +70,105 @@ struct JamfScript: Codable, Sendable, Hashable, Identifiable {
     let category: PolicyCategory?
 }
 
+struct JamfScriptDetail: Decodable, Sendable, Identifiable {
+    let id: String
+    let name: String
+    let categoryId: String?
+    let categoryName: String?
+    let filename: String?
+    let info: String?
+    let notes: String?
+    let osRequirements: String?
+    let priority: String?
+    let scriptContents: String?
+    let parameters: [String: String]?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, categoryId, categoryName, filename, info, notes
+        case osRequirements, priority, scriptContents, parameters
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id              = (try? c.decode(String.self, forKey: .id)) ?? ""
+        name            = (try? c.decode(String.self, forKey: .name)) ?? ""
+        categoryId      = try? c.decode(String.self, forKey: .categoryId)
+        categoryName    = try? c.decode(String.self, forKey: .categoryName)
+        filename        = try? c.decode(String.self, forKey: .filename)
+        info            = try? c.decode(String.self, forKey: .info)
+        notes           = try? c.decode(String.self, forKey: .notes)
+        osRequirements  = try? c.decode(String.self, forKey: .osRequirements)
+        priority        = try? c.decode(String.self, forKey: .priority)
+        scriptContents  = try? c.decode(String.self, forKey: .scriptContents)
+        parameters      = try? c.decode([String: String].self, forKey: .parameters)
+    }
+}
+
 struct JamfPackage: Codable, Sendable, Hashable, Identifiable {
     let id: Int
     let name: String
+}
+
+struct JamfPackageDetail: Decodable, Sendable, Identifiable {
+    let id: Int
+    let name: String
+    let category: String?
+    let filename: String?
+    let info: String?
+    let notes: String?
+    let priority: Int?
+    let rebootRequired: Bool?
+    let osRequirements: String?
+    let fillUserTemplate: Bool?
+    let allowUninstalled: Bool?
+    let sendNotification: Bool?
+    let switchWithPackage: String?
+    let reinstallOption: String?
+    let requiredProcessor: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, category, filename, info, notes, priority
+        case rebootRequired = "reboot_required"
+        case osRequirements = "os_requirements"
+        case fillUserTemplate = "fill_user_template"
+        case allowUninstalled = "allow_uninstalled"
+        case sendNotification = "send_notification"
+        case switchWithPackage = "switch_with_package"
+        case reinstallOption = "reinstall_option"
+        case requiredProcessor = "required_processor"
+    }
+
+    private struct Wrapper: Decodable {
+        let package: JamfPackageDetail
+    }
+
+    init(from decoder: Decoder) throws {
+        // Try unwrapping {"package": {...}} wrapper first, then fall back to flat object
+        if let wrapped = try? Wrapper(from: decoder) {
+            self = wrapped.package
+            return
+        }
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            id = intId
+        } else {
+            id = Int((try? c.decode(String.self, forKey: .id)) ?? "0") ?? 0
+        }
+        name              = (try? c.decode(String.self, forKey: .name)) ?? ""
+        category          = try? c.decode(String.self, forKey: .category)
+        filename          = try? c.decode(String.self, forKey: .filename)
+        info              = try? c.decode(String.self, forKey: .info)
+        notes             = try? c.decode(String.self, forKey: .notes)
+        priority          = try? c.decode(Int.self, forKey: .priority)
+        rebootRequired    = try? c.decode(Bool.self, forKey: .rebootRequired)
+        osRequirements    = try? c.decode(String.self, forKey: .osRequirements)
+        fillUserTemplate  = try? c.decode(Bool.self, forKey: .fillUserTemplate)
+        allowUninstalled  = try? c.decode(Bool.self, forKey: .allowUninstalled)
+        sendNotification  = try? c.decode(Bool.self, forKey: .sendNotification)
+        switchWithPackage = try? c.decode(String.self, forKey: .switchWithPackage)
+        reinstallOption   = try? c.decode(String.self, forKey: .reinstallOption)
+        requiredProcessor = try? c.decode(String.self, forKey: .requiredProcessor)
+    }
 }
 
 struct ConfigProfile: Codable, Sendable, Hashable, Identifiable {

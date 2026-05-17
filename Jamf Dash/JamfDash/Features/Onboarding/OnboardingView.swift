@@ -23,11 +23,12 @@ struct OnboardingView: View {
                 case .welcome:       WelcomeStep(vm: vm)
                 case .cliSetup:      CLISetupStep(vm: vm)
                 case .productPicker: ProductPickerStep(vm: vm)
-                case .authMethod:    AuthMethodStep(vm: vm)
-                case .proSetup:      LocalSetupStep(vm: vm)
-                case .ssoSetup:      SSOSetupStep(vm: vm)
-                case .protectSetup:  ProtectSetupStep(vm: vm)
-                case .schoolSetup:   SchoolSetupStep(vm: vm)
+                case .authMethod:      AuthMethodStep(vm: vm)
+                case .proSetup:        LocalSetupStep(vm: vm)
+                case .ssoSetup:        SSOSetupStep(vm: vm)
+                case .platformSetup:   PlatformSetupStep(vm: vm)
+                case .protectSetup:    ProtectSetupStep(vm: vm)
+                case .schoolSetup:     SchoolSetupStep(vm: vm)
                 case .complete:      CompleteStep(product: vm.selectedProduct, onComplete: onComplete)
                 }
             }
@@ -38,7 +39,7 @@ struct OnboardingView: View {
             ))
             .animation(.easeInOut(duration: 0.3), value: vm.step)
         }
-        .frame(width: 540, height: 560)
+        .frame(width: 560, height: 640)
     }
 
     private var stepIndex: Int {
@@ -46,7 +47,7 @@ struct OnboardingView: View {
         case .welcome:                                   return 0
         case .cliSetup:                                  return 1
         case .productPicker:                             return 2
-        case .authMethod, .proSetup, .ssoSetup,
+        case .authMethod, .proSetup, .ssoSetup, .platformSetup,
              .protectSetup, .schoolSetup:                return 3
         case .complete:                                  return 3
         }
@@ -219,34 +220,46 @@ private struct AuthMethodStep: View {
     let vm: OnboardingViewModel
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "person.badge.key.fill")
-                .font(.system(size: 54))
-                .foregroundStyle(Color.accentColor)
-                .padding(.top, 24)
+        ScrollView {
+            VStack(spacing: 20) {
+                Image(systemName: "person.badge.key.fill")
+                    .font(.system(size: 54))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 24)
 
-            Text("How does your Jamf Pro authenticate?")
-                .font(.title2).bold()
-                .multilineTextAlignment(.center)
+                Text("How does your Jamf Pro authenticate?")
+                    .font(.title2).bold()
+                    .multilineTextAlignment(.center)
 
-            VStack(spacing: 12) {
-                AuthMethodCard(
-                    title: "Local Admin Account",
-                    description: "Your Jamf Pro instance has local admin accounts enabled. Jamf Dash will automatically create a dedicated API client for you.",
-                    icon: "person.fill.checkmark",
-                    action: { vm.chooseAuthMethod(.localAccount) }
-                )
+                VStack(spacing: 12) {
+                    AuthMethodCard(
+                        title: "Platform API",
+                        badge: "Recommended",
+                        description: "Access Blueprints, Compliance Benchmarks & DDM Reports via the Jamf Platform Gateway. Requires jamf-cli 1.17+",
+                        icon: "globe",
+                        action: { vm.chooseAuthMethod(.platform) }
+                    )
 
-                AuthMethodCard(
-                    title: "SSO / No Local Accounts",
-                    description: "Your instance uses SSO or has local admin accounts disabled. You'll create an API client manually in Jamf Pro and paste the credentials here.",
-                    icon: "building.2.fill",
-                    action: { vm.chooseAuthMethod(.sso) }
-                )
+                    AuthMethodCard(
+                        title: "Local Admin Account",
+                        badge: nil,
+                        description: "Your Jamf Pro instance has local admin accounts enabled. Jamf Dash will automatically create a dedicated API client for you.",
+                        icon: "person.fill.checkmark",
+                        action: { vm.chooseAuthMethod(.localAccount) }
+                    )
+
+                    AuthMethodCard(
+                        title: "SSO / No Local Accounts",
+                        badge: nil,
+                        description: "Your instance uses SSO or has local admin accounts disabled. You'll create an API client manually in Jamf Pro and paste the credentials here.",
+                        icon: "building.2.fill",
+                        action: { vm.chooseAuthMethod(.sso) }
+                    )
+                }
+                .padding(.horizontal, 32)
+
+                Spacer(minLength: 20)
             }
-            .padding(.horizontal, 32)
-
-            Spacer()
         }
         .padding(.horizontal, 32)
     }
@@ -254,6 +267,7 @@ private struct AuthMethodStep: View {
 
 private struct AuthMethodCard: View {
     let title: String
+    let badge: String?
     let description: String
     let icon: String
     let action: () -> Void
@@ -267,7 +281,19 @@ private struct AuthMethodCard: View {
                     .frame(width: 32)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title).fontWeight(.semibold)
+                    HStack(spacing: 8) {
+                        Text(title).fontWeight(.semibold)
+                        if let badge {
+                            Text(badge)
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor)
+                                .clipShape(Capsule())
+                        }
+                    }
                     Text(description)
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -339,7 +365,7 @@ private struct LocalSetupStep: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(!vm.canRunLocalSetup || vm.isRunningSetup)
-                .padding(.bottom, 20)
+                .padding(.bottom, 32)
             }
             .padding(.horizontal, 36)
         }
@@ -405,7 +431,76 @@ private struct SSOSetupStep: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(!vm.canRunSSOSetup || vm.isRunningSetup)
-                .padding(.bottom, 20)
+                .padding(.bottom, 32)
+            }
+            .padding(.horizontal, 36)
+        }
+    }
+}
+
+// MARK: - Pro Platform API Setup
+
+private struct PlatformSetupStep: View {
+    @Bindable var vm: OnboardingViewModel
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                VStack(spacing: 6) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 44))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.top, 16)
+                    Text("Platform API Setup")
+                        .font(.title2).bold()
+                    Text("Connect via the Jamf Platform Gateway for access to Blueprints, Compliance Benchmarks and DDM Reports.")
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: 400)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Before continuing:")
+                        .fontWeight(.medium)
+                    Label("Go to **account.jamf.com → API Clients**", systemImage: "1.circle.fill")
+                    Label("Create an API Client and note the **Client ID**", systemImage: "2.circle.fill")
+                    Label("Generate a **Client Secret** (shown only once)", systemImage: "3.circle.fill")
+                }
+                .font(.callout)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(Color.accentColor.opacity(0.07))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                formRows {
+                    row("Gateway URL") {
+                        TextField("https://us.apigw.jamf.com", text: $vm.platformGatewayURL)
+                    }
+                    row("Tenant ID") {
+                        TextField("Tenant ID from account.jamf.com", text: $vm.platformTenantID)
+                    }
+                    row("Profile Name") {
+                        TextField("Jamf Platform", text: $vm.platformProfileName)
+                    }
+                    row("Client ID") {
+                        TextField("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", text: $vm.platformClientID)
+                            .textContentType(.username)
+                    }
+                    row("Client Secret") {
+                        SecureField("Client Secret", text: $vm.platformClientSecret)
+                            .textContentType(.password)
+                    }
+                }
+
+                statusRow(vm: vm, connectingTo: "Jamf Platform")
+
+                Button(vm.isRunningSetup ? "Connecting…" : "Connect") {
+                    Task { await vm.runPlatformSetup() }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(!vm.canRunPlatformSetup || vm.isRunningSetup)
+                .padding(.bottom, 32)
             }
             .padding(.horizontal, 36)
         }
@@ -471,7 +566,7 @@ private struct ProtectSetupStep: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(!vm.canRunProtectSetup || vm.isRunningSetup)
-                .padding(.bottom, 20)
+                .padding(.bottom, 32)
             }
             .padding(.horizontal, 36)
         }
@@ -535,7 +630,7 @@ private struct SchoolSetupStep: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(!vm.canRunSchoolSetup || vm.isRunningSetup)
-                .padding(.bottom, 20)
+                .padding(.bottom, 32)
             }
             .padding(.horizontal, 36)
         }

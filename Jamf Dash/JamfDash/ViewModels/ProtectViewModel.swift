@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 
 // MARK: - Protect data models
@@ -359,6 +360,7 @@ struct ProtectAnalyticDetail: Decodable, Sendable {
 @MainActor
 @Observable
 final class ProtectViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "ProtectViewModel")
     private let cli: CLIRunning
 
     private(set) var overviewState:           LoadState<[OverviewItem]>            = .idle
@@ -411,124 +413,138 @@ final class ProtectViewModel {
     func loadEvents(force: Bool = false) async {
         guard force || eventsState.value == nil else { return }
         guard force || !eventsState.isLoading else { return }
+        Self.logger.debug("Loading Protect events")
         eventsState = .loading
         do {
-            let data  = try await cli.run(.protectEvents)
-            let items = try decodeList(ProtectEvent.self, from: data)
+            let items = try decodeList(ProtectEvent.self, from: try await cli.run(.protectEvents))
+            Self.logger.debug("Loaded \(items.count) Protect events")
             eventsState = .loaded(items)
         } catch {
-            eventsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect events: \(error)")
+            eventsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadOverview(force: Bool = false) async {
         guard force || overviewState.value == nil else { return }
         guard force || !overviewState.isLoading else { return }
+        Self.logger.debug("Loading Protect overview")
         overviewState = .loading
         do {
-            let data  = try await cli.run(.protectOverview)
-            let items = try JSONDecoder().decode([OverviewItem].self, from: data)
+            let items = try JSONDecoder().decode([OverviewItem].self, from: try await cli.run(.protectOverview))
+            Self.logger.debug("Loaded \(items.count) Protect overview items")
             overviewState = .loaded(items)
         } catch {
-            overviewState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect overview: \(error)")
+            overviewState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadComputers(force: Bool = false) async {
         guard force || computersState.value == nil else { return }
         guard force || !computersState.isLoading else { return }
+        Self.logger.debug("Loading Protect computers")
         computersState = .loading
         do {
-            let data  = try await cli.run(.protectComputers)
-            let items = try decodeList(ProtectComputer.self, from: data)
+            let items = try decodeList(ProtectComputer.self, from: try await cli.run(.protectComputers))
+            Self.logger.debug("Loaded \(items.count) Protect computers")
             computersState = .loaded(items)
         } catch {
-            computersState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect computers: \(error)")
+            computersState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadPlans(force: Bool = false) async {
         guard force || plansState.value == nil else { return }
         guard force || !plansState.isLoading else { return }
+        Self.logger.debug("Loading Protect plans")
         plansState = .loading
         do {
-            let data  = try await cli.run(.protectPlans)
-            let items = try decodeList(ProtectPlan.self, from: data)
+            let items = try decodeList(ProtectPlan.self, from: try await cli.run(.protectPlans))
+            Self.logger.debug("Loaded \(items.count) Protect plans")
             plansState = .loaded(items)
         } catch {
-            plansState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect plans: \(error)")
+            plansState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadAnalytics(force: Bool = false) async {
         guard force || analyticsState.value == nil else { return }
         guard force || !analyticsState.isLoading else { return }
+        Self.logger.debug("Loading Protect analytics")
         analyticsState = .loading
         do {
-            let data  = try await cli.run(.protectAlerts)
-            let items = try decodeList(ProtectAnalytic.self, from: data)
+            let items = try decodeList(ProtectAnalytic.self, from: try await cli.run(.protectAlerts))
+            Self.logger.debug("Loaded \(items.count) Protect analytics")
             analyticsState = .loaded(items)
         } catch {
-            analyticsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect analytics: \(error)")
+            analyticsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadAnalyticSets(force: Bool = false) async {
         guard force || analyticSetsState.value == nil else { return }
         guard force || !analyticSetsState.isLoading else { return }
+        Self.logger.debug("Loading Protect analytic sets")
         analyticSetsState = .loading
         do {
-            let data  = try await cli.run(.protectInsights)
-            let items = try decodeList(ProtectAnalyticSet.self, from: data)
+            let items = try decodeList(ProtectAnalyticSet.self, from: try await cli.run(.protectInsights))
+            Self.logger.debug("Loaded \(items.count) Protect analytic sets")
             analyticSetsState = .loaded(items)
         } catch {
-            analyticSetsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect analytic sets: \(error)")
+            analyticSetsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadExceptionSets(force: Bool = false) async {
         guard force || exceptionSetsState.value == nil else { return }
         guard force || !exceptionSetsState.isLoading else { return }
+        Self.logger.debug("Loading Protect exception sets")
         exceptionSetsState = .loading
         do {
-            let data  = try await cli.run(.protectAuditLogs)
-            let items = try decodeList(ProtectNamedItem.self, from: data)
+            let items = try decodeList(ProtectNamedItem.self, from: try await cli.run(.protectAuditLogs))
+            Self.logger.debug("Loaded \(items.count) Protect exception sets")
             exceptionSetsState = .loaded(items)
         } catch {
-            exceptionSetsState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect exception sets: \(error)")
+            exceptionSetsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadULFDetail(name: String) async {
         ulfDetailState = .loading
         do {
-            let data   = try await cli.run(.protectUnifiedLoggingDetail(name: name))
-            let detail = try JSONDecoder().decode(ProtectULFDetail.self, from: data)
+            let detail = try JSONDecoder().decode(ProtectULFDetail.self, from: try await cli.run(.protectUnifiedLoggingDetail(name: name)))
             ulfDetailState = .loaded(detail)
         } catch {
-            ulfDetailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load ULF detail (\(name)): \(error)")
+            ulfDetailState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadAnalyticDetail(name: String) async {
         analyticDetailState = .loading
         do {
-            let data   = try await cli.run(.protectAnalyticDetail(name: name))
-            let detail = try JSONDecoder().decode(ProtectAnalyticDetail.self, from: data)
+            let detail = try JSONDecoder().decode(ProtectAnalyticDetail.self, from: try await cli.run(.protectAnalyticDetail(name: name)))
             analyticDetailState = .loaded(detail)
         } catch {
-            analyticDetailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load analytic detail (\(name)): \(error)")
+            analyticDetailState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
     func loadComputerDetail(name: String) async {
         computerDetailState = .loading
         do {
-            let data   = try await cli.run(.protectComputerDetail(name: name))
-            let detail = try JSONDecoder().decode(ProtectComputer.self, from: data)
+            let detail = try JSONDecoder().decode(ProtectComputer.self, from: try await cli.run(.protectComputerDetail(name: name)))
             computerDetailState = .loaded(detail)
         } catch {
-            computerDetailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load Protect computer detail (\(name)): \(error)")
+            computerDetailState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
@@ -537,7 +553,7 @@ final class ProtectViewModel {
         guard force || !removableStorageState.isLoading else { return }
         removableStorageState = .loading
         do { removableStorageState = .loaded(try decodeList(ProtectNamedEntry.self, from: try await cli.run(.protectRemovableStorage))) }
-        catch { removableStorageState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load removable storage: \(error)"); removableStorageState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadUnifiedLogging(force: Bool = false) async {
@@ -545,7 +561,7 @@ final class ProtectViewModel {
         guard force || !unifiedLoggingState.isLoading else { return }
         unifiedLoggingState = .loading
         do { unifiedLoggingState = .loaded(try decodeList(ProtectNamedEntry.self, from: try await cli.run(.protectUnifiedLogging))) }
-        catch { unifiedLoggingState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load unified logging: \(error)"); unifiedLoggingState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadActionConfigs(force: Bool = false) async {
@@ -553,7 +569,7 @@ final class ProtectViewModel {
         guard force || !actionConfigsState.isLoading else { return }
         actionConfigsState = .loading
         do { actionConfigsState = .loaded(try decodeList(ProtectNamedEntry.self, from: try await cli.run(.protectActionConfigs))) }
-        catch { actionConfigsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load action configs: \(error)"); actionConfigsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadTelemetry(force: Bool = false) async {
@@ -561,7 +577,7 @@ final class ProtectViewModel {
         guard force || !telemetryState.isLoading else { return }
         telemetryState = .loading
         do { telemetryState = .loaded(try decodeList(ProtectNamedEntry.self, from: try await cli.run(.protectTelemetryConfigs))) }
-        catch { telemetryState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load telemetry: \(error)"); telemetryState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadPreventLists(force: Bool = false) async {
@@ -569,7 +585,7 @@ final class ProtectViewModel {
         guard force || !preventListsState.isLoading else { return }
         preventListsState = .loading
         do { preventListsState = .loaded(try decodeList(ProtectNamedEntry.self, from: try await cli.run(.protectCustomPreventLists))) }
-        catch { preventListsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load prevent lists: \(error)"); preventListsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadRoles(force: Bool = false) async {
@@ -577,7 +593,7 @@ final class ProtectViewModel {
         guard force || !rolesState.isLoading else { return }
         rolesState = .loading
         do { rolesState = .loaded(try decodeList(ProtectRole.self, from: try await cli.run(.protectRoles))) }
-        catch { rolesState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load Protect roles: \(error)"); rolesState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadUsers(force: Bool = false) async {
@@ -585,7 +601,7 @@ final class ProtectViewModel {
         guard force || !usersState.isLoading else { return }
         usersState = .loading
         do { usersState = .loaded(try decodeList(ProtectUser.self, from: try await cli.run(.protectUsers))) }
-        catch { usersState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load Protect users: \(error)"); usersState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadGroups(force: Bool = false) async {
@@ -593,7 +609,7 @@ final class ProtectViewModel {
         guard force || !groupsState.isLoading else { return }
         groupsState = .loading
         do { groupsState = .loaded(try decodeList(ProtectGroup.self, from: try await cli.run(.protectGroups))) }
-        catch { groupsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load Protect groups: \(error)"); groupsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadAPIClients(force: Bool = false) async {
@@ -601,7 +617,7 @@ final class ProtectViewModel {
         guard force || !apiClientsState.isLoading else { return }
         apiClientsState = .loading
         do { apiClientsState = .loaded(try decodeList(ProtectAPIClient.self, from: try await cli.run(.protectAPIClients))) }
-        catch { apiClientsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load Protect API clients: \(error)"); apiClientsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadDataForwarding(force: Bool = false) async {
@@ -609,7 +625,7 @@ final class ProtectViewModel {
         guard force || !dataForwardingState.isLoading else { return }
         dataForwardingState = .loading
         do { dataForwardingState = .loaded(try await cli.run(.protectDataForwarding)) }
-        catch { dataForwardingState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load data forwarding: \(error)"); dataForwardingState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadDataRetention(force: Bool = false) async {
@@ -617,7 +633,7 @@ final class ProtectViewModel {
         guard force || !dataRetentionState.isLoading else { return }
         dataRetentionState = .loading
         do { dataRetentionState = .loaded(try await cli.run(.protectDataRetention)) }
-        catch { dataRetentionState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load data retention: \(error)"); dataRetentionState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadConfigFreeze(force: Bool = false) async {
@@ -625,7 +641,7 @@ final class ProtectViewModel {
         guard force || !configFreezeState.isLoading else { return }
         configFreezeState = .loading
         do { configFreezeState = .loaded(try await cli.run(.protectConfigFreeze)) }
-        catch { configFreezeState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load config freeze: \(error)"); configFreezeState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadDownloads(force: Bool = false) async {
@@ -633,17 +649,17 @@ final class ProtectViewModel {
         guard force || !downloadsState.isLoading else { return }
         downloadsState = .loading
         do { downloadsState = .loaded(try await cli.run(.protectDownloadsSummary)) }
-        catch { downloadsState = .failed(error.localizedDescription) }
+        catch { Self.logger.error("Failed to load downloads: \(error)"); downloadsState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     func loadExceptionSetDetail(name: String) async {
         exceptionSetDetailState = .loading
         do {
-            let data   = try await cli.run(.protectExceptionSetDetail(name: name))
-            let detail = try JSONDecoder().decode(ProtectExceptionSetDetail.self, from: data)
+            let detail = try JSONDecoder().decode(ProtectExceptionSetDetail.self, from: try await cli.run(.protectExceptionSetDetail(name: name)))
             exceptionSetDetailState = .loaded(detail)
         } catch {
-            exceptionSetDetailState = .failed(error.localizedDescription)
+            Self.logger.error("Failed to load exception set detail (\(name)): \(error)")
+            exceptionSetDetailState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

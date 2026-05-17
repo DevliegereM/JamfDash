@@ -2,12 +2,30 @@ import SwiftUI
 
 extension Notification.Name {
     static let openHelpWindow = Notification.Name("jamfDash.openHelpWindow")
+    static let refreshCurrentView = Notification.Name("jamfDash.refreshCurrentView")
+    static let focusSearch = Notification.Name("jamfDash.focusSearch")
+    static let openDeviceSearch = Notification.Name("jamfDash.openDeviceSearch")
+    static let navigateToSidebarItem = Notification.Name("jamfDash.navigateToSidebarItem")
 }
 
 struct HelpView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+
+                HelpSection(title: "Keyboard Shortcuts", icon: "keyboard", color: .purple) {
+                    HelpItem(heading: "Available shortcuts") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Cmd+R — Refresh current view", systemImage: "command").font(.caption)
+                            Label("Cmd+K — Jump to Device Search", systemImage: "command").font(.caption)
+                            Label("Cmd+F — Focus search field", systemImage: "command").font(.caption)
+                            Label("Cmd+1–9 — Navigate sidebar items", systemImage: "command").font(.caption)
+                            Label("Cmd+? — Open Help window", systemImage: "command").font(.caption)
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+                    }
+                }
 
                 HelpSection(title: "Getting Started", icon: "star.fill", color: .yellow) {
                     HelpItem(heading: "jamf-cli dependency") {
@@ -23,6 +41,9 @@ struct HelpView: View {
                 HelpSection(title: "Connections & Profiles", icon: "key.fill", color: .teal) {
                     HelpItem(heading: "Adding a connection") {
                         Text("Open Settings → Connection and click the **+** button. Choose your Jamf product (Pro, Protect, or School) and enter the required credentials. Each connection is stored securely in the system keychain by jamf-cli and appears as a named profile.")
+                    }
+                    HelpItem(heading: "Jamf Pro — Platform API") {
+                        Text("Platform API unlocks Blueprints and Compliance Benchmarks. Choose **Platform API** when adding a connection and enter the **Gateway URL**, **Tenant ID**, **Client ID**, and **Client Secret** from account.jamf.com. Requires jamf-cli 1.17 or later — update via Settings → CLI if needed.")
                     }
                     HelpItem(heading: "Switching profiles") {
                         Text("If you have multiple Jamf environments (e.g., dev and production), add a connection for each. Then use the **Active Profile** picker to choose which environment Jamf Dash queries. Click **Save** to apply the change — all data views will reload automatically.")
@@ -53,12 +74,45 @@ struct HelpView: View {
                     }
                 }
 
+                HelpSection(title: "AI Assistant (Dashie)", icon: "sparkles", color: .purple) {
+                    HelpItem(heading: "What Dashie can do") {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("• Answer fleet questions — device counts, compliance rates, OS distribution, patch status")
+                            Text("• Look up any Mac by serial number — hardware specs, installed apps, group memberships")
+                            Text("• Report on security posture, smart groups, and policies")
+                            Text("• Send management commands (blank push, MDM renew, restart) after your confirmation")
+                        }
+                        .font(.callout)
+                    }
+                    HelpItem(heading: "Requirements") {
+                        Text("Requires macOS 26 or later with **Apple Intelligence** enabled (System Settings → Apple Intelligence & Siri) on an eligible device. All data processing happens on-device — nothing is sent to external servers.")
+                    }
+                    HelpItem(heading: "Context compaction") {
+                        Text("When a conversation grows long, Dashie automatically summarises the history — capturing message counts, key topics, devices discussed, and important findings — into a JSON file saved to ~/Library/Application Support/JamfDash/. The conversation then continues seamlessly with a fresh context. The saved path is shown in the chat.")
+                    }
+                    HelpItem(heading: "Limitations") {
+                        Text("Dashie cannot create, update, or delete Jamf Pro objects. Use the Jamf Pro web console for configuration changes. Dashie works only with data accessible via jamf-cli.")
+                    }
+                }
+
+                HelpSection(title: "Jamf Pro — Platform", icon: "globe", color: .purple) {
+                    HelpItem(heading: "Blueprints") {
+                        Text("Browse all DDM (Declarative Device Management) blueprints. Select any blueprint to see its deployment state, last deployment time, scope, and the full set of declarations. Each declaration shows its type, channel, and all payload settings as structured key-value rows — booleans appear with checkmark or cross icons; nested objects are expanded inline.")
+                    }
+                    HelpItem(heading: "Compliance Benchmarks") {
+                        Text("Lists all configured compliance benchmarks with name and status. Select a benchmark to view its controls and rules. Tap **Load Compliance Results** to fetch the current benchmark results for your fleet.")
+                    }
+                    HelpItem(heading: "Requirements") {
+                        Text("Both views require a **Platform API** connection and **jamf-cli 1.17 or later**. If you see an auth error, go to Settings → Connection and add a Platform API profile, then update jamf-cli via Settings → CLI if needed.")
+                    }
+                }
+
                 HelpSection(title: "Jamf Pro — Fleet & Config", icon: "gearshape.2.fill", color: .indigo) {
                     HelpItem(heading: "Policies") {
                         Text("Shows all Jamf policies grouped by category. Click any policy row to open a detail sheet displaying its full scope: included computer groups, individual computers, departments, buildings, and any exclusions.")
                     }
                     HelpItem(heading: "Smart Groups") {
-                        Text("Displays all smart computer groups. Click any group to view its membership criteria — name, search type, value, and AND/OR logic.")
+                        Text("Displays all smart computer groups. Click any group to open a visual criteria inspector showing each criterion with logical connector badges (IF / AND / OR), optional parenthesis grouping, criterion name, search-type chip, and copyable monospaced value. A read-only banner notes that editing requires the Jamf Pro web console.")
                     }
                     HelpItem(heading: "Scripts") {
                         Text("Full script inventory grouped by category. Click any script to see its contents, description, and parameters in a scrollable detail sheet.")
@@ -99,6 +153,9 @@ struct HelpView: View {
                         }
                         .font(.caption)
                         .padding(.top, 2)
+                    }
+                    HelpItem(heading: "Device History") {
+                        Text("At the bottom of each device detail view, a Device History panel shows: an enrollment timeline with first enrolled date, last re-enrolled date (if different), and last check-in; the enrollment method recorded by Jamf Pro; and placeholder sections for MDM command history and user assignment history (data not available via jamf-cli).")
                     }
                 }
 

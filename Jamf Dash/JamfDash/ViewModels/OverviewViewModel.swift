@@ -1,9 +1,11 @@
 import Foundation
+import OSLog
 import Observation
 
 @MainActor
 @Observable
 final class OverviewViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "OverviewViewModel")
     private(set) var state: LoadState<[OverviewItem]> = .idle
     private let repository: OverviewRepository
 
@@ -14,12 +16,15 @@ final class OverviewViewModel {
     func load(force: Bool = false) async {
         guard force || state.value == nil else { return }
         guard force || !state.isLoading else { return }
+        Self.logger.debug("Loading overview")
         state = .loading
         do {
             let items = try await repository.fetch()
+            Self.logger.debug("Loaded \(items.count) overview items")
             state = .loaded(items)
         } catch {
-            state = .failed(Self.message(for: error))
+            Self.logger.error("Failed to load overview: \(error)")
+            state = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 
@@ -49,10 +54,5 @@ final class OverviewViewModel {
         return items.first(where: { $0.resource == resource })?.value
     }
 
-    private static func message(for error: Error) -> String {
-        if let cliError = error as? CLIError {
-            return cliError.localizedDescription
-        }
-        return error.localizedDescription
-    }
+
 }

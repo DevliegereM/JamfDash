@@ -9,6 +9,7 @@ struct DevicesView: View {
     @State private var selectedDeviceIDs: Set<Computer.ID> = []
     @State private var sortOrder: [KeyPathComparator<Computer>] = []
     @State private var filterManaged: Bool? = nil
+    @FocusState private var isSearchFocused: Bool
 
     private let versionColors: [Color] = [
         .blue, .green, .orange, .purple, .pink, .teal, .indigo, .yellow, .mint, .cyan
@@ -25,6 +26,7 @@ struct DevicesView: View {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Search by name or serial…", text: $vm.searchText)
                     .textFieldStyle(.plain)
+                    .focused($isSearchFocused)
                 if !vm.searchText.isEmpty {
                     Button { vm.searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
@@ -63,6 +65,9 @@ struct DevicesView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
+            isSearchFocused = true
+        }
         .navigationTitle("Devices")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -79,6 +84,7 @@ struct DevicesView: View {
                 .disabled(vm.state.isLoading)
             }
         }
+        .liquidGlassToolbar()
     }
 
     // MARK: - All Devices
