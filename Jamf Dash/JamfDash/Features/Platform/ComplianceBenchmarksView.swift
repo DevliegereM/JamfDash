@@ -2,7 +2,6 @@ import SwiftUI
 
 struct ComplianceBenchmarksView: View {
     @Bindable var vm: PlatformViewModel
-    @State private var showResults = false
 
     var body: some View {
         Group {
@@ -45,25 +44,26 @@ struct ComplianceBenchmarksView: View {
             }
         }
         .task { await vm.loadComplianceBenchmarks() }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    @ViewBuilder
     private func benchmarkList(_ benchmarks: [JamfComplianceBenchmark]) -> some View {
-        Group {
-            if benchmarks.isEmpty {
-                ContentUnavailableView("No Benchmarks", systemImage: "checkmark.shield", description: Text("No compliance benchmarks found in this tenant."))
-            } else {
-                List(selection: $vm.selectedBenchmarkID) {
-                    ForEach(benchmarks, id: \.id) { b in
-                        Text(b.name).tag(b.id)
-                    }
+        if benchmarks.isEmpty {
+            ContentUnavailableView("No Benchmarks", systemImage: "checkmark.shield", description: Text("No compliance benchmarks found in this tenant."))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List(selection: $vm.selectedBenchmarkID) {
+                ForEach(benchmarks, id: \.id) { b in
+                    Text(b.name).tag(b.id)
                 }
-                .listStyle(.sidebar)
             }
-        }
-        .onChange(of: vm.selectedBenchmarkID, initial: false) { _, id in
-            guard let id else { return }
-            showResults = false
-            Task { await vm.loadBenchmarkDetail(name: id) }
+            .listStyle(.sidebar)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: vm.selectedBenchmarkID, initial: false) { _, id in
+                guard let id else { return }
+                Task { await vm.loadBenchmarkDetail(name: id) }
+            }
         }
     }
 
@@ -79,7 +79,7 @@ struct ComplianceBenchmarksView: View {
             VStack { Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange); Text(e).font(.caption) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let json):
-            BenchmarkDetailView(json: json, showResults: $showResults, vm: vm)
+            BenchmarkDetailView(json: json)
         }
     }
 }
@@ -93,8 +93,17 @@ private struct BenchmarkDetail: Decodable {
     let version: String?
     let framework: String?
     let status: String?
+    let scope: BenchmarkScope?
     let controls: [BenchmarkControl]?
     let rules: [BenchmarkRule]?
+}
+
+/// Which devices / groups the benchmark is deployed to.
+private struct BenchmarkScope: Decodable {
+    let deviceGroups: [String]?
+    let devices: [String]?
+    let users: [String]?
+    let userGroups: [String]?
 }
 
 private struct BenchmarkControl: Decodable {
@@ -103,13 +112,42 @@ private struct BenchmarkControl: Decodable {
     let description: String?
     let severity: String?
     let status: String?
+    let enabled: Bool?
+    let remediation: String?
+
+    /// True when this control is actively checked.
+    var isEnabled: Bool {
+        if let e = enabled { return e }
+        if let s = status { return !["DISABLED", "INACTIVE", "OFF", "EXCLUDED"].contains(s.uppercased()) }
+        return true
+    }
 }
 
 private struct BenchmarkRule: Decodable {
     let id: String?
+    // API may use "name" (Jamf) or "title" (mSCP native)
     let name: String?
+    let title: String?
+    // API may use "description" or "discussion" (mSCP native)
+    let description: String?
+    let discussion: String?
     let severity: String?
     let status: String?
+    let enabled: Bool?
+    // Remediation: "fix" (mSCP native) or "remediation" (Jamf)
+    let fix: String?
+    let remediation: String?
+
+    var displayName: String? { name ?? title }
+    var displayDescription: String? { discussion ?? description }
+    var displayRemediation: String? { fix ?? remediation }
+
+    /// True when this rule is actively enforced.
+    var isEnabled: Bool {
+        if let e = enabled { return e }
+        if let s = status { return !["DISABLED", "INACTIVE", "OFF", "EXCLUDED"].contains(s.uppercased()) }
+        return true
+    }
 }
 
 // MARK: - Benchmark Decoder
@@ -186,8 +224,6 @@ private struct BenchmarkInfoRow: View {
 
 private struct BenchmarkDetailView: View {
     let json: String
-    @Binding var showResults: Bool
-    var vm: PlatformViewModel
 
     private var detail: BenchmarkDetail? {
         guard let data = json.data(using: .utf8) else { return nil }
@@ -196,38 +232,15 @@ private struct BenchmarkDetailView: View {
 
     var body: some View {
         if let detail {
-            BenchmarkStructuredView(detail: detail, showResults: $showResults, vm: vm)
+            BenchmarkStructuredView(detail: detail)
         } else {
-            VStack(spacing: 0) {
-                resultsToggleBar
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(json)
-                            .font(.system(.caption, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if showResults {
-                            Divider()
-                            BenchmarkResultsSection(vm: vm)
-                        }
-                    }
+            ScrollView {
+                Text(json)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                }
             }
-        }
-    }
-
-    private var resultsToggleBar: some View {
-        HStack {
-            Spacer()
-            Button(showResults ? "Hide Results" : "Load Compliance Results") {
-                showResults.toggle()
-                if showResults, let id = vm.selectedBenchmarkID {
-                    Task { await vm.loadBenchmarkResults(name: id) }
-                }
-            }
-            .buttonStyle(.bordered)
-            .padding()
         }
     }
 }
@@ -236,39 +249,20 @@ private struct BenchmarkDetailView: View {
 
 private struct BenchmarkStructuredView: View {
     let detail: BenchmarkDetail
-    @Binding var showResults: Bool
-    var vm: PlatformViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button(showResults ? "Hide Results" : "Load Compliance Results") {
-                    showResults.toggle()
-                    if showResults, let id = vm.selectedBenchmarkID {
-                        Task { await vm.loadBenchmarkResults(name: id) }
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                headerSection
+                detailsSection
+                if let scope = detail.scope { scopeSection(scope) }
+                if let controls = detail.controls, !controls.isEmpty {
+                    controlsSection(controls)
+                } else if let rules = detail.rules, !rules.isEmpty {
+                    rulesSection(rules)
                 }
-                .buttonStyle(.bordered)
-                .padding()
             }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    headerSection
-                    detailsSection
-                    if let controls = detail.controls, !controls.isEmpty {
-                        controlsSection(controls)
-                    } else if let rules = detail.rules, !rules.isEmpty {
-                        rulesSection(rules)
-                    }
-                    if showResults {
-                        Divider()
-                        BenchmarkResultsSection(vm: vm)
-                            .padding(.top, 4)
-                    }
-                }
-                .padding(20)
-            }
+            .padding(20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -308,41 +302,129 @@ private struct BenchmarkStructuredView: View {
                     BenchmarkInfoRow(label: "Version", value: version)
                     Divider()
                 }
-                if let framework = detail.framework {
-                    BenchmarkInfoRow(label: "Framework", value: framework)
-                } else {
-                    BenchmarkInfoRow(label: "Framework", value: "—")
+                BenchmarkInfoRow(label: "Framework", value: detail.framework ?? "—")
+                // Rule / control summary
+                let ruleCount    = detail.rules?.count    ?? detail.controls?.count ?? 0
+                let enabledCount = (detail.rules?.filter(\.isEnabled).count)
+                                ?? (detail.controls?.filter(\.isEnabled).count)
+                                ?? 0
+                if ruleCount > 0 {
+                    Divider()
+                    HStack(spacing: 0) {
+                        Text("Rules")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .frame(width: 110, alignment: .leading)
+                        HStack(spacing: 10) {
+                            Label("\(enabledCount) active", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green).font(.caption.weight(.medium))
+                            Label("\(ruleCount - enabledCount) inactive", systemImage: "minus.circle")
+                                .foregroundStyle(.secondary).font(.caption)
+                        }
+                    }
                 }
             }
             .padding(14)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func scopeSection(_ scope: BenchmarkScope) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashSectionHeader("Applied To", systemImage: "scope")
+            VStack(alignment: .leading, spacing: 8) {
+                let groups     = scope.deviceGroups ?? []
+                let devices    = scope.devices      ?? []
+                let users      = scope.users        ?? []
+                let userGroups = scope.userGroups   ?? []
+                if groups.isEmpty && devices.isEmpty && users.isEmpty && userGroups.isEmpty {
+                    Text("No scope assigned")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    if !groups.isEmpty     { scopeNameList(label: "Device Groups", names: groups) }
+                    if !devices.isEmpty    { if !groups.isEmpty { Divider() }; scopeNameList(label: "Devices", names: devices) }
+                    if !users.isEmpty      { if !groups.isEmpty || !devices.isEmpty { Divider() }; scopeNameList(label: "Users", names: users) }
+                    if !userGroups.isEmpty { if !groups.isEmpty || !devices.isEmpty || !users.isEmpty { Divider() }; scopeNameList(label: "User Groups", names: userGroups) }
+                }
+            }
+            .padding(14)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func scopeNameList(label: String, names: [String]) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            Text(label)
+                .font(.subheadline).foregroundStyle(.secondary)
+                .frame(width: 110, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(names, id: \.self) { Text($0).font(.subheadline).textSelection(.enabled) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private func controlsSection(_ controls: [BenchmarkControl]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let enabled  = controls.filter  { $0.isEnabled }
+        let disabled = controls.filter  { !$0.isEnabled }
+        return VStack(alignment: .leading, spacing: 10) {
             DashSectionHeader("Controls (\(controls.count))", systemImage: "list.bullet.clipboard")
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(controls.enumerated()), id: \.offset) { index, control in
-                    if index > 0 { Divider() }
-                    BenchmarkControlRow(control: control)
+            if !enabled.isEmpty {
+                ruleGroup(title: "Active", systemImage: "checkmark.circle.fill", color: .green) {
+                    ForEach(Array(enabled.enumerated()), id: \.offset) { idx, c in
+                        if idx > 0 { Divider() }
+                        BenchmarkControlRow(control: c)
+                    }
                 }
             }
-            .padding(14)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            if !disabled.isEmpty {
+                ruleGroup(title: "Inactive", systemImage: "minus.circle", color: .secondary) {
+                    ForEach(Array(disabled.enumerated()), id: \.offset) { idx, c in
+                        if idx > 0 { Divider() }
+                        BenchmarkControlRow(control: c)
+                    }
+                }
+            }
         }
     }
 
     private func rulesSection(_ rules: [BenchmarkRule]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let enabled  = rules.filter  { $0.isEnabled }
+        let disabled = rules.filter  { !$0.isEnabled }
+        return VStack(alignment: .leading, spacing: 10) {
             DashSectionHeader("Rules (\(rules.count))", systemImage: "list.bullet.clipboard")
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(rules.enumerated()), id: \.offset) { index, rule in
-                    if index > 0 { Divider() }
-                    BenchmarkRuleRow(rule: rule)
+            if !enabled.isEmpty {
+                ruleGroup(title: "Active (\(enabled.count))", systemImage: "checkmark.circle.fill", color: .green) {
+                    ForEach(Array(enabled.enumerated()), id: \.offset) { idx, r in
+                        if idx > 0 { Divider() }
+                        BenchmarkRuleRow(rule: r)
+                    }
                 }
             }
-            .padding(14)
+            if !disabled.isEmpty {
+                ruleGroup(title: "Inactive (\(disabled.count))", systemImage: "minus.circle", color: .secondary) {
+                    ForEach(Array(disabled.enumerated()), id: \.offset) { idx, r in
+                        if idx > 0 { Divider() }
+                        BenchmarkRuleRow(rule: r)
+                    }
+                }
+            }
+        }
+    }
+
+    private func ruleGroup<Content: View>(
+        title: String,
+        systemImage: String,
+        color: Color,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 6) {
+                content()
+            }
+            .padding(12)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         }
     }
@@ -354,17 +436,21 @@ private struct BenchmarkControlRow: View {
     let control: BenchmarkControl
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: control.isEnabled ? "checkmark.circle.fill" : "minus.circle")
+                    .foregroundStyle(control.isEnabled ? .green : .secondary)
+                    .font(.caption)
                 Text(control.name ?? control.id ?? "Unknown")
                     .font(.caption.weight(.semibold))
                 Spacer()
-                if let severity = control.severity {
-                    severityBadge(severity)
-                }
-                if let status = control.status {
-                    BenchmarkStatusBadge(status: status)
-                }
+                if let severity = control.severity { severityBadge(severity) }
+            }
+            if let id = control.id {
+                Text(id)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
             }
             if let description = control.description, !description.isEmpty {
                 Text(description)
@@ -372,86 +458,115 @@ private struct BenchmarkControlRow: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if let rem = control.remediation, !rem.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Remediation")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(rem)
+                        .font(.system(.caption2, design: .monospaced))
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 5))
+            }
         }
     }
 
     private func severityBadge(_ severity: String) -> some View {
-        let color: Color = {
-            switch severity.uppercased() {
-            case "HIGH", "CRITICAL": return .red
-            case "MEDIUM": return .orange
-            case "LOW": return .yellow
-            default: return .secondary
-            }
-        }()
+        let color: Color = severityColor(severity)
         return Text(severity)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 5).padding(.vertical, 2)
             .background(color.opacity(0.1), in: Capsule())
     }
 }
 
 private struct BenchmarkRuleRow: View {
     let rule: BenchmarkRule
+    @State private var expanded = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(rule.name ?? rule.id ?? "Unknown")
-                .font(.caption.weight(.semibold))
-            Spacer()
-            if let severity = rule.severity {
-                severityBadge(severity)
+        VStack(alignment: .leading, spacing: 5) {
+            // Primary row — always visible
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: rule.isEnabled ? "checkmark.circle.fill" : "minus.circle")
+                    .foregroundStyle(rule.isEnabled ? .green : .secondary)
+                    .font(.caption)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(rule.displayName ?? rule.id ?? "Unknown")
+                        .font(.caption.weight(.semibold))
+                    if let id = rule.id {
+                        Text(id)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .textSelection(.enabled)
+                    }
+                }
+                Spacer()
+                if let severity = rule.severity { severityBadge(severity) }
+                if rule.displayDescription != nil || rule.displayRemediation != nil {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) { expanded.toggle() }
+                    } label: {
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            if let status = rule.status {
-                BenchmarkStatusBadge(status: status)
+
+            // Expanded detail
+            if expanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let desc = rule.displayDescription, !desc.isEmpty {
+                        Text(desc)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let rem = rule.displayRemediation, !rem.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Remediation")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(rem)
+                                .font(.system(.caption2, design: .monospaced))
+                                .textSelection(.enabled)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 5))
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
 
     private func severityBadge(_ severity: String) -> some View {
-        let color: Color = {
-            switch severity.uppercased() {
-            case "HIGH", "CRITICAL": return .red
-            case "MEDIUM": return .orange
-            case "LOW": return .yellow
-            default: return .secondary
-            }
-        }()
+        let color: Color = severityColor(severity)
         return Text(severity)
             .font(.caption2.weight(.medium))
             .foregroundStyle(color)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 5).padding(.vertical, 2)
             .background(color.opacity(0.1), in: Capsule())
     }
 }
 
-// MARK: - Results Section
-
-private struct BenchmarkResultsSection: View {
-    var vm: PlatformViewModel
-
-    var body: some View {
-        switch vm.benchmarkResultsState {
-        case .idle:
-            EmptyView()
-        case .loading:
-            HStack { ProgressView(); Text("Loading results…").foregroundStyle(.secondary) }
-        case .failed(let e):
-            Text(e).foregroundStyle(.red).font(.caption)
-        case .loaded(let json):
-            VStack(alignment: .leading, spacing: 8) {
-                DashSectionHeader("Compliance Results", systemImage: "checkmark.shield")
-                Text(json)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-            }
-        }
+private func severityColor(_ severity: String) -> Color {
+    switch severity.uppercased() {
+    case "HIGH", "CRITICAL": return .red
+    case "MEDIUM":           return .orange
+    case "LOW":              return .yellow
+    default:                 return .secondary
     }
 }
 

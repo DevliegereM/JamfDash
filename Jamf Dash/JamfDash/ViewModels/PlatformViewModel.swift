@@ -15,7 +15,6 @@ final class PlatformViewModel {
 
     private(set) var complianceBenchmarksState: LoadState<[JamfComplianceBenchmark]> = .idle
     private(set) var benchmarkDetailState: LoadState<String> = .idle
-    private(set) var benchmarkResultsState: LoadState<String> = .idle
     var selectedBenchmarkID: String? = nil
 
     private let cli: any CLIRunning
@@ -65,12 +64,35 @@ final class PlatformViewModel {
         complianceBenchmarksState = .loading
         do {
             let data = try await cli.run(.complianceBenchmarks)
+
+            // Log the raw payload at debug level so decoding problems are easy to spot.
+            if let raw = String(data: data, encoding: .utf8) {
+                Self.logger.debug("Compliance benchmarks raw JSON: \(raw)")
+            }
+
             let benchmarks: [JamfComplianceBenchmark]
+            let snakeDecoder: JSONDecoder = {
+                let d = JSONDecoder()
+                d.keyDecodingStrategy = .convertFromSnakeCase
+                return d
+            }()
+
+            // 1. Direct array – camelCase
             if let direct = try? JSONDecoder().decode([JamfComplianceBenchmark].self, from: data) {
                 benchmarks = direct
+            // 2. Direct array – snake_case keys
+            } else if let direct = try? snakeDecoder.decode([JamfComplianceBenchmark].self, from: data) {
+                benchmarks = direct
+            // 3. Wrapped object – camelCase
             } else if let wrapped = try? JSONDecoder().decode(JamfComplianceBenchmarkListResponse.self, from: data) {
-                benchmarks = wrapped.results ?? []
+                benchmarks = wrapped.resolved
+            // 4. Wrapped object – snake_case keys
+            } else if let wrapped = try? snakeDecoder.decode(JamfComplianceBenchmarkListResponse.self, from: data) {
+                benchmarks = wrapped.resolved
             } else {
+                // None of the known shapes matched; log the raw payload for diagnosis.
+                let preview = String(data: data.prefix(500), encoding: .utf8) ?? "<non-UTF8>"
+                Self.logger.error("Unable to decode compliance benchmarks. Raw preview: \(preview)")
                 benchmarks = []
             }
             complianceBenchmarksState = .loaded(benchmarks)
@@ -87,16 +109,6 @@ final class PlatformViewModel {
             benchmarkDetailState = .loaded(Self.prettyPrint(data))
         } catch {
             benchmarkDetailState = .failed(ErrorMessageFormatter.message(for: error))
-        }
-    }
-
-    func loadBenchmarkResults(name: String) async {
-        benchmarkResultsState = .loading
-        do {
-            let data = try await cli.run(.complianceBenchmarkResults(name: name))
-            benchmarkResultsState = .loaded(Self.prettyPrint(data))
-        } catch {
-            benchmarkResultsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

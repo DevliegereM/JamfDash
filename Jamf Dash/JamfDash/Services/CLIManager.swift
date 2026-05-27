@@ -32,7 +32,6 @@ enum CLICommand: Sendable {
     // MARK: Compliance Benchmarks
     case complianceBenchmarks
     case complianceBenchmarkDetail(name: String)
-    case complianceBenchmarkResults(name: String)
 
     // MARK: Jamf Protect — data fetching
     case protectOverview
@@ -208,7 +207,6 @@ enum CLICommand: Sendable {
         // Compliance Benchmarks
         case .complianceBenchmarks:                return ["pro", "cb", "list", "-o", "json"]
         case .complianceBenchmarkDetail(let n):    return ["pro", "cb", "get", n, "-o", "json"]
-        case .complianceBenchmarkResults(let n):   return ["pro", "cb", "compliance", n, "-o", "json"]
 
         // Jamf Protect — data
         case .protectEvents:        return ["protect", "alerts", "list", "-o", "json"]

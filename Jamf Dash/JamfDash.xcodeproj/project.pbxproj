@@ -716,7 +716,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = JamfDash/JamfDash.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20260517.15;
+				CURRENT_PROJECT_VERSION = 20260527.13;
 				DEVELOPMENT_TEAM = 4FZ2H85CA5;
 				INFOPLIST_FILE = JamfDash/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Jamf Dash";
@@ -726,7 +726,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash;
 				SDKROOT = macosx;
 			};
@@ -739,7 +739,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = JamfDash/JamfDash.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20260517.15;
+				CURRENT_PROJECT_VERSION = 20260527.13;
 				DEVELOPMENT_TEAM = 4FZ2H85CA5;
 				INFOPLIST_FILE = JamfDash/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Jamf Dash";
@@ -749,7 +749,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash;
 				SDKROOT = macosx;
 			};

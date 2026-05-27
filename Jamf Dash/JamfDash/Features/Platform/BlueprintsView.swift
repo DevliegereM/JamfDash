@@ -44,23 +44,25 @@ struct BlueprintsView: View {
             }
         }
         .task { await vm.loadBlueprints() }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    @ViewBuilder
     private func blueprintList(_ blueprints: [JamfBlueprint]) -> some View {
-        Group {
-            if blueprints.isEmpty {
-                ContentUnavailableView("No Blueprints", systemImage: "square.3.layers.3d", description: Text("No blueprints found in this tenant."))
-            } else {
-                List(selection: $vm.selectedBlueprintID) {
-                    ForEach(blueprints, id: \.id) { bp in
-                        Text(bp.name).tag(bp.id)
-                    }
+        if blueprints.isEmpty {
+            ContentUnavailableView("No Blueprints", systemImage: "square.3.layers.3d", description: Text("No blueprints found in this tenant."))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List(selection: $vm.selectedBlueprintID) {
+                ForEach(blueprints, id: \.id) { bp in
+                    Text(bp.name).tag(bp.id)
                 }
-                .listStyle(.sidebar)
-                .onChange(of: vm.selectedBlueprintID, initial: false) { _, id in
-                    guard let id else { return }
-                    Task { await vm.loadBlueprintDetail(name: id) }
-                }
+            }
+            .listStyle(.sidebar)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: vm.selectedBlueprintID, initial: false) { _, id in
+                guard let id else { return }
+                Task { await vm.loadBlueprintDetail(name: id) }
             }
         }
     }
@@ -107,6 +109,9 @@ private struct BlueprintLastDeployment: Decodable {
 
 private struct BlueprintScope: Decodable {
     let deviceGroups: [String]?
+    let devices: [String]?
+    let users: [String]?
+    let userGroups: [String]?
 }
 
 private struct BlueprintStep: Decodable {
@@ -116,7 +121,44 @@ private struct BlueprintStep: Decodable {
 
 private struct BlueprintComponent: Decodable {
     let identifier: String
-    let configuration: BlueprintComponentConfig?
+    // The API ships the content in one of three shapes:
+    // 1. component.configuration.declarations[]  (nested array)
+    // 2. component.payload  (direct object)
+    // 3. component.configuration  (flat settings object, not wrapped)
+    let configuration: BlueprintComponentConfig?   // shape 1
+    let directPayload: JSONPayload?                 // shape 2
+    let rawConfiguration: JSONPayload?              // shape 3 (captured when shape 1 parse fails)
+    // Optional top-level declaration metadata
+    let type: String?
+    let channelType: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case identifier, type, channelType, configuration
+        case directPayload = "payload"
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        identifier    = try  c.decode(String.self,                   forKey: .identifier)
+        type          = try? c.decode(String.self,                   forKey: .type)
+        channelType   = try? c.decode(String.self,                   forKey: .channelType)
+        directPayload = try? c.decode(JSONPayload.self,              forKey: .directPayload)
+        let structured = try? c.decode(BlueprintComponentConfig.self, forKey: .configuration)
+        configuration = structured
+        // Shape 3: grab raw config only when structured decode found no declarations
+        rawConfiguration = (structured?.declarations?.isEmpty != false)
+            ? (try? c.decode(JSONPayload.self, forKey: .configuration))
+            : nil
+    }
+
+    /// The best-available payload for display — prefers nested declarations,
+    /// then direct payload, then raw configuration.
+    var effectivePayload: JSONPayload? { directPayload ?? rawConfiguration }
+    var hasPayload: Bool {
+        let declarations = configuration?.declarations ?? []
+        if !declarations.isEmpty { return true }
+        return effectivePayload != nil
+    }
 }
 
 private struct BlueprintComponentConfig: Decodable {
@@ -352,15 +394,56 @@ private struct BlueprintStructuredView: View {
             DashSectionHeader("Scope", systemImage: "scope")
             VStack(alignment: .leading, spacing: 8) {
                 if let scope = detail.scope {
-                    let groupCount = scope.deviceGroups?.count ?? 0
-                    BlueprintInfoRow(
-                        label: "Device Groups",
-                        value: groupCount == 1 ? "1 group" : "\(groupCount) groups"
-                    )
+                    scopeRows(for: scope)
                 }
             }
             .padding(14)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    @ViewBuilder
+    private func scopeRows(for scope: BlueprintScope) -> some View {
+        let deviceGroups = scope.deviceGroups ?? []
+        let devices      = scope.devices ?? []
+        let users        = scope.users ?? []
+        let userGroups   = scope.userGroups ?? []
+
+        if deviceGroups.isEmpty && devices.isEmpty && users.isEmpty && userGroups.isEmpty {
+            Text("No scope assigned").font(.subheadline).foregroundStyle(.secondary)
+        } else {
+            if !deviceGroups.isEmpty {
+                scopeNameList(label: "Device Groups", names: deviceGroups)
+            }
+            if !devices.isEmpty {
+                if !deviceGroups.isEmpty { Divider() }
+                scopeNameList(label: "Devices", names: devices)
+            }
+            if !users.isEmpty {
+                if !deviceGroups.isEmpty || !devices.isEmpty { Divider() }
+                scopeNameList(label: "Users", names: users)
+            }
+            if !userGroups.isEmpty {
+                if !deviceGroups.isEmpty || !devices.isEmpty || !users.isEmpty { Divider() }
+                scopeNameList(label: "User Groups", names: userGroups)
+            }
+        }
+    }
+
+    private func scopeNameList(label: String, names: [String]) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 110, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(names, id: \.self) { name in
+                    Text(name)
+                        .font(.subheadline)
+                        .textSelection(.enabled)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -396,19 +479,126 @@ private struct DeclarationComponentView: View {
 
     var body: some View {
         let declarations = component.configuration?.declarations ?? []
-        if declarations.isEmpty {
-            // Non-declaration component — just show identifier
-            Text(component.identifier)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 2)
-        } else {
+        if !declarations.isEmpty {
+            // Shape 1: structured nested declarations
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(declarations.enumerated()), id: \.offset) { _, decl in
                     DeclarationRow(declaration: decl)
                 }
             }
+        } else {
+            // Shape 2 & 3: flat payload on the component itself
+            ComponentPayloadRow(
+                identifier: component.identifier,
+                type: component.type,
+                channelType: component.channelType,
+                payload: component.effectivePayload
+            )
         }
+    }
+}
+
+// MARK: - Component Payload Row (flat shape)
+
+private struct ComponentPayloadRow: View {
+    let identifier: String
+    let type: String?
+    let channelType: String?
+    let payload: JSONPayload?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Header
+            HStack(spacing: 6) {
+                Text(identifier.humanizedDeclarationID)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                Spacer()
+                if let ch = channelType { kindBadge(ch, color: .purple) }
+                // Show the Apple declaration type only when it differs from the identifier
+                if let t = type, t != identifier { kindBadge(t.humanizedDeclarationID, color: .blue) }
+            }
+
+            // Content
+            if let payload {
+                payloadContent(payload)
+            } else {
+                // No payload at all — show domain as dim fallback
+                Text(identifier)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(10)
+        .background(Color.primary.opacity(0.03), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func payloadContent(_ p: JSONPayload) -> some View {
+        switch p {
+        case .object(let dict) where !dict.isEmpty:
+            payloadTable(dict)
+        case .null:
+            EmptyView()
+        default:
+            Text(p.displayString)
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+        }
+    }
+
+    private func payloadTable(_ dict: [String: JSONPayload]) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(dict.keys.sorted(), id: \.self) { key in
+                HStack(alignment: .top, spacing: 0) {
+                    Text(key.camelToWords)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 180, alignment: .leading)
+                    payloadValueView(dict[key])
+                }
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private func payloadValueView(_ value: JSONPayload?) -> some View {
+        if let value {
+            switch value {
+            case .bool(let b):
+                HStack(spacing: 4) {
+                    Image(systemName: b ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundStyle(b ? .green : .red).font(.caption)
+                    Text(b ? "true" : "false")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(b ? .green : .red)
+                }
+            case .null:
+                Text("null").font(.caption).foregroundStyle(.tertiary)
+            default:
+                Text(value.displayString)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+            }
+        } else {
+            Text("—").font(.caption).foregroundStyle(.tertiary)
+        }
+    }
+
+    private func kindBadge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(color)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.1), in: Capsule())
     }
 }
 
@@ -417,9 +607,9 @@ private struct DeclarationRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header: type + kind/channelType badges
+            // Header: humanized type + kind/channelType badges
             HStack(spacing: 6) {
-                Text(declaration.type)
+                Text(declaration.type.humanizedDeclarationID)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
                     .textSelection(.enabled)
@@ -437,10 +627,10 @@ private struct DeclarationRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     ForEach(dict.keys.sorted(), id: \.self) { key in
                         HStack(alignment: .top, spacing: 0) {
-                            Text(key)
+                            Text(key.camelToWords)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .frame(width: 160, alignment: .leading)
+                                .frame(width: 180, alignment: .leading)
                             payloadValueView(dict[key])
                         }
                     }
@@ -455,7 +645,7 @@ private struct DeclarationRow: View {
                     Text("value")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .frame(width: 160, alignment: .leading)
+                        .frame(width: 180, alignment: .leading)
                     payloadValueView(payload)
                 }
                 .padding(8)
@@ -500,6 +690,48 @@ private struct DeclarationRow: View {
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .background(color.opacity(0.1), in: Capsule())
+    }
+}
+
+// MARK: - String helpers for declaration display
+
+private extension String {
+    /// Strips well-known Apple/Jamf DDM reverse-DNS prefixes and title-cases the remainder.
+    /// e.g. "com.jamf.ddm.passcode-settings"          → "Passcode Settings"
+    ///      "com.apple.configuration.passcode.settings" → "Passcode Settings"
+    var humanizedDeclarationID: String {
+        var s = self
+        for prefix in [
+            "com.jamf.ddm.",
+            "com.apple.configuration.",
+            "com.apple.management.",
+            "com.apple.",
+            "com.jamf."
+        ] {
+            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)); break }
+        }
+        return s
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst().lowercased() }
+            .joined(separator: " ")
+    }
+
+    /// Splits camelCase into spaced Title Words.
+    /// e.g. "passcodeMinLength" → "Passcode Min Length"
+    var camelToWords: String {
+        var result = ""
+        for char in self {
+            if char.isUppercase && !result.isEmpty {
+                result += " "
+            }
+            result.append(char)
+        }
+        return result
+            .split(separator: " ")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
     }
 }
 

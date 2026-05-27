@@ -193,7 +193,18 @@ final class AppEnvironment {
                     group.addTask { await self.fleetVM.loadConfigProfiles(force: true) }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                if !Task.isCancelled { self.isSyncing = false }
+                guard !Task.isCancelled else { return }
+                // Keep the stored server URL in sync with whatever Jamf Pro reports in the
+                // overview. This corrects platform-API profiles, which store the gateway URL
+                // (e.g. eu.apigw.jamf.com) at setup time instead of the actual instance URL
+                // needed for console deep links (e.g. kbcgroup.jamfcloud.com).
+                if !self.isDemoMode,
+                   let reportedURL = self.overviewVM.value(for: "Server URL"),
+                   !reportedURL.isEmpty {
+                    let profile = self.profileService.selectedProfile.name
+                    self.profileService.setServerURL(reportedURL, for: profile)
+                }
+                self.isSyncing = false
             }
         case .protect:
             syncStepLabels = ["Overview", "Computers", "Plans", "Analytics", "Analytic Sets", "Exception Sets"]

@@ -219,11 +219,17 @@ struct DevicesView: View {
 
     private var staleTab: some View {
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 8) {
                 Text("Flag devices with no check-in for more than:")
                     .font(.callout).foregroundStyle(.secondary)
-                Stepper("\(vm.staleThresholdDays) days", value: $vm.staleThresholdDays, in: 1...365)
-                    .fixedSize()
+                TextField("", value: $vm.staleThresholdDays, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 52)
+                    .multilineTextAlignment(.center)
+                Stepper("", value: $vm.staleThresholdDays, in: 1...365)
+                    .labelsHidden()
+                Text("days")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)

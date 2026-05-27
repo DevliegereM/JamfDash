@@ -89,6 +89,9 @@ struct ComputerDetail: Decodable, Sendable, Identifiable {
         let supervised: Bool?
         let mdmCapable: Bool?
         let userApprovedMdm: Bool?
+        /// Display string for how the device was enrolled.
+        /// Decoded from either a plain string (`"PreStage"`) or the newer
+        /// Pro API v1 object shape `{ "id": "…", "objectName": "…", "objectType": "…" }`.
         let enrollmentMethod: String?
         let declarativeDeviceManagementEnabled: Bool?
         let lastContactTime: String?
@@ -99,6 +102,60 @@ struct ComputerDetail: Decodable, Sendable, Identifiable {
         struct RemoteManagement: Decodable, Sendable {
             let managed: Bool?
             let managementUsername: String?
+        }
+
+        // Private helper types for the polymorphic fields.
+        private struct EnrollmentMethodObject: Decodable {
+            let objectName: String?
+        }
+        private struct MdmCapableObject: Decodable {
+            let capable: Bool?
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name, lastIpAddress, jamfBinaryVersion
+            case assetTag, barcode1, barcode2
+            case supervised, mdmCapable, userApprovedMdm
+            case enrollmentMethod, declarativeDeviceManagementEnabled
+            case lastContactTime, lastEnrolledDate, initialEntryDate
+            case remoteManagement
+        }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+
+            name                              = try? c.decode(String.self, forKey: .name)
+            lastIpAddress                     = try? c.decode(String.self, forKey: .lastIpAddress)
+            jamfBinaryVersion                 = try? c.decode(String.self, forKey: .jamfBinaryVersion)
+            assetTag                          = try? c.decode(String.self, forKey: .assetTag)
+            barcode1                          = try? c.decode(String.self, forKey: .barcode1)
+            barcode2                          = try? c.decode(String.self, forKey: .barcode2)
+            supervised                        = try? c.decode(Bool.self,   forKey: .supervised)
+            userApprovedMdm                   = try? c.decode(Bool.self,   forKey: .userApprovedMdm)
+            declarativeDeviceManagementEnabled = try? c.decode(Bool.self,  forKey: .declarativeDeviceManagementEnabled)
+            lastContactTime                   = try? c.decode(String.self, forKey: .lastContactTime)
+            lastEnrolledDate                  = try? c.decode(String.self, forKey: .lastEnrolledDate)
+            initialEntryDate                  = try? c.decode(String.self, forKey: .initialEntryDate)
+            remoteManagement                  = try? c.decode(RemoteManagement.self, forKey: .remoteManagement)
+
+            // mdmCapable: plain Bool (older CLI/API) OR object { capable: Bool } (Pro API v1)
+            if let b = try? c.decode(Bool.self, forKey: .mdmCapable) {
+                mdmCapable = b
+            } else if let obj = try? c.decode(MdmCapableObject.self, forKey: .mdmCapable) {
+                mdmCapable = obj.capable
+            } else {
+                mdmCapable = nil
+            }
+
+            // enrollmentMethod: plain String (older CLI output) OR
+            // object { objectName: String, … } (Pro API v1)
+            if let s = try? c.decode(String.self, forKey: .enrollmentMethod), !s.isEmpty {
+                enrollmentMethod = s
+            } else if let obj = try? c.decode(EnrollmentMethodObject.self, forKey: .enrollmentMethod) {
+                enrollmentMethod = obj.objectName
+            } else {
+                enrollmentMethod = nil
+            }
         }
     }
 
