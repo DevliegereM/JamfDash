@@ -3,8 +3,6 @@
 
 ---
 
----
-
 ## Overview
 
 Jamf Dash connects to your Jamf environment via [`jamf-cli`](https://github.com/jamf-concepts/jamf-cli), an open-source CLI maintained by Jamf Concepts. The app downloads and manages `jamf-cli` automatically — no manual installation required.
@@ -190,11 +188,38 @@ Three-tab enrollment dashboard:
 - *Computer Prestages* — all configured Mac prestages with MDM removable flag
 - *Mobile Device Prestages* — all configured iOS/iPadOS prestages
 
+**Webhooks**
+Table of all configured Jamf Pro webhooks — name, event type, enabled state, and endpoint URL.
+
+**DDM Monitor**
+Two-view panel for Declarative Device Management status:
+- *Per Device* — searchable device list on the left; select any device to see its full DDM declaration status items on the right, including each declaration identifier, status, and any errors reported by the device.
+- *Fleet Overview* — table showing all declarations across the fleet with counts of succeeded, failed, and pending devices per declaration.
+
+**Configuration Drift**
+Point-in-time snapshots of your Jamf Pro policies, configuration profiles, and scripts stored locally in SQLite. Click **Snapshot Now** to capture the current state. Each subsequent snapshot is diffed against the previous one and any Added, Modified, or Removed objects appear in a chronological timeline grouped by date.
+
+- Color-coded rows: green for additions, yellow for modifications, red for removals
+- Filter by object type (All · Policies · Profiles · Scripts)
+- Tap any row to open a diff sheet showing field-level changes (old value vs new value)
+- Snapshot history persists across app restarts at `~/Library/Application Support/JamfDash/drift.db`
+
+**Audit Dashboard**
+Cross-checks your Jamf Pro environment against a built-in set of security and hygiene rules and surfaces findings with severity ratings (Critical · High · Medium · Low · Info):
+
+- Summary bar showing finding counts per severity
+- Filter by severity or search by keyword
+- Click any finding for a detail sheet with a full description and remediation guidance
+- Findings refresh on demand or on each view load
+
+**Settings Inspector**
+Browse all Jamf Pro settings endpoints exposed by `jamf-cli` in a searchable two-pane layout — settings category list on the left, raw structured output on the right. Useful for auditing configuration values without opening the Jamf Pro web console.
+
 **Blueprints** *(requires Platform API, jamf-cli 1.17+)*
-Browse all DDM (Declarative Device Management) blueprints. Select any blueprint to see a structured detail view: deployment state badge, last deployment timestamp, scope, and the complete set of declarations. Each declaration card shows its type, channel, and all payload settings as key-value rows — booleans are displayed with checkmark/cross icons; nested objects are expanded inline.
+Browse all DDM (Declarative Device Management) blueprints. Select any blueprint to see a structured detail view: deployment state badge, last deployment timestamp, scope, and the complete applied settings. The **Scope** section lists the exact device group and device names the blueprint is deployed to. Each declaration card humanises the type identifier (e.g. `com.jamf.ddm.passcode-settings` → **Passcode Settings**), renders all payload keys as readable label/value rows, and displays booleans as checkmark/cross icons.
 
 **Compliance Benchmarks** *(requires Platform API, jamf-cli 1.17+)*
-List all configured compliance benchmarks. Select a benchmark to view its name, status badge, associated controls, and individual rules. Click **Load Compliance Results** to fetch the current benchmark results for your fleet.
+List all configured compliance benchmarks. Select a benchmark to view its name, status badge, framework version, and rule summary. The **Applied To** section shows which device groups, devices, users, and user groups the benchmark is scoped to. Rules are grouped into **Active** and **Inactive** sections; expand any rule row to read its full description and remediation guidance inline.
 
 ---
 
@@ -218,6 +243,19 @@ When a conversation grows large, Dashie automatically summarises the history int
 
 **Limitations:**
 Dashie cannot create, update, or delete Jamf Pro objects. For configuration changes use the Jamf Pro web console. All data stays on-device.
+
+---
+
+### Device Correlation *(requires Jamf Pro + Jamf Protect)*
+
+When both Jamf Pro and Jamf Protect are connected, the Device Correlation view joins the two device inventories by serial number and presents a unified table:
+
+- **Match status** — Matched (in both products), Pro Only, or Protect Only, shown as a color-coded dot
+- **Columns** — device name, serial, Protect plan, last Protect check-in, OS version, last Pro contact
+- **Filter** by match state or search by name/serial
+- **Detail panel** — select any device to expand an inline split panel: left side shows Protect-specific data (plan, agent version, alert count, FDA status, web protection), right side shows Pro-specific data (managed status, OS, last contact) with quick-action buttons
+
+Summary chips in the toolbar show the total matched, Pro-only, and Protect-only counts at a glance.
 
 ---
 
@@ -334,6 +372,90 @@ In Demo Mode a banner appears in the toolbar and a product switcher (Pro / Prote
 ## jamf-cli Updates
 
 Jamf Dash checks for `jamf-cli` updates automatically on launch. When a newer version is available, an **Update** button appears in the toolbar. You can also check manually from **Settings → CLI**.
+
+---
+
+## Debug Logging
+
+JamfDash emits structured log messages via macOS Unified Logging under the `com.jamfdash` subsystem. Each major area has its own category so you can filter precisely.
+
+### Enable debug mode
+
+Launch with the `--debug` flag to turn on verbose output:
+
+```bash
+open -a "JamfDash" --args --debug
+```
+
+### Stream logs
+
+In a separate Terminal window:
+
+```bash
+# All JamfDash messages
+log stream --predicate 'subsystem == "com.jamfdash"' --level debug
+
+# CLI timing only (command duration + response size per call)
+log stream --predicate 'subsystem == "com.jamfdash" AND category == "CLIManager"' --level debug
+
+# App lifecycle (phase transitions, sync start/complete)
+log stream --predicate 'subsystem == "com.jamfdash" AND category == "AppState"' --level debug
+
+# Sparkle update check results
+log stream --predicate 'subsystem == "com.jamfdash" AND category == "Sparkle"' --level debug
+
+# Errors only
+log stream --predicate 'subsystem == "com.jamfdash"' --level error
+```
+
+### Log categories
+
+| Category | What's logged |
+|---|---|
+| `AppState` | App phase transitions (`launching → main`, `onboarding → main`, etc.) |
+| `AppEnvironment` | Sync start/complete with elapsed time, profile switches, notification counts, health score alerts |
+| `CLIManager` | Command arguments (private by default), duration, response size in bytes, errors |
+| `Sparkle` | Update check results, download progress, install errors |
+| `FleetViewModel` | Load start/count/error for policies, groups, scripts, packages, profiles; cache-hit skips; total `loadAll` duration |
+| `SecurityViewModel` | Security report and patch compliance load with cache-hit skips |
+| `DevicesViewModel` | Computer load with cache-hit skips |
+| `DDMMonitorViewModel` | Device list, status items, fleet stats; deprecation warnings (exit 15) |
+| `DriftViewModel` | Snapshot start/complete with event count |
+| `AuditViewModel` | Findings load, decode failures |
+| `ProtectViewModel` | Load start/count/error for every Protect data type |
+| `SchoolViewModel` | Load start/count/error for every School data type |
+| `FleetRepository` | Category back-fill progress (N/M resolved) |
+| `OverviewRepository` | Empty response and skipped-field warnings |
+| `SecurityRepository` | Schema change warnings |
+
+### Instruments (signpost tracing)
+
+The main sync task groups are instrumented with `OSSignposter` intervals under the `Sync` category. To see them as visual timeline tracks:
+
+1. Open **Instruments** → **Blank** template
+2. Add the **os_signpost** instrument
+3. Set the process filter to **JamfDash**
+4. Record while triggering a sync — a `MainSync` track will appear for each product (Jamf Pro, Protect, School)
+
+### Viewing private log values
+
+Command arguments are marked `.private` by default to protect credentials. To reveal them locally, drop a plist into the logging subsystems directory:
+
+```bash
+sudo mkdir -p /Library/Preferences/Logging/Subsystems
+sudo tee /Library/Preferences/Logging/Subsystems/com.jamfdash.plist > /dev/null << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Enable-Private-Data</key>
+    <true/>
+</dict>
+</plist>
+EOF
+```
+
+Remove it when done — it applies to all users on the machine. For fleet-managed Macs, install the included `JamfDash-Debug-Logging.mobileconfig` instead; it scopes the same setting to an MDM enrollment and can be removed remotely.
 
 ---
 
