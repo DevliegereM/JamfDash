@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>PayloadType</key>
+            <string>com.apple.system.logging</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+            <key>PayloadIdentifier</key>
+            <string>com.jamfdash.debug-logging.subsystem</string>
+            <key>PayloadUUID</key>
+            <string>FF09FDD6-76C3-4858-9BD5-9F43C431D9B1</string>
+            <key>PayloadDisplayName</key>
+            <string>JamfDash Subsystem Logging</string>
+            <key>Subsystems</key>
+            <dict>
+                <key>com.jamfdash</key>
+                <dict>
+                    <key>Enable-Private-Data</key>
+                    <true/>
+                    <key>Default-Privacy-Level</key>
+                    <string>Public</string>
+                    <key>Debug-Mode</key>
+                    <string>enable</string>
+                </dict>
+            </dict>
+        </dict>
+    </array>
+    <key>PayloadDisplayName</key>
+    <string>JamfDash Debug Logging</string>
+    <key>PayloadDescription</key>
+    <string>Enables private data visibility and debug-level messages for the com.jamfdash subsystem. Install on a Mac running JamfDash to reveal redacted log values (e.g. jamf-cli arguments) via `log stream`. Remove when debugging is complete.</string>
+    <key>PayloadIdentifier</key>
+    <string>com.jamfdash.debug-logging</string>
+    <key>PayloadOrganization</key>
+    <string>JamfDash</string>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>70E28A0B-A677-42FE-B02D-83EEB9F5E2B0</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>
