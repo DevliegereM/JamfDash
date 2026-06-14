@@ -355,6 +355,51 @@ struct ProtectAnalyticDetail: Decodable, Sendable {
     let analyticActions: [AnalyticAction]?
 }
 
+// MARK: - Audit Log model
+
+/// A single entry returned by `protect audit-logs list`.
+/// Field names vary across Protect versions — the custom init handles all known shapes.
+struct ProtectAuditLogEntry: Decodable, Sendable, Identifiable {
+    let id: String
+    let action: String
+    let actor: String?
+    let timestamp: String?
+    let resource: String?
+    let details: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, uuid
+        case action, event, type
+        case actor, user, username, email
+        case timestamp, time, createdAt
+        case resource, target
+        case details, description, message
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let s = try? c.decode(String.self, forKey: .uuid)         { id = s }
+        else if let s = try? c.decode(String.self, forKey: .id)      { id = s }
+        else                                                          { id = UUID().uuidString }
+        action    = (try? c.decode(String.self, forKey: .action))
+                 ?? (try? c.decode(String.self, forKey: .event))
+                 ?? (try? c.decode(String.self, forKey: .type))
+                 ?? "Unknown"
+        actor     = (try? c.decode(String.self, forKey: .actor))
+                 ?? (try? c.decode(String.self, forKey: .user))
+                 ?? (try? c.decode(String.self, forKey: .username))
+                 ?? (try? c.decode(String.self, forKey: .email))
+        timestamp = (try? c.decode(String.self, forKey: .timestamp))
+                 ?? (try? c.decode(String.self, forKey: .time))
+                 ?? (try? c.decode(String.self, forKey: .createdAt))
+        resource  = (try? c.decode(String.self, forKey: .resource))
+                 ?? (try? c.decode(String.self, forKey: .target))
+        details   = (try? c.decode(String.self, forKey: .details))
+                 ?? (try? c.decode(String.self, forKey: .description))
+                 ?? (try? c.decode(String.self, forKey: .message))
+    }
+}
+
 // MARK: - ProtectViewModel
 
 @MainActor
@@ -369,6 +414,7 @@ final class ProtectViewModel {
     private(set) var plansState:              LoadState<[ProtectPlan]>             = .idle
     private(set) var analyticsState:          LoadState<[ProtectAnalytic]>         = .idle
     private(set) var analyticSetsState:       LoadState<[ProtectAnalyticSet]>      = .idle
+    private(set) var auditLogsState:          LoadState<[ProtectAuditLogEntry]>     = .idle
     private(set) var exceptionSetsState:      LoadState<[ProtectNamedItem]>        = .idle
     private(set) var exceptionSetDetailState: LoadState<ProtectExceptionSetDetail> = .idle
 
@@ -405,6 +451,7 @@ final class ProtectViewModel {
             group.addTask { await self.loadAnalytics() }
             group.addTask { await self.loadAnalyticSets() }
             group.addTask { await self.loadExceptionSets() }
+            group.addTask { await self.loadAuditLogs() }
         }
     }
 
@@ -506,12 +553,27 @@ final class ProtectViewModel {
         Self.logger.debug("Loading Protect exception sets")
         exceptionSetsState = .loading
         do {
-            let items = try decodeList(ProtectNamedItem.self, from: try await cli.run(.protectAuditLogs))
+            let items = try decodeList(ProtectNamedItem.self, from: try await cli.run(.protectExceptionSets))
             Self.logger.debug("Loaded \(items.count) Protect exception sets")
             exceptionSetsState = .loaded(items)
         } catch {
             Self.logger.error("Failed to load Protect exception sets: \(error)")
             exceptionSetsState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadAuditLogs(force: Bool = false) async {
+        guard force || auditLogsState.value == nil else { return }
+        guard force || !auditLogsState.isLoading else { return }
+        Self.logger.debug("Loading Protect audit logs")
+        auditLogsState = .loading
+        do {
+            let items = try decodeList(ProtectAuditLogEntry.self, from: try await cli.run(.protectAuditLogs))
+            Self.logger.debug("Loaded \(items.count) Protect audit log entries")
+            auditLogsState = .loaded(items)
+        } catch {
+            Self.logger.error("Failed to load Protect audit logs: \(error)")
+            auditLogsState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

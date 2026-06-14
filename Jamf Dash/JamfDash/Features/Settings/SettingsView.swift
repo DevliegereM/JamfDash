@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 #if canImport(FoundationModels)
 import FoundationModels
@@ -23,6 +24,9 @@ struct SettingsView: View {
 
             AITab(isEnabled: $isAIEnabled)
                 .tabItem { Label("AI", systemImage: "brain") }
+
+            DeveloperTab()
+                .tabItem { Label("Developer", systemImage: "ladybug") }
         }
         .padding(20)
         .frame(minWidth: 620, minHeight: 520)
@@ -62,6 +66,7 @@ private struct ConnectionTab: View {
                             }
                             .buttonStyle(.plain)
                             .help("Remove this connection")
+                            .accessibilityLabel("Delete \(profile) connection")
                         }
                     }
                 }
@@ -855,3 +860,244 @@ private struct AIStatusSection: View {
     }
 }
 #endif
+
+// MARK: - Developer Tab
+
+private struct DeveloperTab: View {
+    @State private var debugService = DebugLoggingService.shared
+    @State private var showExportSuccess = false
+    @State private var exportHours = 4
+
+    var body: some View {
+        Form {
+            // MARK: Unified Log
+            Section {
+                Toggle(isOn: $debugService.isEnabled) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Verbose Unified Logging")
+                            .fontWeight(.medium)
+                        Text("Captures all log levels (debug, info, notice, error, fault) for the com.jamfdash subsystem in macOS Console and log exports.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if debugService.isEnabled {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .imageScale(.small)
+                        Text("Config installed — restart the app once to apply fully.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Text("Config file")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(debugService.configFilePath)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(debugService.configFilePath, forType: .string)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .imageScale(.small)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy path to clipboard")
+                    }
+                }
+            } header: {
+                Text("Unified Log Verbosity")
+            } footer: {
+                Text("In Console.app filter by: subsystem == \"com.jamfdash\". Without this toggle only errors and faults are persisted; debug and info messages are discarded.")
+                    .foregroundStyle(.secondary)
+            }
+
+            // MARK: Log Export
+            Section {
+                Picker("Time window", selection: $exportHours) {
+                    Text("Last 1 hour").tag(1)
+                    Text("Last 2 hours").tag(2)
+                    Text("Last 4 hours (Recommended)").tag(4)
+                    Text("Last 8 hours").tag(8)
+                }
+                .pickerStyle(.menu)
+
+                HStack {
+                    Button {
+                        Task { await debugService.exportLogs(hours: exportHours) }
+                    } label: {
+                        if debugService.isExporting {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text("Exporting…")
+                            }
+                        } else {
+                            Label("Export Logs to Downloads", systemImage: "arrow.down.doc")
+                        }
+                    }
+                    .disabled(debugService.isExporting)
+                    .help("Runs 'log show' for the com.jamfdash subsystem and saves the result to ~/Downloads")
+
+                    Spacer()
+
+                    if let url = debugService.lastExportURL {
+                        Button {
+                            debugService.revealInFinder()
+                        } label: {
+                            Label("Show in Finder", systemImage: "folder")
+                        }
+                        .help(url.path)
+                    }
+                }
+
+                if let err = debugService.exportError {
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.caption)
+                }
+
+                if let url = debugService.lastExportURL {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        Text("Saved to \(url.lastPathComponent)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Log Export")
+            } footer: {
+                Text("Exports recent unified log entries for JamfDash to a .log file. Enable verbose logging first to capture debug-level entries, reproduce the issue, then export.")
+                    .foregroundStyle(.secondary)
+            }
+
+            // MARK: Pre-launch activation
+            Section {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Enable before first launch (Terminal)")
+                        .fontWeight(.medium)
+                    terminalCommandRow(
+                        label: "Install config plist:",
+                        command: #"mkdir -p ~/Library/Preferences/Logging/Subsystems && printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>DEFAULT-OPTIONS</key><dict><key>level</key><string>debug</string></dict></dict></plist>' > ~/Library/Preferences/Logging/Subsystems/com.jamfdash.plist"#
+                    )
+                    Divider()
+                    terminalCommandRow(
+                        label: "Launch with --debug flag:",
+                        command: #"open -a "JamfDash" --args --debug"#
+                    )
+                    Divider()
+                    terminalCommandRow(
+                        label: "Stream live in Terminal:",
+                        command: #"log stream --predicate 'subsystem == "com.jamfdash"' --level debug"#
+                    )
+                    Divider()
+                    terminalCommandRow(
+                        label: "Capture stream to file (Ctrl+C to stop):",
+                        command: #"log stream --predicate 'subsystem == "com.jamfdash"' --level debug > ~/Desktop/JamfDash.log"#
+                    )
+                    Divider()
+                    terminalCommandRow(
+                        label: "Capture to file AND watch in Terminal:",
+                        command: #"log stream --predicate 'subsystem == "com.jamfdash"' --level debug | tee ~/Desktop/JamfDash.log"#
+                    )
+                    Divider()
+                    terminalCommandRow(
+                        label: "Remove config plist:",
+                        command: "rm ~/Library/Preferences/Logging/Subsystems/com.jamfdash.plist"
+                    )
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Pre-launch Activation")
+            } footer: {
+                Text("The plist approach takes effect before your process's first line of code runs — the OS logging daemon reads it at process startup. Once installed via Terminal or the toggle above, it persists across all future launches automatically.")
+                    .foregroundStyle(.secondary)
+            }
+
+            // MARK: How to read logs
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    instructionRow(
+                        step: "1",
+                        title: "Open Console.app",
+                        detail: "Found in /Applications/Utilities/ or via Spotlight."
+                    )
+                    Divider()
+                    instructionRow(
+                        step: "2",
+                        title: "Filter by subsystem",
+                        detail: "In the search bar, type:  subsystem:com.jamfdash"
+                    )
+                    Divider()
+                    instructionRow(
+                        step: "3",
+                        title: "Set Action → Include Debug Messages",
+                        detail: "In the Console menu bar choose Action → Include Debug Messages (and Info Messages) to see all log levels."
+                    )
+                    Divider()
+                    instructionRow(
+                        step: "4",
+                        title: "Or use Terminal",
+                        detail: "log stream --predicate 'subsystem == \"com.jamfdash\"' --level debug"
+                    )
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("How to Read Logs")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func terminalCommandRow(label: String, command: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(command)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(command, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .imageScale(.small)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
+            }
+            .padding(8)
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+        }
+    }
+
+    @ViewBuilder
+    private func instructionRow(step: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text(step)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Color.accentColor, in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).fontWeight(.medium)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+}

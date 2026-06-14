@@ -1,12 +1,17 @@
 import SwiftUI
 
 struct BlueprintsView: View {
+    // @Bindable required: provides $vm.selectedBlueprintID binding for List(selection:)
     @Bindable var vm: PlatformViewModel
+    @State private var refreshTask: Task<Void, Never>? = nil
 
     var body: some View {
         Group {
             switch vm.blueprintsState {
-            case .idle, .loading:
+            case .idle:
+                ContentUnavailableView("Blueprints", systemImage: "square.3.layers.3d")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .loading:
                 VStack(spacing: 12) {
                     ProgressView()
                     Text("Loading blueprints…").foregroundStyle(.secondary)
@@ -14,7 +19,7 @@ struct BlueprintsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let error):
                 if PlatformViewModel.isPlatformAuthError(error) {
-                    PlatformAuthRequiredView()
+                    PlatformAuthRequiredView(featureName: "Blueprints")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 12) {
@@ -26,19 +31,23 @@ struct BlueprintsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             case .loaded(let blueprints):
-                HSplitView {
+                HStack(spacing: 0) {
                     blueprintList(blueprints)
-                        .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
+                        .frame(width: 240)
+                    Divider()
                     blueprintDetail
-                        .frame(minWidth: 300, maxWidth: .infinity)
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
         .navigationTitle("Blueprints")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { Task { await vm.loadBlueprints(force: true) } } label: {
-                    Image(systemName: "arrow.clockwise")
+                Button {
+                    refreshTask?.cancel()
+                    refreshTask = Task { await vm.loadBlueprints(force: true) }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm.blueprintsState.isLoading)
             }
@@ -78,151 +87,10 @@ struct BlueprintsView: View {
         case .failed(let e):
             VStack { Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange); Text(e).font(.caption) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .loaded(let json):
-            BlueprintDetailView(json: json)
+        case .loaded(let result):
+            BlueprintDetailView(result: result)
         }
     }
-}
-
-// MARK: - Blueprint JSON Models
-
-private struct BlueprintDetail: Decodable {
-    let id: String
-    let name: String
-    let description: String?
-    let created: Date?
-    let updated: Date?
-    let deploymentState: BlueprintDeploymentState?
-    let scope: BlueprintScope?
-    let steps: [BlueprintStep]?
-}
-
-private struct BlueprintDeploymentState: Decodable {
-    let state: String
-    let lastDeployment: BlueprintLastDeployment?
-}
-
-private struct BlueprintLastDeployment: Decodable {
-    let started: Date?
-    let state: String
-}
-
-private struct BlueprintScope: Decodable {
-    let deviceGroups: [String]?
-    let devices: [String]?
-    let users: [String]?
-    let userGroups: [String]?
-}
-
-private struct BlueprintStep: Decodable {
-    let name: String
-    let components: [BlueprintComponent]?
-}
-
-private struct BlueprintComponent: Decodable {
-    let identifier: String
-    // The API ships the content in one of three shapes:
-    // 1. component.configuration.declarations[]  (nested array)
-    // 2. component.payload  (direct object)
-    // 3. component.configuration  (flat settings object, not wrapped)
-    let configuration: BlueprintComponentConfig?   // shape 1
-    let directPayload: JSONPayload?                 // shape 2
-    let rawConfiguration: JSONPayload?              // shape 3 (captured when shape 1 parse fails)
-    // Optional top-level declaration metadata
-    let type: String?
-    let channelType: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case identifier, type, channelType, configuration
-        case directPayload = "payload"
-    }
-
-    init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        identifier    = try  c.decode(String.self,                   forKey: .identifier)
-        type          = try? c.decode(String.self,                   forKey: .type)
-        channelType   = try? c.decode(String.self,                   forKey: .channelType)
-        directPayload = try? c.decode(JSONPayload.self,              forKey: .directPayload)
-        let structured = try? c.decode(BlueprintComponentConfig.self, forKey: .configuration)
-        configuration = structured
-        // Shape 3: grab raw config only when structured decode found no declarations
-        rawConfiguration = (structured?.declarations?.isEmpty != false)
-            ? (try? c.decode(JSONPayload.self, forKey: .configuration))
-            : nil
-    }
-
-    /// The best-available payload for display — prefers nested declarations,
-    /// then direct payload, then raw configuration.
-    var effectivePayload: JSONPayload? { directPayload ?? rawConfiguration }
-    var hasPayload: Bool {
-        let declarations = configuration?.declarations ?? []
-        if !declarations.isEmpty { return true }
-        return effectivePayload != nil
-    }
-}
-
-private struct BlueprintComponentConfig: Decodable {
-    let declarations: [BlueprintDeclaration]?
-}
-
-private struct BlueprintDeclaration: Decodable {
-    let type: String
-    let kind: String?
-    let channelType: String?
-    let payload: JSONPayload?
-}
-
-// Dynamic JSON value for arbitrary declaration payloads
-private enum JSONPayload: Decodable {
-    case bool(Bool)
-    case int(Int)
-    case double(Double)
-    case string(String)
-    case array([JSONPayload])
-    case object([String: JSONPayload])
-    case null
-
-    init(from decoder: any Decoder) throws {
-        let c = try decoder.singleValueContainer()
-        if c.decodeNil()              { self = .null }
-        else if let v = try? c.decode(Bool.self)          { self = .bool(v) }
-        else if let v = try? c.decode(Int.self)           { self = .int(v) }
-        else if let v = try? c.decode(Double.self)        { self = .double(v) }
-        else if let v = try? c.decode(String.self)        { self = .string(v) }
-        else if let v = try? c.decode([JSONPayload].self) { self = .array(v) }
-        else { self = .object(try c.decode([String: JSONPayload].self)) }
-    }
-
-    var displayString: String {
-        switch self {
-        case .bool(let b):   return b ? "true" : "false"
-        case .int(let i):    return "\(i)"
-        case .double(let d): return "\(d)"
-        case .string(let s): return s
-        case .null:          return "null"
-        case .array(let a):  return "[\(a.map(\.displayString).joined(separator: ", "))]"
-        case .object(let d): return d.map { "\($0.key): \($0.value.displayString)" }.sorted().joined(separator: ", ")
-        }
-    }
-}
-
-// MARK: - Blueprint Decoder
-
-private func makeBlueprintDecoder() -> JSONDecoder {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    decoder.dateDecodingStrategy = .custom { dec in
-        let container = try dec.singleValueContainer()
-        let string = try container.decode(String.self)
-        let withFrac = ISO8601DateFormatter()
-        withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = withFrac.date(from: string) { return date }
-        let noFrac = ISO8601DateFormatter()
-        noFrac.formatOptions = [.withInternetDateTime]
-        if let date = noFrac.date(from: string) { return date }
-        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot parse date: \(string)")
-    }
-    return decoder
 }
 
 // MARK: - Deployment State Badge
@@ -241,10 +109,10 @@ private struct DeploymentStateBadge: View {
     var body: some View {
         Text(state)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(badgeColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(badgeColor, in: Capsule())
+            .background(badgeColor.opacity(0.15), in: Capsule())
             .accessibilityLabel("Deployment state: \(state)")
     }
 }
@@ -279,19 +147,14 @@ private struct BlueprintInfoRow: View {
 // MARK: - Blueprint Detail View
 
 private struct BlueprintDetailView: View {
-    let json: String
-
-    private var detail: BlueprintDetail? {
-        guard let data = json.data(using: .utf8) else { return nil }
-        return try? makeBlueprintDecoder().decode(BlueprintDetail.self, from: data)
-    }
+    let result: BlueprintDetailResult
 
     var body: some View {
-        if let detail {
+        if let detail = result.detail {
             BlueprintStructuredView(detail: detail)
         } else {
             ScrollView {
-                Text(json)
+                Text(result.rawJSON)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .padding()
@@ -412,20 +275,16 @@ private struct BlueprintStructuredView: View {
         if deviceGroups.isEmpty && devices.isEmpty && users.isEmpty && userGroups.isEmpty {
             Text("No scope assigned").font(.subheadline).foregroundStyle(.secondary)
         } else {
-            if !deviceGroups.isEmpty {
-                scopeNameList(label: "Device Groups", names: deviceGroups)
-            }
-            if !devices.isEmpty {
-                if !deviceGroups.isEmpty { Divider() }
-                scopeNameList(label: "Devices", names: devices)
-            }
-            if !users.isEmpty {
-                if !deviceGroups.isEmpty || !devices.isEmpty { Divider() }
-                scopeNameList(label: "Users", names: users)
-            }
-            if !userGroups.isEmpty {
-                if !deviceGroups.isEmpty || !devices.isEmpty || !users.isEmpty { Divider() }
-                scopeNameList(label: "User Groups", names: userGroups)
+            let rows: [(label: String, names: [String])] = [
+                ("Device Groups", deviceGroups),
+                ("Devices",       devices),
+                ("Users",         users),
+                ("User Groups",   userGroups),
+            ].filter { !$0.names.isEmpty }
+
+            ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
+                if idx > 0 { Divider() }
+                scopeNameList(label: row.label, names: row.names)
             }
         }
     }
@@ -745,91 +604,5 @@ private struct BulletLabelStyle: LabelStyle {
                 .foregroundStyle(.secondary)
             configuration.title
         }
-    }
-}
-
-// MARK: - PlatformAuthRequiredView
-
-private struct PlatformAuthRequiredView: View {
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
-                HStack(spacing: 12) {
-                    Image(systemName: "lock.shield")
-                        .font(.system(size: 32, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Platform Gateway Auth Required")
-                            .font(.headline)
-                        Text("Blueprints require a Jamf platform profile.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                // Version requirement notice
-                HStack(spacing: 8) {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundStyle(.blue)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Requires jamf-cli 1.17 or later")
-                            .font(.callout)
-                            .fontWeight(.medium)
-                        Link("Download the latest release at github.com/Jamf-Concepts/jamf-cli",
-                             destination: URL(string: "https://github.com/Jamf-Concepts/jamf-cli/releases")!)
-                            .font(.caption)
-                    }
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.blue.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                Divider()
-
-                // CLI setup instructions
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Run this command in Terminal to set one up:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Text("""
-jamf-cli config add-profile <name> \\
-  --auth-method platform \\
-  --url <gateway-url> \\
-  --tenant-id <id>
-""")
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.regularMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                // Environment variable alternative
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Or set environment variables:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Text("JAMF_URL, JAMF_CLIENT_ID, JAMF_CLIENT_SECRET, JAMF_TENANT_ID")
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.regularMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: 560, alignment: .leading)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(32)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

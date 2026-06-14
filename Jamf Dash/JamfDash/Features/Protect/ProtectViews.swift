@@ -221,35 +221,71 @@ struct ProtectInsightsView: View {
     }
 }
 
-// MARK: - Exception Sets
+// MARK: - Audit Logs
 
 struct ProtectAuditLogsView: View {
     @Bindable var vm: ProtectViewModel
-    @State private var selectedID: ProtectNamedItem.ID? = nil
-    @State private var detailItem: ProtectNamedItem? = nil
+    @State private var selectedID: ProtectAuditLogEntry.ID? = nil
+    @State private var detailEntry: ProtectAuditLogEntry? = nil
 
     var body: some View {
-        AsyncContentView(state: vm.exceptionSetsState, retry: { await vm.loadExceptionSets(force: true) }) { sets in
-            if sets.isEmpty {
-                protectEmptyState(icon: "shield.slash", label: "No exception sets found")
+        AsyncContentView(state: vm.auditLogsState, retry: { await vm.loadAuditLogs(force: true) }) { entries in
+            if entries.isEmpty {
+                protectEmptyState(icon: "clock.arrow.circlepath", label: "No audit log entries found")
             } else {
-                Table(sets, selection: $selectedID) {
-                    TableColumn("Name") { Text($0.name) }
-                    TableColumn("UUID") { Text($0.id).foregroundStyle(.secondary).font(.caption) }
+                Table(entries, selection: $selectedID) {
+                    TableColumn("Action") { (entry: ProtectAuditLogEntry) in
+                        Text(entry.action).lineLimit(1)
+                    }
+                    TableColumn("Actor") { (entry: ProtectAuditLogEntry) in
+                        Text(entry.actor ?? "—")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    TableColumn("Timestamp") { (entry: ProtectAuditLogEntry) in
+                        Text(entry.timestamp ?? "—")
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                            .lineLimit(1)
+                    }
+                    TableColumn("Resource") { (entry: ProtectAuditLogEntry) in
+                        Text(entry.resource ?? "—")
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
                 .onChange(of: selectedID) { _, newID in
-                    guard let id = newID, let item = sets.first(where: { $0.id == id }) else { return }
-                    detailItem = item
-                    Task { await vm.loadExceptionSetDetail(name: item.name) }
+                    guard let id = newID,
+                          let entry = entries.first(where: { $0.id == id })
+                    else { return }
+                    detailEntry = entry
                 }
             }
         }
-        .navigationTitle("Protect Exception Sets")
-        .toolbar { refreshButton { await vm.loadExceptionSets(force: true) } }
-        .task { await vm.loadExceptionSets() }
-        .sheet(item: $detailItem) { item in
-            ExceptionSetDetailSheet(item: item, vm: vm)
+        .navigationTitle("Protect Audit Logs")
+        .toolbar { refreshButton { await vm.loadAuditLogs(force: true) } }
+        .task { await vm.loadAuditLogs() }
+        .sheet(item: $detailEntry) { entry in
+            AuditLogDetailSheet(entry: entry)
                 .onDisappear { selectedID = nil }
+        }
+    }
+}
+
+// MARK: - Audit Log detail sheet
+
+private struct AuditLogDetailSheet: View {
+    let entry: ProtectAuditLogEntry
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        DetailSheetContainer(title: entry.action, subtitle: entry.actor) {
+            Group {
+                if let v = entry.timestamp { detailRow("Timestamp", value: v) }
+                if let v = entry.resource  { detailRow("Resource",  value: v) }
+                if let v = entry.details   { detailRow("Details",   value: v) }
+                detailRow("ID", value: entry.id)
+            }
         }
     }
 }
@@ -653,6 +689,7 @@ private func refreshButton(action: @escaping @MainActor () async -> Void) -> som
         } label: {
             Label("Refresh", systemImage: "arrow.clockwise")
         }
+        .help("Refresh data")
     }
 }
 

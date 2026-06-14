@@ -13,6 +13,7 @@ struct RootView: View {
             switch appState.phase {
             case .launching:
                 LaunchView()
+                    .navigationTitle("")
 
             case .onboarding:
                 OnboardingView(vm: env.makeOnboardingVM()) {
@@ -26,9 +27,13 @@ struct RootView: View {
 
             case .main:
                 ZStack {
-                    MainView()
+                    if !showLaunch {
+                        MainView()
+                            .transition(.opacity)
+                    }
                     if showLaunch {
                         LaunchView()
+                            .navigationTitle("")
                             .transition(.opacity)
                     }
                 }
@@ -78,6 +83,7 @@ private struct LaunchView: View {
                 Mark()
                     .frame(width: 120, height: 120)
                     .padding(.bottom, 24)
+                    .accessibilityHidden(true)
 
                 Text("Jamf Dash")
                     .font(.system(size: 38, weight: .bold))
@@ -94,6 +100,7 @@ private struct LaunchView: View {
                             .fill(.green)
                             .frame(width: 6, height: 6)
                             .shadow(color: .green.opacity(0.6), radius: 3)
+                            .accessibilityHidden(true)
                         (Text("Connected to ").foregroundStyle(.secondary) +
                          Text(url).fontWeight(.medium))
                     }

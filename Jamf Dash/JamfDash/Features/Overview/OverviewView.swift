@@ -30,6 +30,7 @@ struct OverviewView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm.state.isLoading)
+                .help("Refresh instance overview")
             }
         }
         .liquidGlassToolbar()

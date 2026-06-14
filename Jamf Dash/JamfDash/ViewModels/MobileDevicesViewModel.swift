@@ -105,7 +105,7 @@ final class MobileDevicesViewModel {
         state = .loading
         do {
             let data = try await cli.run(.mobileDeviceList)
-            let devices = try Self.decodeDevices(from: data)
+            let devices = Self.decodeDevices(from: data)
             Self.logger.debug("Loaded \(devices.count) mobile devices")
             state = .loaded(devices)
         } catch {
@@ -114,13 +114,23 @@ final class MobileDevicesViewModel {
         }
     }
 
-    private static func decodeDevices(from data: Data) throws -> [MobileDevice] {
+    private static func decodeDevices(from data: Data) -> [MobileDevice] {
+        // jamf-cli returns JSON null when there are no mobile devices enrolled or the API
+        // client lacks the mobile-device scope — treat this as an empty list.
+        let raw = (String(data: data, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard raw != "null" && !raw.isEmpty else {
+            Self.logger.info("Mobile device list returned null — no devices enrolled or scope not granted")
+            return []
+        }
         let decoder = JSONDecoder()
         if let items = try? decoder.decode([MobileDevice].self, from: data) { return items }
         struct Paged: Decodable { let results: [MobileDevice] }
         if let paged = try? decoder.decode(Paged.self, from: data) { return paged.results }
         struct Items: Decodable { let items: [MobileDevice] }
-        return try decoder.decode(Items.self, from: data).items
+        if let wrapped = try? decoder.decode(Items.self, from: data) { return wrapped.items }
+        // Unexpected shape — log and return empty rather than crashing the sync.
+        Self.logger.error("Mobile device list: unexpected response shape, returning empty")
+        return []
     }
 
     // MARK: - Computed

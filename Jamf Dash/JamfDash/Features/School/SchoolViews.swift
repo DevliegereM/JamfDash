@@ -164,6 +164,94 @@ private func schoolRefreshButton(action: @escaping @MainActor () async -> Void) 
         } label: {
             Label("Refresh", systemImage: "arrow.clockwise")
         }
+        .help("Refresh data")
+    }
+}
+
+// MARK: - Configuration Profiles
+
+struct SchoolProfilesView: View {
+    @Bindable var vm: SchoolViewModel
+
+    var body: some View {
+        AsyncContentView(state: vm.profilesState, retry: { await vm.loadProfiles(force: true) }) { profiles in
+            Table(profiles) {
+                TableColumn("Name") { Text($0.displayName) }
+                TableColumn("Scope") {
+                    Text($0.displayScope)
+                        .foregroundStyle(.secondary)
+                }
+                TableColumn("Payloads") {
+                    if let count = $0.payloadCount {
+                        Text("\(count)")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("—").foregroundStyle(.secondary)
+                    }
+                }
+                .width(80)
+                TableColumn("Status") {
+                    Text($0.displayEnabled)
+                        .foregroundStyle($0.enabled == true ? .green : .secondary)
+                }
+                .width(90)
+            }
+        }
+        .navigationTitle("Configuration Profiles")
+        .toolbar { schoolRefreshButton { await vm.loadProfiles(force: true) } }
+        .task { await vm.loadProfiles() }
+        .liquidGlassToolbar()
+    }
+}
+
+// MARK: - DEP / ADE Devices
+
+struct SchoolDepDevicesView: View {
+    @Bindable var vm: SchoolViewModel
+    @State private var searchText = ""
+
+    private var filtered: [SchoolDepDevice] {
+        guard case .loaded(let items) = vm.depDevicesState else { return [] }
+        guard !searchText.isEmpty else { return items }
+        return items.filter {
+            ($0.serial?.localizedCaseInsensitiveContains(searchText) == true) ||
+            ($0.model?.localizedCaseInsensitiveContains(searchText) == true) ||
+            ($0.profileName?.localizedCaseInsensitiveContains(searchText) == true)
+        }
+    }
+
+    var body: some View {
+        AsyncContentView(state: vm.depDevicesState, retry: { await vm.loadDepDevices(force: true) }) { _ in
+            Table(filtered) {
+                TableColumn("Serial") { device in
+                    Text(device.displaySerial)
+                        .font(.body.monospaced())
+                }
+                TableColumn("Model") { device in
+                    Text(device.model ?? "—")
+                        .foregroundStyle(.secondary)
+                }
+                TableColumn("Assigned Profile") { device in
+                    Text(device.profileName ?? "None")
+                        .foregroundStyle(device.profileName == nil ? .tertiary : .primary)
+                }
+                TableColumn("Status") { device in
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(device.statusColor)
+                            .frame(width: 7, height: 7)
+                        Text(device.displayStatus)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .width(120)
+            }
+        }
+        .navigationTitle("DEP / ADE Devices")
+        .searchable(text: $searchText, prompt: "Search serial, model, profile…")
+        .toolbar { schoolRefreshButton { await vm.loadDepDevices(force: true) } }
+        .task { await vm.loadDepDevices() }
+        .liquidGlassToolbar()
     }
 }
 

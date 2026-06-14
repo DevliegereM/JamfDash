@@ -37,6 +37,8 @@ struct ComplianceDonutChart: View {
                     )
                     .foregroundStyle(slice.isCompliant ? color : Color.gray.opacity(0.3))
                     .cornerRadius(4)
+                    .accessibilityLabel(slice.isCompliant ? "Compliant" : "Non-compliant")
+                    .accessibilityValue("\(slice.value) of \(total) devices")
                 }
                 .frame(width: 110, height: 110)
 

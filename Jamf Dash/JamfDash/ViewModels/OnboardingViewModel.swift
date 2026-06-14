@@ -1,9 +1,11 @@
 import Foundation
+import OSLog
 import Observation
 
 @MainActor
 @Observable
 final class OnboardingViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "OnboardingViewModel")
 
     enum Step {
         case welcome
@@ -119,18 +121,40 @@ final class OnboardingViewModel {
     // MARK: - CLI Download
 
     func downloadCLI() async {
+        Self.logger.info("Downloading jamf-cli binary")
         isDownloading    = true
         downloadProgress = "Downloading jamf-cli…"
         error            = nil
         do {
             try await cliManager.ensureBinary()
+            Self.logger.info("jamf-cli binary installed successfully")
             downloadProgress = "jamf-cli installed successfully."
             step = await cliManager.hasProfiles() ? .complete : .productPicker
         } catch {
+            Self.logger.error("jamf-cli download failed: \(error)")
             self.error       = error.localizedDescription
             downloadProgress = ""
         }
         isDownloading = false
+    }
+
+    // MARK: - HTTPS URL validation
+
+    private func requireHTTPS(_ url: String) throws {
+        guard url.lowercased().hasPrefix("https://") else {
+            throw NSError(domain: "JamfDash", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Server URL must use HTTPS (e.g. https://your-server.jamfcloud.com)"])
+        }
+    }
+
+    // MARK: - Credential clearing
+
+    func clearSetupForm() {
+        serverURL = ""; username = ""; password = ""
+        ssoServerURL = ""; ssoClientID = ""; ssoClientSecret = ""
+        platformTenantID = ""; platformClientID = ""; platformClientSecret = ""
+        protectServerURL = ""; protectClientID = ""; protectClientSecret = ""
+        schoolServerURL = ""; schoolNetworkID = ""; schoolAPIKey = ""
     }
 
     // MARK: - Pro Local Account Setup
@@ -144,11 +168,13 @@ final class OnboardingViewModel {
     func runLocalSetup() async {
         isRunningSetup = true
         error          = nil
+        let name = profileName.trimmingCharacters(in: .whitespaces).isEmpty
+                       ? "Jamf-CLI - Standard"
+                       : profileName.trimmingCharacters(in: .whitespaces)
+        Self.logger.info("Running local-account setup — profile: \(name, privacy: .private), scope: \(self.scope.rawValue)")
         do {
-            let name = profileName.trimmingCharacters(in: .whitespaces).isEmpty
-                           ? "Jamf-CLI - Standard"
-                           : profileName.trimmingCharacters(in: .whitespaces)
             let trimmedURL = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            try requireHTTPS(trimmedURL)
             _ = try await cliManager.setup(
                 serverURL:   trimmedURL,
                 username:    username.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -160,8 +186,12 @@ final class OnboardingViewModel {
             profileService.setScope(scope, for: name)
             profileService.setServerURL(trimmedURL, for: name)
             try await verifyAndCleanup(profileName: name, product: .pro)
+            Self.logger.info("Local-account setup complete — profile: \(name, privacy: .private)")
+            clearSetupForm()
             step = .complete
         } catch {
+            Self.logger.error("Local-account setup failed — profile: \(name, privacy: .private): \(error)")
+            clearSetupForm()
             self.error = error.localizedDescription
         }
         isRunningSetup = false
@@ -178,11 +208,13 @@ final class OnboardingViewModel {
     func runSSOSetup() async {
         isRunningSetup = true
         error          = nil
+        let name = ssoProfileName.trimmingCharacters(in: .whitespaces).isEmpty
+                       ? "Jamf-CLI - SSO"
+                       : ssoProfileName.trimmingCharacters(in: .whitespaces)
+        Self.logger.info("Running OAuth/SSO setup — profile: \(name, privacy: .private)")
         do {
-            let name = ssoProfileName.trimmingCharacters(in: .whitespaces).isEmpty
-                           ? "Jamf-CLI - SSO"
-                           : ssoProfileName.trimmingCharacters(in: .whitespaces)
             let trimmedURL = ssoServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            try requireHTTPS(trimmedURL)
             _ = try await cliManager.setupOAuth(
                 serverURL:    trimmedURL,
                 profileName:  name,
@@ -193,8 +225,12 @@ final class OnboardingViewModel {
             profileService.setScope(.fullAdmin, for: name)
             profileService.setServerURL(trimmedURL, for: name)
             try await verifyAndCleanup(profileName: name, product: .pro)
+            Self.logger.info("OAuth/SSO setup complete — profile: \(name, privacy: .private)")
+            clearSetupForm()
             step = .complete
         } catch {
+            Self.logger.error("OAuth/SSO setup failed — profile: \(name, privacy: .private): \(error)")
+            clearSetupForm()
             self.error = error.localizedDescription
         }
         isRunningSetup = false
@@ -212,12 +248,14 @@ final class OnboardingViewModel {
     func runPlatformSetup() async {
         isRunningSetup = true
         error          = nil
+        let name = platformProfileName.trimmingCharacters(in: .whitespaces).isEmpty
+                       ? "Jamf Platform"
+                       : platformProfileName.trimmingCharacters(in: .whitespaces)
+        Self.logger.info("Running Platform API setup — profile: \(name, privacy: .private)")
         do {
-            let name = platformProfileName.trimmingCharacters(in: .whitespaces).isEmpty
-                           ? "Jamf Platform"
-                           : platformProfileName.trimmingCharacters(in: .whitespaces)
             let trimmedURL    = platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedTenant = platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines)
+            try requireHTTPS(trimmedURL)
             _ = try await cliManager.setupPlatform(
                 gatewayURL:   trimmedURL,
                 tenantID:     trimmedTenant,
@@ -229,8 +267,12 @@ final class OnboardingViewModel {
             profileService.setScope(.fullAdmin, for: name)
             profileService.setServerURL(trimmedURL, for: name)
             try await verifyAndCleanup(profileName: name, product: .pro)
+            Self.logger.info("Platform API setup complete — profile: \(name, privacy: .private)")
+            clearSetupForm()
             step = .complete
         } catch {
+            Self.logger.error("Platform API setup failed — profile: \(name, privacy: .private): \(error)")
+            clearSetupForm()
             self.error = error.localizedDescription
         }
         isRunningSetup = false
@@ -247,11 +289,13 @@ final class OnboardingViewModel {
     func runProtectSetup() async {
         isRunningSetup = true
         error          = nil
+        let name = protectProfileName.trimmingCharacters(in: .whitespaces).isEmpty
+                       ? "Jamf Protect"
+                       : protectProfileName.trimmingCharacters(in: .whitespaces)
+        Self.logger.info("Running Jamf Protect setup — profile: \(name, privacy: .private)")
         do {
-            let name = protectProfileName.trimmingCharacters(in: .whitespaces).isEmpty
-                           ? "Jamf Protect"
-                           : protectProfileName.trimmingCharacters(in: .whitespaces)
             let trimmedURL = protectServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            try requireHTTPS(trimmedURL)
             _ = try await cliManager.setupOAuth(
                 serverURL:    trimmedURL,
                 profileName:  name,
@@ -261,8 +305,12 @@ final class OnboardingViewModel {
             profileService.setProduct(.protect, for: name)
             profileService.setServerURL(trimmedURL, for: name)
             try await verifyAndCleanup(profileName: name, product: .protect)
+            Self.logger.info("Jamf Protect setup complete — profile: \(name, privacy: .private)")
+            clearSetupForm()
             step = .complete
         } catch {
+            Self.logger.error("Jamf Protect setup failed — profile: \(name, privacy: .private): \(error)")
+            clearSetupForm()
             self.error = error.localizedDescription
         }
         isRunningSetup = false
@@ -279,11 +327,13 @@ final class OnboardingViewModel {
     func runSchoolSetup() async {
         isRunningSetup = true
         error          = nil
+        let name = schoolProfileName.trimmingCharacters(in: .whitespaces).isEmpty
+                       ? "Jamf School"
+                       : schoolProfileName.trimmingCharacters(in: .whitespaces)
+        Self.logger.info("Running Jamf School setup — profile: \(name, privacy: .private)")
         do {
-            let name = schoolProfileName.trimmingCharacters(in: .whitespaces).isEmpty
-                           ? "Jamf School"
-                           : schoolProfileName.trimmingCharacters(in: .whitespaces)
             let trimmedURL = schoolServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            try requireHTTPS(trimmedURL)
             _ = try await cliManager.setupSchool(
                 serverURL:   trimmedURL,
                 profileName: name,
@@ -293,8 +343,12 @@ final class OnboardingViewModel {
             profileService.setProduct(.school, for: name)
             profileService.setServerURL(trimmedURL, for: name)
             try await verifyAndCleanup(profileName: name, product: .school)
+            Self.logger.info("Jamf School setup complete — profile: \(name, privacy: .private)")
+            clearSetupForm()
             step = .complete
         } catch {
+            Self.logger.error("Jamf School setup failed — profile: \(name, privacy: .private): \(error)")
+            clearSetupForm()
             self.error = error.localizedDescription
         }
         isRunningSetup = false
@@ -303,9 +357,12 @@ final class OnboardingViewModel {
     // MARK: - Verification
 
     private func verifyAndCleanup(profileName: String, product: JamfProduct) async throws {
+        Self.logger.info("Verifying connection for profile: \(profileName, privacy: .private), product: \(product.rawValue, privacy: .public)")
         do {
             try await cliManager.verifyConnection(profileName: profileName, product: product)
+            Self.logger.info("Connection verified for profile: \(profileName, privacy: .private)")
         } catch {
+            Self.logger.error("Verification failed for profile: \(profileName, privacy: .private) — rolling back. Error: \(error)")
             try? await cliManager.removeProfile(profileName)
             profileService.removeProfileData(profileName)
             throw setupVerificationError(from: error, profile: profileName)
@@ -320,7 +377,10 @@ final class OnboardingViewModel {
                lower.contains("invalid") || lower.contains("forbidden") || lower.contains("401") {
                 reason = "Authentication failed — check your credentials and try again."
             } else {
-                reason = stderr.isEmpty ? error.localizedDescription : stderr
+                // Do not surface raw stderr to the UI — it may contain server hostnames,
+                // stack traces, or partial API responses. Log privately for diagnostics.
+                Self.logger.error("Setup verification error detail — profile: \(profile, privacy: .private): \(stderr, privacy: .private)")
+                reason = "Connection test failed. Enable debug logging and check the log for details."
             }
             return NSError(domain: "JamfDash", code: 1,
                            userInfo: [NSLocalizedDescriptionKey: "Could not connect to \"\(profile)\": \(reason)"])

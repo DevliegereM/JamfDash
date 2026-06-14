@@ -35,26 +35,49 @@ struct FleetRepository: Sendable {
         return try decodeArray(data)
     }
 
+    /// Maximum number of simultaneous jamf-cli detail calls for category back-fill.
+    /// Keeps subprocess count bounded so the system doesn't become overwhelmed during
+    /// the initial sync when policies/profiles are fetched in parallel with other tasks.
+    private static let categoryFetchConcurrency = 6
+
     func fetchPolicyCategoryMap(for policies: [Policy]) async -> [Int: String] {
-        await withTaskGroup(of: (Int, String?).self) { group in
-            for policy in policies {
-                group.addTask { (policy.id, try? await self.policyCategory(id: policy.id)) }
+        guard !policies.isEmpty else { return [:] }
+        Self.logger.info("Back-filling categories for \(policies.count) uncategorized policies (batch size \(Self.categoryFetchConcurrency))")
+        var map: [Int: String] = [:]
+        for chunk in policies.chunked(by: Self.categoryFetchConcurrency) {
+            guard !Task.isCancelled else {
+                Self.logger.info("Policy category back-fill cancelled after \(map.count) entries")
+                break
             }
-            var map: [Int: String] = [:]
-            for await (id, name) in group { if let name { map[id] = name } }
-            return map
+            await withTaskGroup(of: (Int, String?).self) { group in
+                for policy in chunk {
+                    group.addTask { (policy.id, try? await self.policyCategory(id: policy.id)) }
+                }
+                for await (id, name) in group { if let name { map[id] = name } }
+            }
         }
+        Self.logger.info("Policy category back-fill complete — \(map.count)/\(policies.count) resolved")
+        return map
     }
 
     func fetchConfigProfileCategoryMap(for profiles: [ConfigProfile]) async -> [Int: String] {
-        await withTaskGroup(of: (Int, String?).self) { group in
-            for profile in profiles {
-                group.addTask { (profile.id, try? await self.configProfileCategory(id: profile.id)) }
+        guard !profiles.isEmpty else { return [:] }
+        Self.logger.info("Back-filling categories for \(profiles.count) config profiles (batch size \(Self.categoryFetchConcurrency))")
+        var map: [Int: String] = [:]
+        for chunk in profiles.chunked(by: Self.categoryFetchConcurrency) {
+            guard !Task.isCancelled else {
+                Self.logger.info("Config profile category back-fill cancelled after \(map.count) entries")
+                break
             }
-            var map: [Int: String] = [:]
-            for await (id, name) in group { if let name { map[id] = name } }
-            return map
+            await withTaskGroup(of: (Int, String?).self) { group in
+                for profile in chunk {
+                    group.addTask { (profile.id, try? await self.configProfileCategory(id: profile.id)) }
+                }
+                for await (id, name) in group { if let name { map[id] = name } }
+            }
         }
+        Self.logger.info("Config profile category back-fill complete — \(map.count)/\(profiles.count) resolved")
+        return map
     }
 
     private func policyCategory(id: Int) async throws -> String? {
@@ -186,5 +209,17 @@ struct FleetRepository: Sendable {
     private func isNull(_ data: Data) -> Bool {
         guard let str = String(data: data, encoding: .utf8) else { return false }
         return str.trimmingCharacters(in: .whitespacesAndNewlines) == "null"
+    }
+}
+
+// MARK: - Collection chunking
+
+private extension Array {
+    /// Splits the array into consecutive sub-arrays of at most `size` elements.
+    func chunked(by size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
     }
 }

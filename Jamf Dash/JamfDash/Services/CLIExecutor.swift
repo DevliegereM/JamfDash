@@ -44,7 +44,11 @@ actor CLIExecutor {
                 }
             }
 
+            // Defined before the handler so it can be captured and cancelled on exit.
+            let timeout0 = CancellableWorkItem(DispatchWorkItem { if process.isRunning { process.terminate() } })
+
             process.terminationHandler = { proc in
+                timeout0.cancel()
                 // Drain any remaining data
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
@@ -56,8 +60,18 @@ actor CLIExecutor {
 
                 let outData = stdoutBuffer.drain()
                 let errData = stderrBuffer.drain()
+                let status  = Int(proc.terminationStatus)
 
-                if proc.terminationStatus == 0 {
+                if status == 0 {
+                    continuation.resume(returning: outData)
+                } else if status == 15, !outData.isEmpty {
+                    // Exit code 15 is jamf-cli's convention for "API call succeeded but
+                    // the endpoint has returned a Deprecation header — migrate callers."
+                    // The response data is still valid; log the warning and return stdout.
+                    let warning = String(data: errData, encoding: .utf8)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    Logger(subsystem: "com.jamfdash", category: "CLIExecutor")
+                        .warning("Deprecated endpoint (exit 15) — data returned normally. \(warning)")
                     continuation.resume(returning: outData)
                 } else {
                     // jamf-cli writes JSON errors to stdout (not stderr) when using -o json.
@@ -66,8 +80,8 @@ actor CLIExecutor {
                     let errMsg = String(data: errOutput, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     continuation.resume(throwing: CLIError.nonZeroExit(
-                        code: Int(proc.terminationStatus),
-                        stderr: errMsg.isEmpty ? "exit \(proc.terminationStatus)" : errMsg
+                        code: status,
+                        stderr: errMsg.isEmpty ? "exit \(status)" : errMsg
                     ))
                 }
             }
@@ -84,13 +98,7 @@ actor CLIExecutor {
                 return
             }
 
-            // Timeout guard — terminate the process after the allotted time
-            Task.detached {
-                try? await Task.sleep(for: .seconds(timeout))
-                if process.isRunning {
-                    process.terminate()
-                }
-            }
+            timeout0.schedule(after: timeout)
         }
     }
 
@@ -156,7 +164,10 @@ actor CLIExecutor {
                 if !chunk.isEmpty { stderrBuffer.append(chunk) }
             }
 
+            let timeout0 = CancellableWorkItem(DispatchWorkItem { if process.isRunning { process.terminate() } })
+
             process.terminationHandler = { proc in
+                timeout0.cancel()
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
                 close(masterFD)
@@ -168,16 +179,23 @@ actor CLIExecutor {
 
                 let outData = stdoutBuffer.drain()
                 let errData = stderrBuffer.drain()
+                let status  = Int(proc.terminationStatus)
 
-                if proc.terminationStatus == 0 {
+                if status == 0 {
+                    continuation.resume(returning: outData)
+                } else if status == 15, !outData.isEmpty {
+                    let warning = String(data: errData, encoding: .utf8)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    Logger(subsystem: "com.jamfdash", category: "CLIExecutor")
+                        .warning("Deprecated endpoint (exit 15) — data returned normally. \(warning)")
                     continuation.resume(returning: outData)
                 } else {
                     let errOutput = errData.isEmpty ? outData : errData
                     let errMsg = String(data: errOutput, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     continuation.resume(throwing: CLIError.nonZeroExit(
-                        code: Int(proc.terminationStatus),
-                        stderr: errMsg.isEmpty ? "exit \(proc.terminationStatus)" : errMsg
+                        code: status,
+                        stderr: errMsg.isEmpty ? "exit \(status)" : errMsg
                     ))
                 }
             }
@@ -201,10 +219,7 @@ actor CLIExecutor {
                 return
             }
 
-            Task.detached {
-                try? await Task.sleep(for: .seconds(timeout))
-                if process.isRunning { process.terminate() }
-            }
+            timeout0.schedule(after: timeout)
         }
     }
 }
@@ -248,6 +263,16 @@ extension CLIExecuting {
             timeout: timeout
         )
     }
+}
+
+/// Sendable wrapper around DispatchWorkItem so it can be captured by @Sendable closures.
+final class CancellableWorkItem: @unchecked Sendable {
+    private let item: DispatchWorkItem
+    init(_ item: DispatchWorkItem) { self.item = item }
+    func schedule(after delay: TimeInterval) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + delay, execute: item)
+    }
+    func cancel() { item.cancel() }
 }
 
 /// NSLock-backed Sendable buffer for async pipe collection.

@@ -1,10 +1,12 @@
 import Foundation
+import OSLog
 import Observation
 import AppKit
 
 @MainActor
 @Observable
 final class SettingsViewModel {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "SettingsViewModel")
 
     // MARK: - Product & Setup Method
     var selectedProduct: JamfProduct = .pro
@@ -133,6 +135,7 @@ final class SettingsViewModel {
                                : profileName.trimmingCharacters(in: .whitespaces)
                     scopeForProfile = setupScope
                     let trimURL = serverURLText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    try requireHTTPS(trimURL)
                     _ = try await cliManager.setup(
                         serverURL:   trimURL,
                         username:    username.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -147,6 +150,7 @@ final class SettingsViewModel {
                                : ssoProfileName.trimmingCharacters(in: .whitespaces)
                     scopeForProfile = .fullAdmin
                     let trimURL = ssoServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                    try requireHTTPS(trimURL)
                     _ = try await cliManager.setupOAuth(
                         serverURL:    trimURL,
                         profileName:  name,
@@ -161,6 +165,7 @@ final class SettingsViewModel {
                     scopeForProfile = .fullAdmin
                     let trimURL    = platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
                     let trimTenant = platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines)
+                    try requireHTTPS(trimURL)
                     _ = try await cliManager.setupPlatform(
                         gatewayURL:   trimURL,
                         tenantID:     trimTenant,
@@ -179,6 +184,7 @@ final class SettingsViewModel {
                                ? "Jamf Protect"
                                : protectProfileName.trimmingCharacters(in: .whitespaces)
                 let trimURL = protectServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                try requireHTTPS(trimURL)
                 _ = try await cliManager.setupOAuth(
                     serverURL:    trimURL,
                     profileName:  name,
@@ -194,6 +200,7 @@ final class SettingsViewModel {
                                ? "Jamf School"
                                : schoolProfileName.trimmingCharacters(in: .whitespaces)
                 let trimURL = schoolServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+                try requireHTTPS(trimURL)
                 _ = try await cliManager.setupSchool(
                     serverURL:   trimURL,
                     profileName: name,
@@ -207,22 +214,32 @@ final class SettingsViewModel {
             setupSuccess      = true
             availableProfiles = await keychain.jamfCLIProfiles()
             onProfilesChanged?()
-            // Best-effort: Swift String provides no guaranteed heap-zeroing, but clearing
-            // immediately after use minimizes the credential's time-in-memory window.
             clearSetupForm()
         } catch {
+            Self.logger.error("Settings setup failed: \(error)")
+            clearSetupForm()
             setupError = error.localizedDescription
         }
         isRunningSetup = false
     }
 
     private func verifyAndCleanup(profileName: String, product: JamfProduct) async throws {
+        Self.logger.info("Verifying connection — profile: \(profileName, privacy: .private), product: \(product.rawValue, privacy: .public)")
         do {
             try await cliManager.verifyConnection(profileName: profileName, product: product)
+            Self.logger.info("Connection verified — profile: \(profileName, privacy: .private)")
         } catch {
+            Self.logger.error("Verification failed — profile: \(profileName, privacy: .private), rolling back: \(error)")
             try? await cliManager.removeProfile(profileName)
             profileService.removeProfileData(profileName)
             throw setupVerificationError(from: error, profile: profileName)
+        }
+    }
+
+    private func requireHTTPS(_ url: String) throws {
+        guard url.lowercased().hasPrefix("https://") else {
+            throw NSError(domain: "JamfDash", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Server URL must use HTTPS (e.g. https://your-server.jamfcloud.com)"])
         }
     }
 
@@ -234,7 +251,9 @@ final class SettingsViewModel {
                lower.contains("invalid") || lower.contains("forbidden") || lower.contains("401") {
                 reason = "Authentication failed — check your credentials and try again."
             } else {
-                reason = stderr.isEmpty ? error.localizedDescription : stderr
+                // Do not surface raw stderr to the UI — log privately for diagnostics.
+                Self.logger.error("Setup verification error detail — profile: \(profile, privacy: .private): \(stderr, privacy: .private)")
+                reason = "Connection test failed. Enable debug logging and check the log for details."
             }
             return NSError(domain: "JamfDash", code: 1,
                            userInfo: [NSLocalizedDescriptionKey: "Could not connect to \"\(profile)\": \(reason)"])
@@ -260,31 +279,37 @@ final class SettingsViewModel {
     }
 
     func deleteProfile(_ name: String) async {
+        Self.logger.info("Deleting profile: \(name, privacy: .private)")
         deleteError = nil
         do {
             try await cliManager.removeProfile(name)
             profileService.removeProfileData(name)
             availableProfiles = await keychain.jamfCLIProfiles()
             onProfilesChanged?()
+            Self.logger.info("Profile deleted: \(name, privacy: .private)")
             if profileName_selected == name {
                 profileName_selected = ""
                 saveProfile()
             }
         } catch {
-            deleteError = "Failed to remove \"\(name)\": \(error.localizedDescription)"
+            Self.logger.error("Failed to delete profile \(name, privacy: .private): \(error)")
+            deleteError = "Failed to remove the connection. Check the log for details."
         }
     }
 
     // MARK: - CLI install / update actions
 
     func installCLI() async {
+        Self.logger.info("Installing jamf-cli binary")
         isInstallingCLI = true
         updateStatus    = nil
         do {
             try await cliManager.ensureBinary()
             installedVersion = await cliManager.installedVersion?.semver
+            Self.logger.info("jamf-cli installed — version: \(self.installedVersion ?? "unknown", privacy: .public)")
             updateStatus     = "jamf-cli installed successfully."
         } catch {
+            Self.logger.error("jamf-cli installation failed: \(error)")
             updateStatus = "Installation failed: \(error.localizedDescription)"
         }
         isInstallingCLI = false
@@ -296,12 +321,15 @@ final class SettingsViewModel {
         availableUpdate  = nil
         do {
             if let newVersion = try await cliManager.checkForUpdate() {
+                Self.logger.info("jamf-cli update available: \(newVersion, privacy: .public)")
                 availableUpdate = newVersion
                 updateStatus    = "Update available: \(newVersion)"
             } else {
+                Self.logger.debug("jamf-cli is up to date")
                 updateStatus = "jamf-cli is up to date."
             }
         } catch {
+            Self.logger.error("jamf-cli update check failed: \(error)")
             updateStatus = "Update check failed: \(error.localizedDescription)"
         }
         isCheckingUpdate = false

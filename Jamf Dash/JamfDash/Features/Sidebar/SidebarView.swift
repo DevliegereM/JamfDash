@@ -22,6 +22,9 @@ enum SidebarItem: String, Identifiable {
     case settingsInspector = "pro.settingsInspector"
     case complianceBenchmarks = "pro.complianceBenchmarks"
     case aiAssistant = "pro.aiAssistant"
+    case driftTracker = "pro.driftTracker"
+    case deviceCorrelation = "pro.deviceCorrelation"
+    case auditDashboard    = "pro.audit"
 
     // Jamf Protect — existing
     case protectOverview  = "protect.overview"
@@ -51,6 +54,8 @@ enum SidebarItem: String, Identifiable {
     case schoolUserGroups    = "school.userGroups"
     case schoolClasses       = "school.classes"
     case schoolApps          = "school.apps"
+    case schoolProfiles      = "school.profiles"
+    case schoolDepDevices    = "school.depDevices"
 
     var id: String { rawValue }
 
@@ -72,13 +77,16 @@ enum SidebarItem: String, Identifiable {
         case .complianceBenchmarks:  return "Compliance Benchmarks"
         case .aiAssistant:           return "AI Assistant"
         case .settingsInspector:     return "Settings Inspector"
+        case .driftTracker:          return "Config Drift"
+        case .deviceCorrelation:     return "Device Correlation"
+        case .auditDashboard:        return "Audit Dashboard"
         case .protectOverview:   return "Overview"
         case .protectEvents:     return "Alerts"
         case .protectComputers:  return "Computers"
         case .protectPlans:      return "Plans"
         case .protectAlerts:     return "Analytics"
         case .protectInsights:   return "Analytic Sets"
-        case .protectAuditLogs:  return "Exception Sets"
+        case .protectAuditLogs:  return "Audit Logs"
         case .protectRemovableStorage: return "Removable Storage"
         case .protectUnifiedLogging:   return "Unified Logging"
         case .protectActionConfigs:    return "Action Configs"
@@ -95,6 +103,8 @@ enum SidebarItem: String, Identifiable {
         case .schoolUserGroups:  return "User Groups"
         case .schoolClasses:     return "Classes"
         case .schoolApps:        return "Apps"
+        case .schoolProfiles:    return "Profiles"
+        case .schoolDepDevices:  return "DEP Devices"
         }
     }
 
@@ -116,13 +126,16 @@ enum SidebarItem: String, Identifiable {
         case .complianceBenchmarks:  return "checkmark.shield"
         case .aiAssistant:           return "brain.head.profile"
         case .settingsInspector:     return "slider.horizontal.3"
+        case .driftTracker:          return "camera.badge.clock"
+        case .deviceCorrelation:     return "link.badge.plus"
+        case .auditDashboard:        return "checklist.checked"
         case .protectOverview:   return "chart.bar.doc.horizontal"
         case .protectEvents:     return "exclamationmark.triangle"
         case .protectComputers:  return "laptopcomputer"
         case .protectPlans:      return "doc.badge.gearshape"
         case .protectAlerts:     return "waveform.path.ecg"
         case .protectInsights:   return "rectangle.stack"
-        case .protectAuditLogs:  return "shield.slash"
+        case .protectAuditLogs:  return "clock.arrow.circlepath"
         case .protectRemovableStorage: return "externaldrive"
         case .protectUnifiedLogging:   return "doc.text.magnifyingglass"
         case .protectActionConfigs:    return "bell.and.waveform"
@@ -139,6 +152,8 @@ enum SidebarItem: String, Identifiable {
         case .schoolUserGroups:  return "person.3"
         case .schoolClasses:     return "book"
         case .schoolApps:        return "app.badge"
+        case .schoolProfiles:    return "doc.badge.gearshape"
+        case .schoolDepDevices:  return "ipad.and.arrow.forward"
         }
     }
 
@@ -151,6 +166,8 @@ enum SidebarItem: String, Identifiable {
                 .mobileDevices,
                 .orgBrowser, .extensionAttributes, .patchManagement, .enrollment,
                 .settingsInspector,
+                .driftTracker, .deviceCorrelation,
+                .auditDashboard,
                 .reports, .aiAssistant
             ]
         case .protect:
@@ -163,7 +180,8 @@ enum SidebarItem: String, Identifiable {
             ]
         case .school:
             return [.schoolOverview, .schoolDevices, .schoolDeviceGroups,
-                    .schoolUsers, .schoolUserGroups, .schoolClasses, .schoolApps]
+                    .schoolUsers, .schoolUserGroups, .schoolClasses, .schoolApps,
+                    .schoolProfiles, .schoolDepDevices]
         }
     }
 }
@@ -177,7 +195,11 @@ struct SidebarView: View {
     @AppStorage("jamfDash.aiEnabled") private var isAIEnabled = false
 
     var body: some View {
-        let items = SidebarItem.items(for: env.currentProduct).filter { $0 != .aiAssistant || isAIEnabled }
+        let hasProtectData = env.protectVM.computersState.value != nil
+        let items = SidebarItem.items(for: env.currentProduct).filter {
+            ($0 != .aiAssistant || isAIEnabled) &&
+            ($0 != .deviceCorrelation || hasProtectData)
+        }
         List(items, selection: $selection) { item in
             Label(item.title, systemImage: item.icon)
                 .tag(item)

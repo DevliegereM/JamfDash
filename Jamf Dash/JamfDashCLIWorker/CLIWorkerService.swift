@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// XPC service implementation.  Receives requests from the main app via `CLIWorkerXPCProtocol`
 /// and delegates the actual subprocess work to an in-process `CLIExecutor`.
@@ -72,7 +73,7 @@ import Foundation
         interactive: Bool,
         reply: @escaping (Data?, NSError?) -> Void
     ) async {
-        // Allowlist: only execute binaries from the JamfDash bin directory
+        // Allowlist: only execute binaries from the JamfDash bin directory.
         let allowedPrefix = (NSHomeDirectory() as NSString)
             .appendingPathComponent("Library/Application Support/JamfDash/bin")
         let resolvedPath = (binaryPath as NSString).standardizingPath
@@ -83,7 +84,15 @@ import Foundation
             ))
             return
         }
-        let binary = URL(fileURLWithPath: binaryPath)
+        let binary = URL(fileURLWithPath: resolvedPath)
+
+        // Code-signature check: the binary must be signed by JAMF Software.
+        // This prevents a trojan in the bin directory from being executed even if
+        // the path check passes.
+        if let signatureError = verifyJAMFSignature(at: binary) {
+            reply(nil, signatureError)
+            return
+        }
         do {
             let output: Data
             if interactive {
@@ -112,6 +121,38 @@ import Foundation
                 description: error.localizedDescription
             ))
         }
+    }
+
+    // MARK: - Code signature verification
+
+    /// Returns nil if the binary at `url` is validly signed by JAMF Software (Team ID 483DWKW443),
+    /// or an NSError to send as the XPC reply if verification fails.
+    private func verifyJAMFSignature(at url: URL) -> NSError? {
+        var staticCode: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode) == errSecSuccess,
+              let code = staticCode else {
+            return CLIWorkerError.nsError(
+                code: .launchFailed,
+                description: "Security: could not read code signature of '\(url.lastPathComponent)'"
+            )
+        }
+        let requirementString = "anchor apple generic and certificate leaf[subject.OU] = \"483DWKW443\""
+        var requirement: SecRequirement?
+        guard SecRequirementCreateWithString(requirementString as CFString, [], &requirement) == errSecSuccess,
+              let req = requirement else {
+            return CLIWorkerError.nsError(
+                code: .launchFailed,
+                description: "Security: could not build code-signing requirement"
+            )
+        }
+        let status = SecStaticCodeCheckValidity(code, [], req)
+        guard status == errSecSuccess else {
+            return CLIWorkerError.nsError(
+                code: .launchFailed,
+                description: "Security: '\(url.lastPathComponent)' is not signed by JAMF Software (status \(status))"
+            )
+        }
+        return nil
     }
 
     // MARK: - CLIError → NSError

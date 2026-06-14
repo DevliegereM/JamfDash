@@ -26,6 +26,10 @@ final class FleetViewModel {
     private(set) var patchPoliciesState:          LoadState<[PatchPolicy]>           = .idle
     private(set) var patchTitleDetailState:       LoadState<PatchTitleDetail>        = .idle
     private(set) var patchPolicyDetailState:      LoadState<PatchPolicyDetail>       = .idle
+    private(set) var modernPatchState:            LoadState<[ModernPatchTitle]>       = .idle
+    private(set) var appInstallerTitlesState:     LoadState<[AppInstallerTitle]>      = .idle
+    private(set) var appInstallerDeploymentsState: LoadState<[AppInstallerDeployment]> = .idle
+    private(set) var restrictedSoftwareState:     LoadState<[RestrictedSoftware]>     = .idle
     private(set) var depTokensState:              LoadState<[DEPToken]>              = .idle
     private(set) var computerPrestagesState:      LoadState<[ComputerPrestage]>      = .idle
     private(set) var mobileDevicePrestagesState:  LoadState<[MobileDevicePrestage]>  = .idle
@@ -35,6 +39,11 @@ final class FleetViewModel {
 
     private(set) var policyCategoryMap:       [Int: String] = [:]
     private(set) var configProfileCategoryMap: [Int: String] = [:]
+
+    /// Tracks in-flight category back-fill tasks so a force-refresh can cancel them.
+    private var policyCategoryTask:    Task<Void, Never>?
+    private var profileCategoryTask:   Task<Void, Never>?
+    private var patchTitleEnrichTask:  Task<Void, Never>?
 
     private let repository: FleetRepository
 
@@ -63,7 +72,12 @@ final class FleetViewModel {
             policiesState = .loaded(policies)
             let uncategorized = policies.filter { $0.category == nil }
             if !uncategorized.isEmpty {
-                Task { policyCategoryMap = await repository.fetchPolicyCategoryMap(for: uncategorized) }
+                // Cancel any previous back-fill before starting a new one.
+                policyCategoryTask?.cancel()
+                policyCategoryTask = Task {
+                    let map = await repository.fetchPolicyCategoryMap(for: uncategorized)
+                    if !Task.isCancelled { policyCategoryMap = map }
+                }
             }
         }
         catch {
@@ -129,7 +143,12 @@ final class FleetViewModel {
             let profiles = try await repository.fetchConfigProfiles()
             Self.logger.debug("Loaded \(profiles.count) config profiles")
             configProfilesState = .loaded(profiles)
-            Task { configProfileCategoryMap = await repository.fetchConfigProfileCategoryMap(for: profiles) }
+            // Cancel any previous back-fill before starting a new one.
+            profileCategoryTask?.cancel()
+            profileCategoryTask = Task {
+                let map = await repository.fetchConfigProfileCategoryMap(for: profiles)
+                if !Task.isCancelled { configProfileCategoryMap = map }
+            }
         }
         catch {
             Self.logger.error("Failed to load config profiles: \(error)")
@@ -224,16 +243,260 @@ final class FleetViewModel {
         guard force || patchTitlesState.value == nil else { return }
         guard force || !patchTitlesState.isLoading else { return }
         patchTitlesState = .loading
-        do { patchTitlesState = .loaded(try await repository.fetchList(PatchTitle.self, command: .patchTitles)) }
-        catch { Self.logger.error("Failed to load patch titles: \(error)"); patchTitlesState = .failed(ErrorMessageFormatter.message(for: error)) }
+        do {
+            // 1. Show names immediately — the list endpoint only returns id + name.
+            let thin = try await repository.fetchList(PatchTitle.self, command: .patchTitles)
+            patchTitlesState = .loaded(thin)
+
+            // 2. Batch-enrich with detail calls (category + current version) in the background.
+            if !thin.isEmpty {
+                patchTitleEnrichTask?.cancel()
+                patchTitleEnrichTask = Task {
+                    Self.logger.info("Enriching \(thin.count) patch titles with detail calls")
+                    let enriched = await Self.enrichPatchTitles(thin, cli: repository.cli)
+                    if !Task.isCancelled { patchTitlesState = .loaded(enriched) }
+                }
+            }
+        } catch {
+            Self.logger.error("Failed to load patch titles: \(error)")
+            patchTitlesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
     }
 
     func loadPatchPolicies(force: Bool = false) async {
         guard force || patchPoliciesState.value == nil else { return }
         guard force || !patchPoliciesState.isLoading else { return }
         patchPoliciesState = .loading
-        do { patchPoliciesState = .loaded(try await repository.fetchList(PatchPolicy.self, command: .patchPolicies)) }
-        catch { Self.logger.error("Failed to load patch policies: \(error)"); patchPoliciesState = .failed(ErrorMessageFormatter.message(for: error)) }
+        do {
+            // 1. Load thin list via Classic API (id + name only) — fast.
+            let thin = try await repository.fetchList(PatchPolicy.self, command: .patchPolicies)
+            patchPoliciesState = .loaded(thin)   // show names immediately
+
+            // 2. Batch-enrich all policies in parallel using the detail endpoint.
+            //    This fills Enabled, Target Version and Patch Title without making the user click.
+            if !thin.isEmpty {
+                Self.logger.debug("Enriching \(thin.count) patch policies with detail calls")
+                let enriched = await Self.enrichPatchPolicies(thin, cli: repository.cli)
+                patchPoliciesState = .loaded(enriched)
+            }
+        } catch {
+            Self.logger.error("Failed to load patch policies: \(error)")
+            patchPoliciesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    /// Batch-fetches category and current version for each Classic patch title.
+    nonisolated private static func enrichPatchTitles(
+        _ items: [PatchTitle],
+        cli: any CLIRunning
+    ) async -> [PatchTitle] {
+        var result: [PatchTitle] = []
+        for chunk in items.chunked(by: enrichConcurrency) {
+            guard !Task.isCancelled else { break }
+            await withTaskGroup(of: PatchTitle.self) { group in
+                for item in chunk {
+                    group.addTask {
+                        guard let data = try? await cli.run(.patchTitleDetail(id: item.id)),
+                              let detail = try? JSONDecoder().decode(PatchTitleDetail.self, from: data)
+                        else { return item }
+                        return PatchTitle(thin: item, detail: detail)
+                    }
+                }
+                for await t in group { result.append(t) }
+            }
+        }
+        return result.sorted { $0.name < $1.name }
+    }
+
+    /// Batch-fetches individual detail for each patch policy and returns enriched items.
+    nonisolated private static func enrichPatchPolicies(
+        _ items: [PatchPolicy],
+        cli: any CLIRunning
+    ) async -> [PatchPolicy] {
+        var result: [PatchPolicy] = []
+        for chunk in items.chunked(by: enrichConcurrency) {
+            guard !Task.isCancelled else { break }
+            await withTaskGroup(of: PatchPolicy.self) { group in
+                for item in chunk {
+                    group.addTask {
+                        guard let data = try? await cli.run(.patchPolicyDetail(id: item.id)),
+                              let detail = try? JSONDecoder().decode(PatchPolicyDetail.self, from: data)
+                        else { return item }
+                        return PatchPolicy(thin: item, detail: detail)
+                    }
+                }
+                for await p in group { result.append(p) }
+            }
+        }
+        return result.sorted { $0.name < $1.name }
+    }
+
+    func loadModernPatch(force: Bool = false) async {
+        guard force || modernPatchState.value == nil else { return }
+        guard force || !modernPatchState.isLoading else { return }
+        modernPatchState = .loading
+        do {
+            let data = try await repository.cli.run(.patchSoftwareTitleConfigurations)
+            let decoder = JSONDecoder()
+            var titles: [ModernPatchTitle]?
+            titles = try? decoder.decode([ModernPatchTitle].self, from: data)
+            if titles == nil, let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                for key in ["results", "items", "data", "softwareTitles", "titles", "patchTitles"] {
+                    if let arr = obj[key],
+                       let d = try? JSONSerialization.data(withJSONObject: arr) {
+                        titles = try? decoder.decode([ModernPatchTitle].self, from: d)
+                        if titles != nil { break }
+                    }
+                }
+            }
+            modernPatchState = .loaded(titles ?? [])
+        } catch {
+            Self.logger.error("Failed to load modern patch: \(error)")
+            modernPatchState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadAppInstallerTitles(force: Bool = false) async {
+        guard force || appInstallerTitlesState.value == nil else { return }
+        guard force || !appInstallerTitlesState.isLoading else { return }
+        appInstallerTitlesState = .loading
+        do {
+            let data = try await repository.cli.run(.appInstallerTitles)
+            let decoder = JSONDecoder()
+            var items: [AppInstallerTitle]?
+            items = try? decoder.decode([AppInstallerTitle].self, from: data)
+            if items == nil, let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                for key in ["results", "items", "data", "titles", "appInstallerTitles"] {
+                    if let arr = obj[key],
+                       let d = try? JSONSerialization.data(withJSONObject: arr) {
+                        items = try? decoder.decode([AppInstallerTitle].self, from: d)
+                        if items != nil { break }
+                    }
+                }
+            }
+            appInstallerTitlesState = .loaded(items ?? [])
+        } catch {
+            Self.logger.error("Failed to load app installer titles: \(error)")
+            appInstallerTitlesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadAppInstallerDeployments(force: Bool = false) async {
+        guard force || appInstallerDeploymentsState.value == nil else { return }
+        guard force || !appInstallerDeploymentsState.isLoading else { return }
+        appInstallerDeploymentsState = .loading
+        do {
+            let data = try await repository.cli.run(.appInstallerDeployments)
+            let decoder = JSONDecoder()
+            var items: [AppInstallerDeployment]?
+            items = try? decoder.decode([AppInstallerDeployment].self, from: data)
+            if items == nil, let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                for key in ["results", "items", "data", "deployments"] {
+                    if let arr = obj[key],
+                       let d = try? JSONSerialization.data(withJSONObject: arr) {
+                        items = try? decoder.decode([AppInstallerDeployment].self, from: d)
+                        if items != nil { break }
+                    }
+                }
+            }
+            Self.logger.info("Loaded \(items?.count ?? 0) app installer deployments")
+            appInstallerDeploymentsState = .loaded(items ?? [])
+        } catch {
+            Self.logger.error("Failed to load app installer deployments: \(error)")
+            appInstallerDeploymentsState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadRestrictedSoftware(force: Bool = false) async {
+        guard force || restrictedSoftwareState.value == nil else { return }
+        guard force || !restrictedSoftwareState.isLoading else { return }
+        restrictedSoftwareState = .loading
+        do {
+            let data = try await repository.cli.run(.restrictedSoftware)
+            let decoder = JSONDecoder()
+            var items: [RestrictedSoftware]?
+            items = try? decoder.decode([RestrictedSoftware].self, from: data)
+            if items == nil, let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                for key in ["results", "items", "data", "restrictedSoftware", "restricted_software"] {
+                    if let arr = obj[key],
+                       let d = try? JSONSerialization.data(withJSONObject: arr) {
+                        items = try? decoder.decode([RestrictedSoftware].self, from: d)
+                        if items != nil { break }
+                    }
+                }
+            }
+            var resolved = items ?? []
+            // The Classic API list only returns id+name; batch-fetch individual details in
+            // parallel to populate process_name, kill_process, etc. from the "general" sub-object.
+            if resolved.allSatisfy({ $0.processName == nil && $0.killProcess == nil }) && !resolved.isEmpty {
+                Self.logger.debug("Restricted software list is thin — enriching \(resolved.count) items with detail calls")
+                resolved = await Self.enrichRestrictedSoftware(resolved, cli: repository.cli)
+            }
+            restrictedSoftwareState = .loaded(resolved)
+        } catch {
+            Self.logger.error("Failed to load restricted software: \(error)")
+            restrictedSoftwareState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    /// Batch-fetches full detail for each restricted software item in parallel.
+    nonisolated private static func enrichRestrictedSoftware(
+        _ items: [RestrictedSoftware],
+        cli: any CLIRunning
+    ) async -> [RestrictedSoftware] {
+        var result: [RestrictedSoftware] = []
+        for chunk in items.chunked(by: enrichConcurrency) {
+            guard !Task.isCancelled else { break }
+            await withTaskGroup(of: RestrictedSoftware.self) { group in
+                for item in chunk {
+                    group.addTask {
+                        guard let data = try? await cli.run(.restrictedSoftwareDetail(id: item.id)),
+                              let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                        else { return item }
+
+                        // Classic API response: {"restricted_software": {"general": {...}, ...}}
+                        // The "general" dict contains id/name plus all the process fields.
+                        // We always use the thin item's id/name (reliable); only take process
+                        // fields from the detail so the enriched item is never "Unknown".
+                        let generalDict: [String: Any]?
+                        if let rs = raw["restricted_software"] as? [String: Any] {
+                            generalDict = rs["general"] as? [String: Any]
+                        } else {
+                            // Some jamf-cli builds flatten the response
+                            generalDict = raw["general"] as? [String: Any] ?? raw
+                        }
+                        guard let g = generalDict else { return item }
+
+                        let processName: String? = {
+                            let v = (g["process_name"] as? String) ?? (g["processName"] as? String) ?? (g["process"] as? String)
+                            return v?.isEmpty == false ? v : nil
+                        }()
+                        let matchExact     = (g["match_exact_process_name"] as? Bool)
+                                          ?? (g["matchExact"] as? Bool)
+                                          ?? (g["match_exact"] as? Bool)
+                        let killProcess    = (g["kill_process"] as? Bool)
+                                          ?? (g["killProcess"] as? Bool)
+                        let deleteExec     = (g["delete_executable"] as? Bool)
+                                          ?? (g["deleteExecutable"] as? Bool)
+                        let displayMsg: String? = {
+                            let v = (g["display_message"] as? String) ?? (g["displayMessage"] as? String)
+                            return v?.isEmpty == false ? v : nil
+                        }()
+
+                        return RestrictedSoftware(
+                            id: item.id, name: item.name,
+                            processName: processName,
+                            matchExact: matchExact,
+                            killProcess: killProcess,
+                            deleteExecutable: deleteExec,
+                            displayMessage: displayMsg
+                        )
+                    }
+                }
+                for await item in group { result.append(item) }
+            }
+        }
+        return result.sorted { $0.name < $1.name }
     }
 
     func loadPatchTitleDetail(id: String) async {
@@ -344,4 +607,19 @@ final class FleetViewModel {
             }
     }
 
+}
+
+// MARK: - Collection chunking (local to this file)
+
+/// Maximum simultaneous jamf-cli detail calls for any enrichment back-fill.
+/// Accessible to both `@MainActor` methods and `nonisolated` static helpers.
+private let enrichConcurrency = 6
+
+private extension Array {
+    func chunked(by size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
 }

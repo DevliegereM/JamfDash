@@ -50,6 +50,7 @@ struct AIAssistantInnerView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("New Chat") { vm.clearHistory() }
                     .disabled(vm.messages.isEmpty && !vm.isResponding)
+                    .help("Start a new conversation")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -57,6 +58,7 @@ struct AIAssistantInnerView: View {
                 } label: {
                     Label("Digest History", systemImage: "doc.text.magnifyingglass")
                 }
+                .help("View saved digest reports")
             }
         }
         .sheet(isPresented: $showDigestHistory) {
@@ -77,6 +79,7 @@ struct AIAssistantInnerView: View {
     private var compactHeader: some View {
         HStack(spacing: 10) {
             DashieMascot(state: vm.state, size: 44)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Dashie").font(.system(size: 13, weight: .semibold))
                 StatePill(state: vm.state)
@@ -107,6 +110,7 @@ struct AIAssistantInnerView: View {
                 Spacer(minLength: 32)
 
                 DashieMascot(state: .idle, size: 110)
+                    .accessibilityHidden(true)
 
                 VStack(spacing: 6) {
                     Text("Ask me about your fleet")
@@ -228,6 +232,7 @@ struct AIAssistantInnerView: View {
             }
             .buttonStyle(.plain)
             .disabled(vm.isResponding || vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .accessibilityLabel("Send message")
         }
     }
 }
@@ -245,10 +250,13 @@ private struct StatePill: View {
                 .frame(width: 6, height: 6)
                 .shadow(color: state == .idle ? .clear : dotColor, radius: 3)
                 .modifier(PulseIfActive(active: state != .idle))
+                .accessibilityHidden(true)
             Text(label)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Dashie: \(label)")
     }
 
     private var label: String {
@@ -346,6 +354,7 @@ private struct AssistantBubble: View {
 
 private struct ThinkingBubble: View {
     @State private var phase: Int = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack {
@@ -354,7 +363,7 @@ private struct ThinkingBubble: View {
                     Circle()
                         .fill(.secondary)
                         .frame(width: 6, height: 6)
-                        .opacity(phase == i ? 1 : 0.3)
+                        .opacity(reduceMotion ? 0.6 : (phase == i ? 1 : 0.3))
                 }
             }
             .padding(.horizontal, 14)
@@ -362,7 +371,9 @@ private struct ThinkingBubble: View {
             .background(.fill.tertiary, in: RoundedRectangle(cornerRadius: 14))
             Spacer()
         }
+        .accessibilityLabel("Dashie is thinking")
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: false)) {
                 phase = (phase + 1) % 3
             }
@@ -372,11 +383,14 @@ private struct ThinkingBubble: View {
 
 private struct BlinkingCaret: View {
     @State private var on = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Text("▎")
-            .opacity(on ? 1 : 0)
+            .opacity(reduceMotion ? 1 : (on ? 1 : 0))
+            .accessibilityHidden(true)
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                     on = false
                 }
@@ -778,13 +792,15 @@ private struct DashieEye: View {
 private struct DashieTalkingMouth: View {
     let size: CGFloat
     @State private var on = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Ellipse()
             .fill(Color.white)
             .frame(width: size * 0.14, height: size * 0.07)
-            .scaleEffect(y: on ? 1.0 : 0.4)
+            .scaleEffect(y: reduceMotion ? 0.7 : (on ? 1.0 : 0.4))
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.22).repeatForever(autoreverses: true)) {
                     on = true
                 }
@@ -807,12 +823,13 @@ private struct DashieSmilePath: Shape {
 private struct PulseIfActive: ViewModifier {
     let active: Bool
     @State private var on = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
-            .opacity(active ? (on ? 1 : 0.4) : 1)
+            .opacity(active && !reduceMotion ? (on ? 1 : 0.4) : 1)
             .onAppear {
-                guard active else { return }
+                guard active && !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                     on = true
                 }

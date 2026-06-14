@@ -29,7 +29,12 @@ actor KeychainService {
     func save(_ credentials: JamfCredentials) throws {
         let payload = try JSONEncoder().encode(KeychainPayload(credentials))
         let query: [String: Any] = baseQuery()
-        let attrs: [String: Any] = [kSecValueData as String: payload]
+        // Include kSecAttrAccessible on the update path so that any item originally
+        // created with a weaker accessibility class gets upgraded to WhenUnlocked.
+        let attrs: [String: Any] = [
+            kSecValueData as String: payload,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ]
         let updateStatus = SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
         if updateStatus == errSecSuccess { return }
         if updateStatus == errSecItemNotFound {

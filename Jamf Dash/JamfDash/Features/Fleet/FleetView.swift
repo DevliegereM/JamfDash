@@ -33,6 +33,7 @@ struct FleetView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
                     }
                 }
                 .padding(.horizontal, 12)
@@ -75,6 +76,7 @@ struct FleetView: View {
                 Button { Task { await vm.loadAll(force: true) } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
+                .help("Refresh all fleet configuration data")
             }
         }
         .sheet(item: $selectedSmartGroup) { group in
@@ -322,6 +324,7 @@ private struct FleetRow: View {
                 }
                 .buttonStyle(.plain)
                 .help("Open in Jamf Pro")
+                .accessibilityLabel("Open in Jamf Pro")
             }
             if hasDetail {
                 Image(systemName: "chevron.right")
@@ -852,6 +855,7 @@ struct OrgBrowserView: View {
                     await vm.loadDepartments(force: true)
                     await vm.loadNetworkSegments(force: true)
                 }} label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                .help("Refresh buildings, departments and network segments")
             }
         }
         .task { await vm.loadBuildings(); await vm.loadDepartments(); await vm.loadNetworkSegments() }
@@ -932,6 +936,7 @@ struct ExtensionAttributesView: View {
                 Button { Task { await vm.loadExtensionAttributes(force: true) } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
+                .help("Refresh extension attributes")
             }
         }
         .task { await vm.loadExtensionAttributes() }
@@ -1044,12 +1049,20 @@ struct PatchView: View {
     @State private var detailTitle: PatchTitle? = nil
     @State private var selectedPolicyID: PatchPolicy.ID? = nil
     @State private var detailPolicy: PatchPolicy? = nil
+    @State private var selectedModernPatchID: ModernPatchTitle.ID? = nil
+    @State private var selectedModernPatch: ModernPatchTitle? = nil
+    @State private var appInstallerTab = 0
+    @State private var selectedRestrictedID: RestrictedSoftware.ID? = nil
+    @State private var detailRestricted: RestrictedSoftware? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("Section", selection: $selectedTab) {
-                Text("Patch Titles").tag(0)
-                Text("Patch Policies").tag(1)
+                Text("Classic Titles").tag(0)
+                Text("Classic Policies").tag(1)
+                Text("Modern Patch").tag(2)
+                Text("App Installer").tag(3)
+                Text("Restricted").tag(4)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 20).padding(.vertical, 10)
@@ -1063,8 +1076,16 @@ struct PatchView: View {
                                  retry: { await vm.loadPatchTitles(force: true) }) { titles in
                     Table(titles, selection: $selectedTitleID) {
                         TableColumn("Name") { Text($0.name) }
-                        TableColumn("Category") { Text($0.category ?? "—").foregroundStyle(.secondary) }
-                        TableColumn("ID") { Text($0.id).foregroundStyle(.secondary) }
+                        TableColumn("Category") { t in
+                            Text(t.category ?? "—")
+                                .foregroundStyle(t.category == nil ? .tertiary : .primary)
+                        }
+                        TableColumn("Current Version") { t in
+                            Text(t.currentVersion ?? "—")
+                                .foregroundStyle(t.currentVersion == nil ? .tertiary : .secondary)
+                                .font(.caption.monospacedDigit())
+                        }
+                        TableColumn("ID") { Text($0.id).foregroundStyle(.secondary).font(.caption) }
                     }
                     .onChange(of: selectedTitleID) { _, newID in
                         guard let id = newID, let item = titles.first(where: { $0.id == id }) else { return }
@@ -1090,9 +1111,13 @@ struct PatchView: View {
                                 Text("—").foregroundStyle(.secondary)
                             }
                         }
-                        TableColumn("Target Version") { Text($0.targetVersion ?? "—").foregroundStyle(.secondary) }
-                        TableColumn("Patch Title") { Text($0.patchTitle ?? "—").foregroundStyle(.secondary) }
-                        TableColumn("ID") { Text($0.id).foregroundStyle(.secondary) }
+                        .width(70)
+                        TableColumn("Target Version") { t in
+                            Text(t.targetVersion ?? "—")
+                                .foregroundStyle(t.targetVersion != nil ? .secondary : .tertiary)
+                                .font(.caption.monospacedDigit())
+                        }
+                        TableColumn("ID") { Text($0.id).foregroundStyle(.secondary).font(.caption) }
                     }
                     .onChange(of: selectedPolicyID) { _, newID in
                         guard let id = newID, let item = policies.first(where: { $0.id == id }) else { return }
@@ -1105,6 +1130,151 @@ struct PatchView: View {
                     PatchPolicyDetailSheet(item: item, vm: vm)
                         .onDisappear { selectedPolicyID = nil }
                 }
+            case 2:
+                AsyncContentView(state: vm.modernPatchState,
+                                 retry: { await vm.loadModernPatch(force: true) }) { titles in
+                    Table(titles, selection: $selectedModernPatchID) {
+                        TableColumn("Software Title") { Text($0.name) }
+                        TableColumn("Publisher") { t in
+                            Text(t.publisher ?? "—")
+                                .foregroundStyle(t.publisher != nil ? .secondary : .tertiary)
+                        }
+                        TableColumn("Source") { t in
+                            Text(t.patchSource ?? "—")
+                                .foregroundStyle(t.patchSource != nil ? .secondary : .tertiary)
+                        }
+                        .width(80)
+                        TableColumn("Notifications") { t in
+                            if let n = t.uiNotifications {
+                                Image(systemName: n ? "bell.fill" : "bell.slash")
+                                    .foregroundStyle(n ? .orange : .secondary)
+                                    .help(n ? "UI notifications enabled" : "UI notifications disabled")
+                            } else {
+                                Text("—").foregroundStyle(.tertiary)
+                            }
+                        }
+                        .width(100)
+                        TableColumn("Email") { t in
+                            if let e = t.emailNotifications {
+                                Image(systemName: e ? "envelope.fill" : "envelope")
+                                    .foregroundStyle(e ? .blue : .secondary)
+                                    .help(e ? "Email notifications enabled" : "Email notifications disabled")
+                            } else {
+                                Text("—").foregroundStyle(.tertiary)
+                            }
+                        }
+                        .width(60)
+                    }
+                }
+                .task { await vm.loadModernPatch() }
+            case 3:
+                VStack(spacing: 0) {
+                    Picker("App Installer", selection: $appInstallerTab) {
+                        Text("Titles").tag(0)
+                        Text("Deployments").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 20).padding(.vertical, 8)
+                    .background(.regularMaterial)
+                    Divider()
+                    if appInstallerTab == 0 {
+                        AsyncContentView(state: vm.appInstallerTitlesState,
+                                         retry: { await vm.loadAppInstallerTitles(force: true) }) { titles in
+                            Table(titles) {
+                                TableColumn("Name") { Text($0.name) }
+                                TableColumn("Publisher") { Text($0.publisher ?? "—").foregroundStyle(.secondary) }
+                                TableColumn("Version") { Text($0.currentVersion ?? "—").foregroundStyle(.secondary) }
+                                TableColumn("Category") { Text($0.category ?? "—").foregroundStyle(.secondary) }
+                            }
+                        }
+                        .task { await vm.loadAppInstallerTitles() }
+                    } else {
+                        AsyncContentView(state: vm.appInstallerDeploymentsState,
+                                         retry: { await vm.loadAppInstallerDeployments(force: true) }) { deployments in
+                            Table(deployments) {
+                                TableColumn("Name") { Text($0.name) }
+                                TableColumn("Category") { d in
+                                    Text(d.categoryName ?? "—")
+                                        .foregroundStyle(d.categoryName != nil ? .secondary : .tertiary)
+                                }
+                                TableColumn("Version") { d in
+                                    let ver = d.displayVersion
+                                    let behavior = d.updateBehavior
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(ver ?? "—")
+                                            .foregroundStyle(ver != nil ? .secondary : .tertiary)
+                                            .font(.caption.monospacedDigit())
+                                        if let b = behavior {
+                                            Text(b.replacingOccurrences(of: "_", with: " ").lowercased().capitalized)
+                                                .font(.caption2).foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                }
+                                TableColumn("Enabled") { d in
+                                    if let e = d.enabled {
+                                        Image(systemName: e ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(e ? .green : .secondary)
+                                    } else { Text("—").foregroundStyle(.secondary) }
+                                }
+                                .width(70)
+                                TableColumn("Installed") { d in
+                                    Text(d.installedCount.map(String.init) ?? "—")
+                                        .foregroundStyle(.secondary).monospacedDigit()
+                                }
+                                .width(70)
+                                TableColumn("Available") { d in
+                                    Text(d.availableCount.map(String.init) ?? "—")
+                                        .foregroundStyle(.secondary).monospacedDigit()
+                                }
+                                .width(70)
+                                TableColumn("Failed") { d in
+                                    Text(d.failedCount.map { $0 > 0 ? "\($0)" : "—" } ?? "—")
+                                        .foregroundStyle(d.failedCount.map { $0 > 0 ? Color.red : Color.secondary } ?? .secondary)
+                                        .monospacedDigit()
+                                }
+                                .width(60)
+                            }
+                        }
+                        .task { await vm.loadAppInstallerDeployments() }
+                    }
+                }
+            case 4:
+                AsyncContentView(state: vm.restrictedSoftwareState,
+                                 retry: { await vm.loadRestrictedSoftware(force: true) }) { items in
+                    Table(items, selection: $selectedRestrictedID) {
+                        TableColumn("Name") { Text($0.name) }
+                        TableColumn("Process") { Text($0.processName ?? "—").foregroundStyle(.secondary).font(.system(.body, design: .monospaced)) }
+                        TableColumn("Match Exact") { r in
+                            if let m = r.matchExact {
+                                Image(systemName: m ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(m ? .blue : .secondary)
+                            } else { Text("—").foregroundStyle(.secondary) }
+                        }
+                        .width(90)
+                        TableColumn("Kill Process") { r in
+                            if let k = r.killProcess {
+                                Image(systemName: k ? "xmark.octagon.fill" : "circle")
+                                    .foregroundStyle(k ? .red : .secondary)
+                            } else { Text("—").foregroundStyle(.secondary) }
+                        }
+                        .width(90)
+                        TableColumn("Delete") { r in
+                            if let d = r.deleteExecutable {
+                                Image(systemName: d ? "trash.fill" : "circle")
+                                    .foregroundStyle(d ? .orange : .secondary)
+                            } else { Text("—").foregroundStyle(.secondary) }
+                        }
+                        .width(70)
+                    }
+                    .onChange(of: selectedRestrictedID) { _, id in
+                        detailRestricted = id.flatMap { id in items.first { $0.id == id } }
+                    }
+                }
+                .task { await vm.loadRestrictedSoftware() }
+                .sheet(item: $detailRestricted) { item in
+                    RestrictedSoftwareDetailSheet(item: item)
+                        .onDisappear { selectedRestrictedID = nil }
+                }
             default: EmptyView()
             }
         }
@@ -1114,7 +1284,12 @@ struct PatchView: View {
                 Button { Task {
                     await vm.loadPatchTitles(force: true)
                     await vm.loadPatchPolicies(force: true)
+                    await vm.loadModernPatch(force: true)
+                    await vm.loadAppInstallerTitles(force: true)
+                    await vm.loadAppInstallerDeployments(force: true)
+                    await vm.loadRestrictedSoftware(force: true)
                 }} label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                .help("Refresh all patch management data")
             }
         }
     }
@@ -1217,6 +1392,49 @@ private struct PatchPolicyDetailSheet: View {
     }
 }
 
+private struct RestrictedSoftwareDetailSheet: View {
+    let item: RestrictedSoftware
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name).font(.title2).bold()
+                    Text("Restricted Software · ID \(item.id)")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+            .padding(20)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let proc = item.processName {
+                        patchDetailRow("Process Name", value: proc)
+                    }
+                    if let m = item.matchExact {
+                        patchDetailRow("Match Exact Process Name", value: m ? "Yes" : "No")
+                    }
+                    if let k = item.killProcess {
+                        patchDetailRow("Kill Process", value: k ? "Yes" : "No")
+                    }
+                    if let d = item.deleteExecutable {
+                        patchDetailRow("Delete Executable", value: d ? "Yes" : "No")
+                    }
+                    if let msg = item.displayMessage, !msg.isEmpty {
+                        patchDetailRow("Display Message", value: msg)
+                    }
+                    patchDetailRow("ID", value: item.id)
+                }
+                .padding(20)
+            }
+        }
+        .frame(minWidth: 440, minHeight: 280)
+    }
+}
+
 @ViewBuilder
 private func patchDetailRow(_ label: String, value: String) -> some View {
     VStack(alignment: .leading, spacing: 4) {
@@ -1304,6 +1522,7 @@ struct EnrollmentView: View {
                     await vm.loadComputerPrestages(force: true)
                     await vm.loadMobileDevicePrestages(force: true)
                 }} label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                .help("Refresh DEP tokens and prestage configurations")
             }
         }
     }
@@ -1350,6 +1569,7 @@ struct WebhooksView: View {
                 Button { Task { await vm.loadWebhooks(force: true) } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
+                .help("Refresh webhooks")
             }
         }
         .task { await vm.loadWebhooks() }

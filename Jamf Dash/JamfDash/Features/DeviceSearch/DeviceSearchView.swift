@@ -27,6 +27,7 @@ struct DeviceSearchView: View {
                     Label("Clear", systemImage: "xmark.circle")
                 }
                 .disabled(vm.searchText.isEmpty && vm.selectedDevice == nil)
+                .help("Clear search query and results")
             }
         }
     }

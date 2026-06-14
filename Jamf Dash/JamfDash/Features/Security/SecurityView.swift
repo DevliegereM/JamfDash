@@ -4,6 +4,8 @@ struct SecurityView: View {
     @Bindable var vm: SecurityViewModel
     @Environment(AppEnvironment.self) private var env
     @State private var showIssuesOnly = false
+    @AppStorage("healthScoreThreshold") private var scoreThreshold: Int = 70
+    @State private var showThresholdPopover = false
 
     private var serialToComputerID: [String: String] {
         Dictionary(
@@ -33,6 +35,7 @@ struct SecurityView: View {
                 } else if let error = vm.state.errorMessage {
                     ErrorStateView(message: error) { await vm.load(force: true) }
                 } else {
+                    HealthScoreBanner(score: env.fleetHealthScore)
                     if let summary = vm.summary {
                         complianceSection(summary: summary)
                     }
@@ -50,11 +53,32 @@ struct SecurityView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    showThresholdPopover.toggle()
+                } label: {
+                    Label("Score Settings", systemImage: "gear")
+                }
+                .help("Configure fleet health score alert threshold")
+                .popover(isPresented: $showThresholdPopover) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Alert Threshold")
+                            .font(.headline)
+                        Text("Get notified when the fleet health score drops below:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Stepper("Score: \(scoreThreshold)", value: $scoreThreshold, in: 0...100, step: 5)
+                    }
+                    .padding()
+                    .frame(width: 280)
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     Task { await vm.load(force: true) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm.state.isLoading)
+                .help("Refresh security posture report")
             }
             ToolbarItem(placement: .primaryAction) {
                 Toggle(isOn: $showIssuesOnly) {
@@ -67,6 +91,7 @@ struct SecurityView: View {
             }
         }
         .liquidGlassToolbar()
+        .task { await vm.loadPatchCompliance() }
     }
 
     // MARK: - Compliance donuts
@@ -184,6 +209,7 @@ struct SecurityView: View {
                                             .foregroundStyle(Color.accentColor)
                                     }
                                     .help("Open in Jamf Pro console")
+                                    .accessibilityLabel("Open \(device.name) in Jamf Pro")
                                 } else {
                                     Color.clear
                                 }
@@ -209,6 +235,94 @@ struct SecurityView: View {
     }
 }
 
+// MARK: - Fleet Health Score Banner
+
+struct HealthScoreBanner: View {
+    let score: FleetHealthScore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            DashSectionHeader("Fleet Health Score", systemImage: "heart.text.square.fill")
+
+            HStack(alignment: .center, spacing: 24) {
+                circularGauge
+                breakdownGrid
+            }
+            .padding(16)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Fleet health score: \(score.score), grade \(score.grade)")
+        }
+    }
+
+    private var circularGauge: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.08), lineWidth: 8)
+            Circle()
+                .trim(from: 0, to: CGFloat(score.score) / 100)
+                .stroke(
+                    score.gradeColor,
+                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+            VStack(spacing: 0) {
+                Text("\(score.score)")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(score.gradeColor)
+                Text(score.grade)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(score.gradeColor.opacity(0.8))
+            }
+        }
+        .frame(width: 80, height: 80)
+    }
+
+    private var breakdownGrid: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if score.isPartial {
+                Label("Partial score — load patch data for full score", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 160), spacing: 6)],
+                spacing: 6
+            ) {
+                ForEach(score.breakdown) { component in
+                    ScoreChip(component: component)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Score Chip
+
+private struct ScoreChip: View {
+    let component: ScoreComponent
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: component.systemImage)
+                .foregroundStyle(component.color)
+                .imageScale(.small)
+            Text(component.name)
+                .font(.caption2)
+            Text("\(Int(component.earned))/\(Int(component.maxPoints))")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(component.color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(component.color.opacity(0.1), in: Capsule())
+    }
+}
+
 // MARK: - Security status indicator
 
 private struct SecurityIndicator: View {
@@ -218,5 +332,6 @@ private struct SecurityIndicator: View {
         Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
             .foregroundStyle(ok ? .green : .red)
             .frame(maxWidth: .infinity)
+            .accessibilityLabel(ok ? "Enabled" : "Disabled")
     }
 }

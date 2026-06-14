@@ -70,12 +70,14 @@ struct MobileDevicesView: View {
                     Label("Export CSV", systemImage: "arrow.down.doc")
                 }
                 .disabled(vm.state.isPending || selectedTab == 2)
+                .help("Export mobile device list as CSV")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button { Task { await vm.load(force: true) } } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm.state.isLoading)
+                .help("Refresh mobile device inventory")
             }
         }
         .sheet(item: $selectedDevice) { device in

@@ -1,9 +1,61 @@
+import AppKit
 import Foundation
+import OSLog
 import Observation
+import SwiftUI
+import UserNotifications
+
+// MARK: - Pro Notification
+
+struct ProNotification: Decodable, Identifiable, Sendable {
+    let id: String
+    let type: String
+    let message: String
+    let severity: String?
+    let expirationDate: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, type, message, severity
+        case expirationDate, expiration_date, expiresAt, expires_at, expirationUtcDateTime
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let s = try? c.decode(String.self, forKey: .id) { id = s }
+        else if let n = try? c.decode(Int.self, forKey: .id) { id = String(n) }
+        else { id = UUID().uuidString }
+        type       = (try? c.decode(String.self, forKey: .type)) ?? "UNKNOWN"
+        message    = (try? c.decode(String.self, forKey: .message)) ?? ""
+        severity   = try? c.decode(String.self, forKey: .severity)
+        expirationDate = (try? c.decode(String.self, forKey: .expirationDate))
+                      ?? (try? c.decode(String.self, forKey: .expiration_date))
+                      ?? (try? c.decode(String.self, forKey: .expiresAt))
+                      ?? (try? c.decode(String.self, forKey: .expires_at))
+                      ?? (try? c.decode(String.self, forKey: .expirationUtcDateTime))
+    }
+
+    var severityColor: Color {
+        switch severity?.uppercased() {
+        case "CRITICAL": return .red
+        case "WARNING":  return .orange
+        default:         return .blue
+        }
+    }
+
+    var severityIcon: String {
+        switch severity?.uppercased() {
+        case "CRITICAL": return "exclamationmark.triangle.fill"
+        case "WARNING":  return "exclamationmark.circle.fill"
+        default:         return "info.circle.fill"
+        }
+    }
+}
 
 @MainActor
 @Observable
 final class AppEnvironment {
+    private static let logger = Logger(subsystem: "com.jamfdash", category: "AppEnvironment")
+
     let keychain: KeychainService
     let profileService: ProfileService
     let downloader: CLIDownloader
@@ -28,6 +80,13 @@ final class AppEnvironment {
     let aiAssistantVM: AIAssistantViewModel
     let settingsInspectorVM: SettingsInspectorViewModel
     let digestService: DigestService
+    let driftVM: DriftViewModel
+    let correlationVM: CorrelationViewModel
+    let auditVM: AuditViewModel
+
+    // MARK: - Health score tracking
+
+    private var previousHealthScore: Int? = nil
 
     /// Profiles discovered from the system keychain.
     private(set) var availableProfiles: [String] = []
@@ -37,6 +96,10 @@ final class AppEnvironment {
     private(set) var syncStepLabels: [String] = []
     private(set) var syncCompletedSteps: Int = 0
     private(set) var isSyncing: Bool = false
+    private(set) var notificationsState: LoadState<[ProNotification]> = .idle
+    var notificationCount: Int {
+        (notificationsState.value ?? []).count
+    }
     private var currentLoadTask: Task<Void, Never>?
 
     // MARK: - Profile switching state
@@ -93,7 +156,7 @@ final class AppEnvironment {
 
         let devicesVM = DevicesViewModel(cli: cliManager)
         self.overviewVM       = OverviewViewModel(repository: overviewRepo)
-        self.securityVM       = SecurityViewModel(repository: securityRepo)
+        self.securityVM       = SecurityViewModel(repository: securityRepo, cli: cliManager)
         self.fleetVM          = FleetViewModel(repository: fleetRepo)
         self.devicesVM        = devicesVM
         self.deviceSearchVM   = DeviceSearchViewModel(cli: cliManager, devicesVM: devicesVM)
@@ -105,6 +168,9 @@ final class AppEnvironment {
         self.schoolVM               = SchoolViewModel(cli: cliManager)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: cliManager)
         self.digestService          = DigestService(cli: cliManager)
+        self.driftVM                = DriftViewModel(cli: cliManager)
+        self.correlationVM          = CorrelationViewModel()
+        self.auditVM                = AuditViewModel(cli: cliManager)
 
         self.currentProduct = profileService.currentProduct
     }
@@ -143,7 +209,7 @@ final class AppEnvironment {
 
         let devicesVM = DevicesViewModel(cli: demoCLI)
         self.overviewVM       = OverviewViewModel(repository: overviewRepo)
-        self.securityVM       = SecurityViewModel(repository: securityRepo)
+        self.securityVM       = SecurityViewModel(repository: securityRepo, cli: demoCLI)
         self.fleetVM          = FleetViewModel(repository: fleetRepo)
         self.devicesVM        = devicesVM
         self.deviceSearchVM   = DeviceSearchViewModel(cli: demoCLI, devicesVM: devicesVM)
@@ -155,6 +221,9 @@ final class AppEnvironment {
         self.aiAssistantVM          = AIAssistantViewModel(cli: demoCLI)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: demoCLI)
         self.digestService          = DigestService(cli: demoCLI)
+        self.driftVM                = DriftViewModel(cli: demoCLI)
+        self.correlationVM          = CorrelationViewModel()
+        self.auditVM                = AuditViewModel(cli: demoCLI)
 
         self.currentProduct = .pro  // demo always starts with Jamf Pro
     }
@@ -174,12 +243,16 @@ final class AppEnvironment {
         if !isDemoMode {
             currentProduct = profileService.currentProduct
         }
-        switch currentProduct {
+        let product = currentProduct
+        Self.logger.info("Starting main data sync — product: \(product.rawValue, privacy: .public), profile: \(self.currentProfileName, privacy: .private)")
+
+        switch product {
         case .pro:
             syncStepLabels = ["Overview", "Security", "Mobile Devices", "Computers",
-                              "Policies", "Smart Groups", "Scripts", "Packages", "Configuration Profiles"]
+                              "Policies", "Smart Groups", "Scripts", "Packages", "Configuration Profiles", "Notifications"]
             syncCompletedSteps = 0
             isSyncing = true
+            let startTime = Date()
             currentLoadTask = Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { await self.overviewVM.load(force: true) }
@@ -191,9 +264,15 @@ final class AppEnvironment {
                     group.addTask { await self.fleetVM.loadScripts(force: true) }
                     group.addTask { await self.fleetVM.loadPackages(force: true) }
                     group.addTask { await self.fleetVM.loadConfigProfiles(force: true) }
+                    group.addTask { await self.loadNotifications() }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    Self.logger.info("Main data sync cancelled (Jamf Pro)")
+                    return
+                }
+                let elapsed = String(format: "%.1f", Date().timeIntervalSince(startTime))
+                Self.logger.info("Main data sync complete in \(elapsed, privacy: .public)s (Jamf Pro)")
                 // Keep the stored server URL in sync with whatever Jamf Pro reports in the
                 // overview. This corrects platform-API profiles, which store the gateway URL
                 // (e.g. eu.apigw.jamf.com) at setup time instead of the actual instance URL
@@ -205,11 +284,13 @@ final class AppEnvironment {
                     self.profileService.setServerURL(reportedURL, for: profile)
                 }
                 self.isSyncing = false
+                self.updateDockBadge()
             }
         case .protect:
             syncStepLabels = ["Overview", "Computers", "Plans", "Analytics", "Analytic Sets", "Exception Sets"]
             syncCompletedSteps = 0
             isSyncing = true
+            let startTime = Date()
             currentLoadTask = Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { await self.protectVM.loadOverview(force: true) }
@@ -220,12 +301,19 @@ final class AppEnvironment {
                     group.addTask { await self.protectVM.loadExceptionSets(force: true) }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                if !Task.isCancelled { self.isSyncing = false }
+                guard !Task.isCancelled else {
+                    Self.logger.info("Main data sync cancelled (Jamf Protect)")
+                    return
+                }
+                let elapsed = String(format: "%.1f", Date().timeIntervalSince(startTime))
+                Self.logger.info("Main data sync complete in \(elapsed, privacy: .public)s (Jamf Protect)")
+                self.isSyncing = false
             }
         case .school:
             syncStepLabels = ["Overview", "Devices", "Device Groups", "Users", "User Groups", "Classes", "Apps"]
             syncCompletedSteps = 0
             isSyncing = true
+            let startTime = Date()
             currentLoadTask = Task {
                 await withTaskGroup(of: Void.self) { group in
                     group.addTask { await self.schoolVM.loadOverview(force: true) }
@@ -237,7 +325,13 @@ final class AppEnvironment {
                     group.addTask { await self.schoolVM.loadApps(force: true) }
                     for await _ in group { self.syncCompletedSteps += 1 }
                 }
-                if !Task.isCancelled { self.isSyncing = false }
+                guard !Task.isCancelled else {
+                    Self.logger.info("Main data sync cancelled (Jamf School)")
+                    return
+                }
+                let elapsed = String(format: "%.1f", Date().timeIntervalSince(startTime))
+                Self.logger.info("Main data sync complete in \(elapsed, privacy: .public)s (Jamf School)")
+                self.isSyncing = false
             }
         }
     }
@@ -249,6 +343,41 @@ final class AppEnvironment {
         guard isDemoMode else { return }
         currentProduct = product
         loadMainData()
+    }
+
+    // MARK: - System Notifications
+
+    func loadNotifications() async {
+        guard !isDemoMode else {
+            notificationsState = .loaded([])
+            return
+        }
+        notificationsState = .loading
+        do {
+            let data = try await cliManager.run(.proNotifications)
+            let decoder = JSONDecoder()
+            if let notifs = try? decoder.decode([ProNotification].self, from: data) {
+                Self.logger.info("Loaded \(notifs.count) system notification(s)")
+                notificationsState = .loaded(notifs)
+            } else if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                for key in ["notifications", "results", "items", "data"] {
+                    if let arr = obj[key],
+                       let arrData = try? JSONSerialization.data(withJSONObject: arr),
+                       let notifs = try? decoder.decode([ProNotification].self, from: arrData) {
+                        Self.logger.info("Loaded \(notifs.count) system notification(s) (key: \(key, privacy: .public))")
+                        notificationsState = .loaded(notifs)
+                        return
+                    }
+                }
+                notificationsState = .loaded([])
+            } else {
+                notificationsState = .loaded([])
+            }
+        } catch {
+            // Non-fatal — notifications failing should not block the UI
+            Self.logger.error("Failed to load system notifications: \(error)")
+            notificationsState = .loaded([])
+        }
     }
 
     // MARK: - Profile discovery
@@ -265,6 +394,7 @@ final class AppEnvironment {
         guard !isSwitchingProfile else { return }
         guard profileName != profileService.selectedProfile.name else { return }
 
+        Self.logger.info("Switching instance to profile: \(profileName, privacy: .private)")
         let previousProfile = profileService.selectedProfile
         let previousProduct = currentProduct
 
@@ -276,9 +406,11 @@ final class AppEnvironment {
         Task {
             do {
                 try await cliManager.verifyConnection()
+                Self.logger.info("Instance switch verified — loading data for \(profileName, privacy: .private)")
                 loadMainData()
                 profileSwitchCount += 1
             } catch {
+                Self.logger.error("Instance switch failed for \(profileName, privacy: .private): \(error)")
                 profileService.selectedProfile = previousProfile
                 currentProduct = previousProduct
                 switchError = Self.connectionErrorMessage(for: error, profile: profileName)
@@ -299,6 +431,52 @@ final class AppEnvironment {
             return "Cannot connect to \"\(profile)\": \(stderr)"
         }
         return "Cannot connect to \"\(profile)\": \(error.localizedDescription)"
+    }
+
+    // MARK: - Fleet Health Score
+
+    var fleetHealthScore: FleetHealthScore {
+        FleetHealthScore(
+            summary: securityVM.summary,
+            staleCount: devicesVM.staleDevices.count,
+            totalCount: devicesVM.totalCount,
+            patchCompliancePct: securityVM.patchCompliancePct
+        )
+    }
+
+    func updateDockBadge() {
+        let score = fleetHealthScore
+        let rawThreshold = UserDefaults.standard.integer(forKey: "healthScoreThreshold")
+        let threshold = rawThreshold == 0 ? 70 : rawThreshold
+        NSApp.dockTile.badgeLabel = score.score < threshold ? "\(score.score)" : nil
+
+        if let prev = previousHealthScore, prev >= threshold, score.score < threshold {
+            sendHealthScoreNotification(score: score.score)
+        }
+        previousHealthScore = score.score
+    }
+
+    private func sendHealthScoreNotification(score: Int) {
+        Self.logger.notice("Fleet health score dropped to \(score) — posting alert notification")
+        let content = UNMutableNotificationContent()
+        content.title = "Fleet Health Alert"
+        content.body = "Fleet health score dropped to \(score). Review your Security Posture."
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "health-score-\(Int(Date().timeIntervalSince1970))",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                // Logger calls from completion handler closures need a nonisolated context;
+                // use a detached task to stay off the main actor.
+                Task.detached {
+                    Logger(subsystem: "com.jamfdash", category: "AppEnvironment")
+                        .error("Failed to post health score notification: \(error)")
+                }
+            }
+        }
     }
 
     // MARK: - Settings / Onboarding factories
@@ -326,5 +504,5 @@ final class AppEnvironment {
     // MARK: - Report factory (always fresh data for PDF export)
 
     func makeReportOverviewVM() -> OverviewViewModel { OverviewViewModel(repository: overviewRepo) }
-    func makeReportSecurityVM() -> SecurityViewModel { SecurityViewModel(repository: securityRepo) }
+    func makeReportSecurityVM() -> SecurityViewModel { SecurityViewModel(repository: securityRepo, cli: cliManager) }
 }

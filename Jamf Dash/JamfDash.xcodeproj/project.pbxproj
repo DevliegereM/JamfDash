@@ -49,6 +49,7 @@
 		6D102B1CDD9A53C6D70F949D /* SyncBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FDD39F52A288F77CA1CE74 /* SyncBar.swift */; };
 		6F79EF1356D65A9B9272FD7B /* SecurityViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3F38E6B5F7091E22D22EF91 /* SecurityViewModel.swift */; };
 		737F81F063CC977CD9729B65 /* MobileDevicesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8B6EDA4485610CFEF3127C1 /* MobileDevicesViewModel.swift */; };
+		77671562D587689C74175B95 /* PlatformAuthRequiredView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF77DC199166B1EE3977079F /* PlatformAuthRequiredView.swift */; };
 		7A4FF0C1C73EF91E7EFE50FD /* ComputerDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D3CD911E87878616E8AE684 /* ComputerDetail.swift */; };
 		7AFFCEF71FC0F59FA14775E5 /* DeviceSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593DEFAA86551BAAE2D3142D /* DeviceSearchViewModel.swift */; };
 		7BC0BF80C61F4B552FEBF1BC /* MobileDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CC1CD48B4A26B1C959B618C /* MobileDevicesView.swift */; };
@@ -64,6 +65,7 @@
 		953B82338107F00CC2CC41DC /* ModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BD108C8D309D947048115E1 /* ModelDecodingTests.swift */; };
 		961F31FDD08C8F05D32F3F1A /* CLIExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653221465C4D79BEC6D18D31 /* CLIExecutor.swift */; };
 		98C91AF1A672AEDB59850E78 /* SecurityReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C1F7CEB1B62559F7CE13A51 /* SecurityReport.swift */; };
+		9D7E2D58B0B2CDAF5253CB7B /* PlatformDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5EB4C0DF4EB44978184E00 /* PlatformDetailModels.swift */; };
 		A2345E33A831B7AB570336C1 /* PlatformModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48FE8BF911228ADF94CCA533 /* PlatformModels.swift */; };
 		AA7F82EBDEB4280C473299CB /* FleetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09F80C6C71219252D7627548 /* FleetView.swift */; };
 		AB228A3F9AF539CD01099042 /* StatCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF753970C444E49A60F45A9 /* StatCardView.swift */; };
@@ -79,6 +81,17 @@
 		D7955D8F525F31204E80EE05 /* ProtectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD9E1C7BDF2FE95296B6228 /* ProtectViewModel.swift */; };
 		D882F91D3C6CBEE8AA2E6211 /* DDMModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7FB80ABB94D6A8BD9C86799 /* DDMModels.swift */; };
 		DC7E4B155F66E1FBDFF83F0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8B40B6D7FB2B01CCB191F7 /* SettingsView.swift */; };
+		DD000001000000000000003A /* DriftModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000001A /* DriftModels.swift */; };
+		DD000001000000000000003B /* CorrelationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000001B /* CorrelationModels.swift */; };
+		DD000001000000000000003C /* HealthScore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000001C /* HealthScore.swift */; };
+		DD000001000000000000003D /* DriftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000001D /* DriftStore.swift */; };
+		DD000001000000000000003E /* DriftViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000001E /* DriftViewModel.swift */; };
+		DD000001000000000000003F /* CorrelationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000001F /* CorrelationViewModel.swift */; };
+		DD000001000000000000004A /* DriftTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000002A /* DriftTrackerView.swift */; };
+		DD000001000000000000004B /* CorrelationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000002B /* CorrelationView.swift */; };
+		DD000001000000000000004C /* DebugLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000001000000000000002C /* DebugLoggingService.swift */; };
+		DDBB00010002A0 /* AuditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB00010001A0 /* AuditViewModel.swift */; };
+		DDBB00010002B0 /* AuditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBB00010001B0 /* AuditView.swift */; };
 		E088377AA55370E9B3A92DB8 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759585A030F63F374BD6FEA9 /* AppUpdater.swift */; };
 		E23DC4DD7CBEB22C2731662F /* CLIDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF8646BC2548A6FFCC1CB88F /* CLIDownloader.swift */; };
 		E55978CC0D18BA02DA815D15 /* SecurityRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276906C92A73944DF3BA9869 /* SecurityRepository.swift */; };
@@ -106,6 +119,7 @@
 		0F296E3F2BC4F04419299C8C /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		110A2FC9AFB355EB767C9F18 /* ComplianceDonutChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplianceDonutChart.swift; sourceTree = "<group>"; };
 		122D1C3DA7468A4DBB598BD0 /* FleetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetViewModel.swift; sourceTree = "<group>"; };
+		1E5EB4C0DF4EB44978184E00 /* PlatformDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDetailModels.swift; sourceTree = "<group>"; };
 		228A2C5DF5787E1FF50A2411 /* PDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFExporter.swift; sourceTree = "<group>"; };
 		2474D3B4BF10F5482B966512 /* AIAssistantViewModel+Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIAssistantViewModel+Session.swift"; sourceTree = "<group>"; };
 		276906C92A73944DF3BA9869 /* SecurityRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityRepository.swift; sourceTree = "<group>"; };
@@ -175,6 +189,17 @@
 		D11104400C1207BCA192BA6A /* DeviceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSearchView.swift; sourceTree = "<group>"; };
 		D5DFBA4FB2776A824875D03C /* DDMMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDMMonitorView.swift; sourceTree = "<group>"; };
 		D97EBD5596E79391C347A4F9 /* CLIWorkerXPCProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIWorkerXPCProtocol.swift; sourceTree = "<group>"; };
+		DD000001000000000000001A /* DriftModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriftModels.swift; sourceTree = "<group>"; };
+		DD000001000000000000001B /* CorrelationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationModels.swift; sourceTree = "<group>"; };
+		DD000001000000000000001C /* HealthScore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthScore.swift; sourceTree = "<group>"; };
+		DD000001000000000000001D /* DriftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriftStore.swift; sourceTree = "<group>"; };
+		DD000001000000000000001E /* DriftViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriftViewModel.swift; sourceTree = "<group>"; };
+		DD000001000000000000001F /* CorrelationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationViewModel.swift; sourceTree = "<group>"; };
+		DD000001000000000000002A /* DriftTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriftTrackerView.swift; sourceTree = "<group>"; };
+		DD000001000000000000002B /* CorrelationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationView.swift; sourceTree = "<group>"; };
+		DD000001000000000000002C /* DebugLoggingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLoggingService.swift; sourceTree = "<group>"; };
+		DDBB00010001A0 /* AuditViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditViewModel.swift; sourceTree = "<group>"; };
+		DDBB00010001B0 /* AuditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditView.swift; sourceTree = "<group>"; };
 		E8B6EDA4485610CFEF3127C1 /* MobileDevicesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileDevicesViewModel.swift; sourceTree = "<group>"; };
 		E8CCE55195910A2FC21223E6 /* DevicesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicesViewModel.swift; sourceTree = "<group>"; };
 		EB50A66360EC92E3FC979988 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -183,6 +208,7 @@
 		F6B3F1138012BC76185BD3F8 /* SecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityView.swift; sourceTree = "<group>"; };
 		F97422B5AE084BF291355310 /* ErrorMessageFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorMessageFormatter.swift; sourceTree = "<group>"; };
 		FB8B5693777519A927D2E2F2 /* PlatformViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformViewModel.swift; sourceTree = "<group>"; };
+		FF77DC199166B1EE3977079F /* PlatformAuthRequiredView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformAuthRequiredView.swift; sourceTree = "<group>"; };
 		FFDFF28776F32F3744EE9C89 /* JamfProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfProfile.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -212,6 +238,9 @@
 				81A6AE0341D8E827B076C462 /* AIAssistantViewModel.swift */,
 				2474D3B4BF10F5482B966512 /* AIAssistantViewModel+Session.swift */,
 				4F66827CB13BDDEFA833FD15 /* DDMMonitorViewModel.swift */,
+				DD000001000000000000001E /* DriftViewModel.swift */,
+				DDBB00010001A0 /* AuditViewModel.swift */,
+				DD000001000000000000001F /* CorrelationViewModel.swift */,
 				593DEFAA86551BAAE2D3142D /* DeviceSearchViewModel.swift */,
 				E8CCE55195910A2FC21223E6 /* DevicesViewModel.swift */,
 				122D1C3DA7468A4DBB598BD0 /* FleetViewModel.swift */,
@@ -233,6 +262,8 @@
 			isa = PBXGroup;
 			children = (
 				B0557DB1E3BD13AB41D84C85 /* BlueprintsView.swift */,
+				FF77DC199166B1EE3977079F /* PlatformAuthRequiredView.swift */,
+				1E5EB4C0DF4EB44978184E00 /* PlatformDetailModels.swift */,
 				CB75E72BD104A22834CA508B /* ComplianceBenchmarksView.swift */,
 			);
 			path = Platform;
@@ -250,6 +281,8 @@
 				A4B36F8A0BB673492220609A /* CLIVersionStore.swift */,
 				7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */,
 				93D6342CADCC7D9FF8F0C85E /* DigestService.swift */,
+				DD000001000000000000001D /* DriftStore.swift */,
+				DD000001000000000000002C /* DebugLoggingService.swift */,
 				F97422B5AE084BF291355310 /* ErrorMessageFormatter.swift */,
 				40B9C78E574926244BB00B74 /* KeychainService.swift */,
 				9D1FB11144A6B476A07A65D8 /* ProfileService.swift */,
@@ -271,6 +304,9 @@
 				70B891128FC5CF093DFE5598 /* OverviewItem.swift */,
 				48FE8BF911228ADF94CCA533 /* PlatformModels.swift */,
 				6C1F7CEB1B62559F7CE13A51 /* SecurityReport.swift */,
+				DD000001000000000000001A /* DriftModels.swift */,
+				DD000001000000000000001B /* CorrelationModels.swift */,
+				DD000001000000000000001C /* HealthScore.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -462,6 +498,30 @@
 			path = XPC;
 			sourceTree = "<group>";
 		};
+		DD000001000000000000005A /* Drift */ = {
+			isa = PBXGroup;
+			children = (
+				DD000001000000000000002A /* DriftTrackerView.swift */,
+			);
+			path = Drift;
+			sourceTree = "<group>";
+		};
+		DD000001000000000000005B /* Correlation */ = {
+			isa = PBXGroup;
+			children = (
+				DD000001000000000000002B /* CorrelationView.swift */,
+			);
+			path = Correlation;
+			sourceTree = "<group>";
+		};
+		DDBB00010003A0 /* Audit */ = {
+			isa = PBXGroup;
+			children = (
+				DDBB00010001B0 /* AuditView.swift */,
+			);
+			path = Audit;
+			sourceTree = "<group>";
+		};
 		ECC6438486424B86DA9FC485 /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
@@ -485,6 +545,9 @@
 			children = (
 				34EA0332054152889D35CE8C /* AIAssistant */,
 				667B498EC4D41B4C16D1D926 /* DDMMonitor */,
+				DD000001000000000000005A /* Drift */,
+				DDBB00010003A0 /* Audit */,
+				DD000001000000000000005B /* Correlation */,
 				5630D58D9E350E30E2B6CDD3 /* Devices */,
 				F682F10ACE8B5AA7E49EB0F5 /* DeviceSearch */,
 				622D7AAC29E68E9611717409 /* Export */,
@@ -619,6 +682,8 @@
 				B66F9DC4EDECAEE439DDB434 /* AppState.swift in Sources */,
 				E088377AA55370E9B3A92DB8 /* AppUpdater.swift in Sources */,
 				6A5C598B2B572E677E8C80EF /* BlueprintsView.swift in Sources */,
+				77671562D587689C74175B95 /* PlatformAuthRequiredView.swift in Sources */,
+				9D7E2D58B0B2CDAF5253CB7B /* PlatformDetailModels.swift in Sources */,
 				3F75BA147C03A8208CBA0FEB /* BrandingService.swift in Sources */,
 				E23DC4DD7CBEB22C2731662F /* CLIDownloader.swift in Sources */,
 				0FA4D793D45D7F898D3123FD /* CLIError.swift in Sources */,
@@ -687,6 +752,17 @@
 				AB228A3F9AF539CD01099042 /* StatCardView.swift in Sources */,
 				6D102B1CDD9A53C6D70F949D /* SyncBar.swift in Sources */,
 				121867D86EC6F19581FFEBA4 /* XPCCLIExecutor.swift in Sources */,
+				DD000001000000000000003A /* DriftModels.swift in Sources */,
+				DD000001000000000000003B /* CorrelationModels.swift in Sources */,
+				DD000001000000000000003C /* HealthScore.swift in Sources */,
+				DD000001000000000000003D /* DriftStore.swift in Sources */,
+				DD000001000000000000004C /* DebugLoggingService.swift in Sources */,
+				DD000001000000000000003E /* DriftViewModel.swift in Sources */,
+				DDBB00010002A0 /* AuditViewModel.swift in Sources */,
+				DDBB00010002B0 /* AuditView.swift in Sources */,
+				DD000001000000000000003F /* CorrelationViewModel.swift in Sources */,
+				DD000001000000000000004A /* DriftTrackerView.swift in Sources */,
+				DD000001000000000000004B /* CorrelationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -716,7 +792,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = JamfDash/JamfDash.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20260527.13;
+				CURRENT_PROJECT_VERSION = 20260614.21;
 				DEVELOPMENT_TEAM = 4FZ2H85CA5;
 				INFOPLIST_FILE = JamfDash/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Jamf Dash";
@@ -726,7 +802,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.5;
+				MARKETING_VERSION = 0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash;
 				SDKROOT = macosx;
 			};
@@ -739,7 +815,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = JamfDash/JamfDash.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20260527.13;
+				CURRENT_PROJECT_VERSION = 20260614.21;
 				DEVELOPMENT_TEAM = 4FZ2H85CA5;
 				INFOPLIST_FILE = JamfDash/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Jamf Dash";
@@ -749,7 +825,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.5;
+				MARKETING_VERSION = 0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = be.devliegere.JamfDash;
 				SDKROOT = macosx;
 			};

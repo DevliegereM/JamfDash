@@ -28,6 +28,8 @@ struct OSDistributionChart: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityLabel(row.osVersion)
+                .accessibilityValue("\(row.count) devices")
             }
             .chartXAxis {
                 AxisMarks(values: .automatic(desiredCount: 5)) {

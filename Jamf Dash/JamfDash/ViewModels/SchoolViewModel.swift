@@ -1,6 +1,7 @@
 import Foundation
 import OSLog
 import Observation
+import SwiftUI
 
 // MARK: - School data models
 
@@ -68,6 +69,75 @@ struct SchoolNamedItem: Codable, Sendable, Hashable, Identifiable {
     private enum CodingKeys: String, CodingKey { case id, name }
 }
 
+struct SchoolProfile: Decodable, Sendable, Hashable, Identifiable {
+    let id: String
+    let name: String?
+    let scope: String?
+    let payloadCount: Int?
+    let enabled: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, scope, enabled
+        case payloadCount, payload_count
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let s = try? c.decode(String.self, forKey: .id) { id = s }
+        else { id = String(try c.decode(Int.self, forKey: .id)) }
+        name         = try? c.decode(String.self, forKey: .name)
+        scope        = try? c.decode(String.self, forKey: .scope)
+        enabled      = try? c.decode(Bool.self, forKey: .enabled)
+        payloadCount = (try? c.decode(Int.self, forKey: .payloadCount))
+                    ?? (try? c.decode(Int.self, forKey: .payload_count))
+    }
+
+    var displayName: String { name ?? id }
+    var displayScope: String { scope ?? "—" }
+    var displayEnabled: String { enabled.map { $0 ? "Active" : "Inactive" } ?? "—" }
+}
+
+struct SchoolDepDevice: Decodable, Sendable, Hashable, Identifiable {
+    let serial: String?
+    let model: String?
+    let profileName: String?
+    let status: String?
+    let enrolled: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case serial, serialNumber, model, deviceModel
+        case profileName, profile_name, assignedProfile, assigned_profile
+        case status, enrollmentStatus, enrollment_status
+        case enrolled
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        serial       = (try? c.decode(String.self, forKey: .serial))
+                    ?? (try? c.decode(String.self, forKey: .serialNumber))
+        model        = (try? c.decode(String.self, forKey: .model))
+                    ?? (try? c.decode(String.self, forKey: .deviceModel))
+        profileName  = (try? c.decode(String.self, forKey: .profileName))
+                    ?? (try? c.decode(String.self, forKey: .profile_name))
+                    ?? (try? c.decode(String.self, forKey: .assignedProfile))
+                    ?? (try? c.decode(String.self, forKey: .assigned_profile))
+        status       = (try? c.decode(String.self, forKey: .status))
+                    ?? (try? c.decode(String.self, forKey: .enrollmentStatus))
+                    ?? (try? c.decode(String.self, forKey: .enrollment_status))
+        enrolled     = try? c.decode(Bool.self, forKey: .enrolled)
+    }
+
+    var id: String { serial ?? UUID().uuidString }
+    var displaySerial: String { serial ?? "—" }
+    var displayStatus: String { status ?? (enrolled == true ? "Enrolled" : "Pending") }
+    var statusColor: Color {
+        let s = displayStatus.lowercased()
+        if s.contains("enroll") { return .green }
+        if s.contains("fail") || s.contains("error") { return .red }
+        return .orange
+    }
+}
+
 // MARK: - SchoolViewModel
 
 @MainActor
@@ -83,6 +153,8 @@ final class SchoolViewModel {
     private(set) var userGroupsState:    LoadState<[SchoolNamedItem]>   = .idle
     private(set) var classesState:       LoadState<[SchoolNamedItem]>   = .idle
     private(set) var appsState:          LoadState<[SchoolNamedItem]>   = .idle
+    private(set) var profilesState:    LoadState<[SchoolProfile]>    = .idle
+    private(set) var depDevicesState:  LoadState<[SchoolDepDevice]>  = .idle
 
     init(cli: CLIRunning) {
         self.cli = cli
@@ -99,6 +171,8 @@ final class SchoolViewModel {
             group.addTask { await self.loadUserGroups() }
             group.addTask { await self.loadClasses() }
             group.addTask { await self.loadApps() }
+            group.addTask { await self.loadProfiles() }
+            group.addTask { await self.loadDepDevices() }
         }
     }
 
@@ -213,6 +287,38 @@ final class SchoolViewModel {
         } catch {
             Self.logger.error("Failed to load school apps: \(error)")
             appsState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadProfiles(force: Bool = false) async {
+        guard force || profilesState.value == nil else { return }
+        guard force || !profilesState.isLoading else { return }
+        Self.logger.debug("Loading school profiles")
+        profilesState = .loading
+        do {
+            let data  = try await cli.run(.schoolProfiles)
+            let items = try decodeList(SchoolProfile.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school profiles")
+            profilesState = .loaded(items)
+        } catch {
+            Self.logger.error("Failed to load school profiles: \(error)")
+            profilesState = .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    func loadDepDevices(force: Bool = false) async {
+        guard force || depDevicesState.value == nil else { return }
+        guard force || !depDevicesState.isLoading else { return }
+        Self.logger.debug("Loading school DEP devices")
+        depDevicesState = .loading
+        do {
+            let data  = try await cli.run(.schoolDepDevices)
+            let items = try decodeList(SchoolDepDevice.self, from: data)
+            Self.logger.debug("Loaded \(items.count) school DEP devices")
+            depDevicesState = .loaded(items)
+        } catch {
+            Self.logger.error("Failed to load school DEP devices: \(error)")
+            depDevicesState = .failed(ErrorMessageFormatter.message(for: error))
         }
     }
 

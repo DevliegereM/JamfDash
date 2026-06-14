@@ -1,12 +1,17 @@
 import SwiftUI
 
 struct ComplianceBenchmarksView: View {
+    // @Bindable required: provides $vm.selectedBenchmarkID binding for List(selection:)
     @Bindable var vm: PlatformViewModel
+    @State private var refreshTask: Task<Void, Never>? = nil
 
     var body: some View {
         Group {
             switch vm.complianceBenchmarksState {
-            case .idle, .loading:
+            case .idle:
+                ContentUnavailableView("Compliance Benchmarks", systemImage: "checkmark.shield")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .loading:
                 VStack(spacing: 12) {
                     ProgressView()
                     Text("Loading compliance benchmarks…").foregroundStyle(.secondary)
@@ -14,7 +19,7 @@ struct ComplianceBenchmarksView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let error):
                 if PlatformViewModel.isPlatformAuthError(error) {
-                    PlatformAuthRequiredView()
+                    PlatformAuthRequiredView(featureName: "Compliance Benchmarks")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 12) {
@@ -26,19 +31,23 @@ struct ComplianceBenchmarksView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             case .loaded(let benchmarks):
-                HSplitView {
+                HStack(spacing: 0) {
                     benchmarkList(benchmarks)
-                        .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
+                        .frame(width: 240)
+                    Divider()
                     benchmarkDetail
-                        .frame(minWidth: 300, maxWidth: .infinity)
+                        .frame(maxWidth: .infinity)
                 }
             }
         }
         .navigationTitle("Compliance Benchmarks")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button { Task { await vm.loadComplianceBenchmarks(force: true) } } label: {
-                    Image(systemName: "arrow.clockwise")
+                Button {
+                    refreshTask?.cancel()
+                    refreshTask = Task { await vm.loadComplianceBenchmarks(force: true) }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm.complianceBenchmarksState.isLoading)
             }
@@ -78,95 +87,10 @@ struct ComplianceBenchmarksView: View {
         case .failed(let e):
             VStack { Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange); Text(e).font(.caption) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .loaded(let json):
-            BenchmarkDetailView(json: json)
+        case .loaded(let result):
+            BenchmarkDetailView(result: result)
         }
     }
-}
-
-// MARK: - Benchmark JSON Models
-
-private struct BenchmarkDetail: Decodable {
-    let id: String?
-    let name: String?
-    let description: String?
-    let version: String?
-    let framework: String?
-    let status: String?
-    let scope: BenchmarkScope?
-    let controls: [BenchmarkControl]?
-    let rules: [BenchmarkRule]?
-}
-
-/// Which devices / groups the benchmark is deployed to.
-private struct BenchmarkScope: Decodable {
-    let deviceGroups: [String]?
-    let devices: [String]?
-    let users: [String]?
-    let userGroups: [String]?
-}
-
-private struct BenchmarkControl: Decodable {
-    let id: String?
-    let name: String?
-    let description: String?
-    let severity: String?
-    let status: String?
-    let enabled: Bool?
-    let remediation: String?
-
-    /// True when this control is actively checked.
-    var isEnabled: Bool {
-        if let e = enabled { return e }
-        if let s = status { return !["DISABLED", "INACTIVE", "OFF", "EXCLUDED"].contains(s.uppercased()) }
-        return true
-    }
-}
-
-private struct BenchmarkRule: Decodable {
-    let id: String?
-    // API may use "name" (Jamf) or "title" (mSCP native)
-    let name: String?
-    let title: String?
-    // API may use "description" or "discussion" (mSCP native)
-    let description: String?
-    let discussion: String?
-    let severity: String?
-    let status: String?
-    let enabled: Bool?
-    // Remediation: "fix" (mSCP native) or "remediation" (Jamf)
-    let fix: String?
-    let remediation: String?
-
-    var displayName: String? { name ?? title }
-    var displayDescription: String? { discussion ?? description }
-    var displayRemediation: String? { fix ?? remediation }
-
-    /// True when this rule is actively enforced.
-    var isEnabled: Bool {
-        if let e = enabled { return e }
-        if let s = status { return !["DISABLED", "INACTIVE", "OFF", "EXCLUDED"].contains(s.uppercased()) }
-        return true
-    }
-}
-
-// MARK: - Benchmark Decoder
-
-private func makeBenchmarkDecoder() -> JSONDecoder {
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    decoder.dateDecodingStrategy = .custom { dec in
-        let container = try dec.singleValueContainer()
-        let string = try container.decode(String.self)
-        let withFrac = ISO8601DateFormatter()
-        withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = withFrac.date(from: string) { return date }
-        let noFrac = ISO8601DateFormatter()
-        noFrac.formatOptions = [.withInternetDateTime]
-        if let date = noFrac.date(from: string) { return date }
-        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot parse date: \(string)")
-    }
-    return decoder
 }
 
 // MARK: - Status Badge
@@ -185,10 +109,10 @@ private struct BenchmarkStatusBadge: View {
     var body: some View {
         Text(status)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(badgeColor)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(badgeColor, in: Capsule())
+            .background(badgeColor.opacity(0.15), in: Capsule())
             .accessibilityLabel("Status: \(status)")
     }
 }
@@ -223,19 +147,14 @@ private struct BenchmarkInfoRow: View {
 // MARK: - Benchmark Detail View
 
 private struct BenchmarkDetailView: View {
-    let json: String
-
-    private var detail: BenchmarkDetail? {
-        guard let data = json.data(using: .utf8) else { return nil }
-        return try? makeBenchmarkDecoder().decode(BenchmarkDetail.self, from: data)
-    }
+    let result: BenchmarkDetailResult
 
     var body: some View {
-        if let detail {
+        if let detail = result.detail {
             BenchmarkStructuredView(detail: detail)
         } else {
             ScrollView {
-                Text(json)
+                Text(result.rawJSON)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -340,10 +259,17 @@ private struct BenchmarkStructuredView: View {
                     Text("No scope assigned")
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else {
-                    if !groups.isEmpty     { scopeNameList(label: "Device Groups", names: groups) }
-                    if !devices.isEmpty    { if !groups.isEmpty { Divider() }; scopeNameList(label: "Devices", names: devices) }
-                    if !users.isEmpty      { if !groups.isEmpty || !devices.isEmpty { Divider() }; scopeNameList(label: "Users", names: users) }
-                    if !userGroups.isEmpty { if !groups.isEmpty || !devices.isEmpty || !users.isEmpty { Divider() }; scopeNameList(label: "User Groups", names: userGroups) }
+                    let rows: [(label: String, names: [String])] = [
+                        ("Device Groups", groups),
+                        ("Devices",       devices),
+                        ("Users",         users),
+                        ("User Groups",   userGroups),
+                    ].filter { !$0.names.isEmpty }
+
+                    ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
+                        if idx > 0 { Divider() }
+                        scopeNameList(label: row.label, names: row.names)
+                    }
                 }
             }
             .padding(14)
@@ -370,7 +296,7 @@ private struct BenchmarkStructuredView: View {
             DashSectionHeader("Controls (\(controls.count))", systemImage: "list.bullet.clipboard")
             if !enabled.isEmpty {
                 ruleGroup(title: "Active", systemImage: "checkmark.circle.fill", color: .green) {
-                    ForEach(Array(enabled.enumerated()), id: \.offset) { idx, c in
+                    ForEach(Array(enabled.enumerated()), id: \.element) { idx, c in
                         if idx > 0 { Divider() }
                         BenchmarkControlRow(control: c)
                     }
@@ -378,7 +304,7 @@ private struct BenchmarkStructuredView: View {
             }
             if !disabled.isEmpty {
                 ruleGroup(title: "Inactive", systemImage: "minus.circle", color: .secondary) {
-                    ForEach(Array(disabled.enumerated()), id: \.offset) { idx, c in
+                    ForEach(Array(disabled.enumerated()), id: \.element) { idx, c in
                         if idx > 0 { Divider() }
                         BenchmarkControlRow(control: c)
                     }
@@ -394,7 +320,7 @@ private struct BenchmarkStructuredView: View {
             DashSectionHeader("Rules (\(rules.count))", systemImage: "list.bullet.clipboard")
             if !enabled.isEmpty {
                 ruleGroup(title: "Active (\(enabled.count))", systemImage: "checkmark.circle.fill", color: .green) {
-                    ForEach(Array(enabled.enumerated()), id: \.offset) { idx, r in
+                    ForEach(Array(enabled.enumerated()), id: \.element) { idx, r in
                         if idx > 0 { Divider() }
                         BenchmarkRuleRow(rule: r)
                     }
@@ -402,7 +328,7 @@ private struct BenchmarkStructuredView: View {
             }
             if !disabled.isEmpty {
                 ruleGroup(title: "Inactive (\(disabled.count))", systemImage: "minus.circle", color: .secondary) {
-                    ForEach(Array(disabled.enumerated()), id: \.offset) { idx, r in
+                    ForEach(Array(disabled.enumerated()), id: \.element) { idx, r in
                         if idx > 0 { Divider() }
                         BenchmarkRuleRow(rule: r)
                     }
@@ -567,89 +493,5 @@ private func severityColor(_ severity: String) -> Color {
     case "MEDIUM":           return .orange
     case "LOW":              return .yellow
     default:                 return .secondary
-    }
-}
-
-// MARK: - Platform Auth Required View
-
-private struct PlatformAuthRequiredView: View {
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .center, spacing: 24) {
-                VStack(spacing: 8) {
-                    Image(systemName: "lock.shield")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-
-                    Text("Platform Gateway Auth Required")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-
-                    Text("Compliance Benchmarks require a Jamf platform profile with platform gateway authentication.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 440)
-
-                    // Version requirement notice
-                    HStack(spacing: 8) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundStyle(.blue)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Requires jamf-cli 1.17 or later")
-                                .font(.callout)
-                                .fontWeight(.medium)
-                            Link("Download the latest release at github.com/Jamf-Concepts/jamf-cli",
-                                 destination: URL(string: "https://github.com/Jamf-Concepts/jamf-cli/releases")!)
-                                .font(.caption)
-                        }
-                        Spacer()
-                    }
-                    .padding(10)
-                    .frame(maxWidth: 480)
-                    .background(Color.blue.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                VStack(alignment: .leading, spacing: 16) {
-                    instructionSection(
-                        title: "Set up a platform profile",
-                        content: """
-                        jamf-cli config add-profile <name> \\
-                          --auth-method platform \\
-                          --url <gateway-url> \\
-                          --tenant-id <id>
-                        """
-                    )
-
-                    instructionSection(
-                        title: "Or set environment variables",
-                        content: "JAMF_URL, JAMF_CLIENT_ID, JAMF_CLIENT_SECRET, JAMF_TENANT_ID"
-                    )
-                }
-                .frame(maxWidth: 480)
-            }
-            .padding(32)
-        }
-    }
-
-    private func instructionSection(title: String, content: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(.primary)
-
-            Text(content)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
     }
 }

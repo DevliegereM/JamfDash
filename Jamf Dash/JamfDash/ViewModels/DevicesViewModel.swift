@@ -35,6 +35,12 @@ final class DevicesViewModel {
     }
 
     var searchText = ""
+    var filterManaged: Bool? = nil
+
+    var filteredManaged: [Computer] {
+        guard let managed = filterManaged else { return filtered }
+        return filtered.filter { $0.managed == managed }
+    }
 
     private let cli: any CLIRunning
 

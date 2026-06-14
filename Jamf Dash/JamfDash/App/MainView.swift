@@ -4,6 +4,7 @@ struct MainView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(AppState.self) private var appState
     @State private var selection: SidebarItem?
+    @State private var showNotificationPopover = false
 
     var body: some View {
         NavigationSplitView {
@@ -45,6 +46,12 @@ struct MainView: View {
                 ComplianceBenchmarksView(vm: env.platformVM)
             case .aiAssistant:
                 AIAssistantView(vm: env.aiAssistantVM)
+            case .driftTracker:
+                DriftTrackerView(vm: env.driftVM)
+            case .deviceCorrelation:
+                CorrelationView(vm: env.correlationVM)
+            case .auditDashboard:
+                AuditView(vm: env.auditVM)
             // MARK: Jamf Protect
             case .protectOverview:
                 ProtectOverviewView(vm: env.protectVM)
@@ -94,14 +101,26 @@ struct MainView: View {
                 SchoolClassesView(vm: env.schoolVM)
             case .schoolApps:
                 SchoolAppsView(vm: env.schoolVM)
+            case .schoolProfiles:
+                SchoolProfilesView(vm: env.schoolVM)
+            case .schoolDepDevices:
+                SchoolDepDevicesView(vm: env.schoolVM)
 
             case nil:
                 ContentUnavailableView("Select a section", systemImage: "sidebar.left")
             }
         }
         .task {
-            // Set initial selection based on the active product
-            if selection == nil {
+            // Defer initial selection until sync is done so NavigationSplitView
+            // can't auto-select .overview and leak "Overview" into the title bar
+            // while the launch overlay is still visible.
+            if selection == nil && !env.isSyncing {
+                selection = SidebarItem.items(for: env.currentProduct).first
+            }
+        }
+        .onChange(of: env.isSyncing) { _, syncing in
+            // Once the initial sync completes, make the first selection.
+            if !syncing && selection == nil {
                 selection = SidebarItem.items(for: env.currentProduct).first
             }
         }
@@ -126,6 +145,19 @@ struct MainView: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                if env.currentProduct == .pro && env.notificationCount > 0 {
+                    Button {
+                        showNotificationPopover.toggle()
+                    } label: {
+                        Image(systemName: "bell.badge.fill")
+                            .foregroundStyle(.orange)
+                            .symbolEffect(.bounce, value: env.notificationCount)
+                    }
+                    .help("\(env.notificationCount) system notification(s)")
+                    .popover(isPresented: $showNotificationPopover) {
+                        NotificationPanelView(notifications: env.notificationsState.value ?? [])
+                    }
+                }
                 if appState.isDemoMode {
                     Label("Demo Mode", systemImage: "theatermask.and.paintbrush")
                         .labelStyle(.titleAndIcon)
@@ -185,12 +217,84 @@ struct MainView: View {
              .protectAPIClients:
             Task { await env.protectVM.load() }
         case .schoolOverview, .schoolDevices, .schoolDeviceGroups, .schoolUsers,
-             .schoolUserGroups, .schoolClasses, .schoolApps:
+             .schoolUserGroups, .schoolClasses, .schoolApps,
+             .schoolProfiles, .schoolDepDevices:
             Task { await env.schoolVM.load() }
         case .settingsInspector:
             Task { await env.settingsInspectorVM.load(force: true) }
-        case .deviceSearch, .reports, .aiAssistant, nil:
+        case .driftTracker:
+            Task { await env.driftVM.loadEvents() }
+        case .auditDashboard:
+            Task { await env.auditVM.load(force: true) }
+        case .deviceSearch, .reports, .aiAssistant, .deviceCorrelation, nil:
             break
         }
+    }
+}
+
+// MARK: - Notification Panel
+
+private struct NotificationPanelView: View {
+    let notifications: [ProNotification]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Label("System Notifications", systemImage: "bell.fill")
+                    .font(.headline)
+                Spacer()
+                Text("\(notifications.count)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.orange, in: Capsule())
+            }
+            .padding()
+
+            Divider()
+
+            if notifications.isEmpty {
+                Text("No active notifications")
+                    .foregroundStyle(.secondary)
+                    .padding()
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(notifications) { notif in
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: notif.severityIcon)
+                                    .foregroundStyle(notif.severityColor)
+                                    .font(.body)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(notif.type.replacingOccurrences(of: "_", with: " ").capitalized)
+                                        .font(.caption.weight(.semibold))
+                                    Text(notif.message)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(3)
+                                    if let exp = notif.expirationDate {
+                                        Text("Expires: \(exp)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 6)
+                            .accessibilityElement(children: .combine)
+
+                            if notif.id != notifications.last?.id {
+                                Divider().padding(.leading, 40)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .frame(width: 340)
+        .frame(minHeight: 200, maxHeight: 480)
     }
 }

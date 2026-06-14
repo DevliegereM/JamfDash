@@ -76,10 +76,12 @@ struct DashSectionHeader: View {
             if let icon = systemImage {
                 Image(systemName: icon)
                     .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
             }
             Text(title)
                 .font(.headline)
         }
         .padding(.bottom, 4)
+        .accessibilityAddTraits(.isHeader)
     }
 }

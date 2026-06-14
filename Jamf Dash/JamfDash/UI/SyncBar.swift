@@ -31,6 +31,9 @@ struct SyncBar: View {
             .padding(.vertical, 20)
             .frame(width: 320, alignment: .leading)
             .modifier(SyncBarBackground())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(title) — \(activeIndex < steps.count ? steps[activeIndex] : "finishing up")")
+            .accessibilityValue("\(steps.isEmpty ? 0 : Int(Double(min(activeIndex, steps.count)) / Double(steps.count) * 100))% complete")
     }
 }
 
@@ -113,6 +116,7 @@ private struct SyncBarContent: View {
 
 private struct IndeterminateBar: View {
     @State private var phase: CGFloat = -0.4
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
@@ -121,12 +125,13 @@ private struct IndeterminateBar: View {
 
                 Capsule()
                     .fill(barFill)
-                    .frame(width: geo.size.width * 0.45)
-                    .offset(x: phase * geo.size.width)
+                    .frame(width: geo.size.width * (reduceMotion ? 1.0 : 0.45))
+                    .offset(x: reduceMotion ? 0 : phase * geo.size.width)
                     .modifier(GlowIfTahoe())
             }
             .clipShape(Capsule())
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
                     phase = 1.0
                 }
@@ -205,10 +210,13 @@ private struct StepDot: View {
 
 private struct LoadingPulse: ViewModifier {
     @State private var on = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func body(content: Content) -> some View {
         content
-            .opacity(on ? 1.0 : 0.5)
+            .opacity(reduceMotion ? 1.0 : (on ? 1.0 : 0.5))
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                     on = true
                 }

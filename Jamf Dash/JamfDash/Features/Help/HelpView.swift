@@ -63,6 +63,9 @@ struct HelpView: View {
                 }
 
                 HelpSection(title: "Jamf Pro — Security Posture", icon: "lock.shield.fill", color: .green) {
+                    HelpItem(heading: "Fleet Health Score") {
+                        Text("A 0–100 score computed from six weighted security signals: FileVault encryption (25 pts), SIP (20 pts), Gatekeeper (15 pts), Firewall (15 pts), patch compliance (15 pts), and stale-device ratio (10 pts). The score is shown as a circular gauge with a letter grade (A–F) at the top of the Security view. When the score drops below your configured threshold, the Jamf Dash Dock tile shows a badge with the current score. Use the **Alert Threshold** stepper (gear icon in the Security toolbar) to set the threshold; a macOS notification is also sent the first time the score crosses it.")
+                    }
                     HelpItem(heading: "Compliance donuts") {
                         Text("Four donut charts display the percentage of computers that have FileVault encryption, Gatekeeper, System Integrity Protection (SIP), and Firewall enabled.")
                     }
@@ -239,6 +242,87 @@ struct HelpView: View {
                     }
                     HelpItem(heading: "Apps") {
                         Text("Lists all apps distributed through Jamf School, including their assignment scope and install status.")
+                    }
+                    HelpItem(heading: "Configuration Profiles") {
+                        Text("Lists all configuration profiles deployed through Jamf School, showing the profile name, scope, payload count, and enabled/disabled state. A green badge indicates an active profile; grey indicates it is disabled.")
+                    }
+                    HelpItem(heading: "ADE / DEP Enrollment Pipeline") {
+                        Text("Shows all devices in the Apple Device Enrollment (ADE/DEP) pipeline. Each row displays the serial number, model, assigned enrollment profile, and current enrollment status — color-coded from green (enrolled) through yellow (awaiting) to red (failed). Use this view to monitor in-progress deployments and spot any devices stuck in the pipeline.")
+                    }
+                }
+
+                HelpSection(title: "Jamf Pro — Audit Dashboard", icon: "checklist.checked", color: .indigo) {
+                    HelpItem(heading: "What it shows") {
+                        Text("A cross-resource health dashboard that runs all audit checks across five categories simultaneously — **Security**, **Compliance**, **Hygiene**, **Enrollment**, and **Platform** — and surfaces the results as a unified, searchable findings list.")
+                    }
+                    HelpItem(heading: "Severity levels") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Critical — requires immediate attention", systemImage: "xmark.octagon.fill").foregroundStyle(.red)
+                            Label("Warning — should be reviewed soon", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            Label("Info — informational, no action required", systemImage: "info.circle.fill").foregroundStyle(.blue)
+                        }
+                        .font(.caption)
+                        .padding(.top, 2)
+                    }
+                    HelpItem(heading: "Filtering") {
+                        Text("Click any severity chip in the summary bar to filter to that level. Use the **Category** picker to narrow by audit domain, or type in the search box to match against finding titles, descriptions, and categories. All filters can be combined.")
+                    }
+                    HelpItem(heading: "Finding detail panel") {
+                        Text("Click any row in the findings table to open an inline detail panel below it. The panel shows the full description of the finding under a **Details** heading, and any available remediation guidance under a **Remediation** heading. The panel is resizable via the divider — drag it up or down to adjust the split.")
+                    }
+                }
+
+                HelpSection(title: "Jamf Pro — DDM Monitor", icon: "square.3.layers.3d", color: .teal) {
+                    HelpItem(heading: "Per-Device view") {
+                        Text("Shows the DDM (Declarative Device Management) status for every managed device. Each row displays the device name, last check-in time, and the status of its active declarations. Select a device to open a full declaration detail sheet.")
+                    }
+                    HelpItem(heading: "Fleet Overview tab") {
+                        Text("Switch to **Fleet Overview** using the segmented control in the toolbar to see an aggregate table of all declaration types across the fleet. Each row shows a declaration identifier together with counts of how many devices have it in a Succeeded, Failed, or Pending state — giving you an instant picture of roll-out health without scanning device by device.")
+                    }
+                }
+
+                HelpSection(title: "Jamf Pro — Configuration Drift Tracker", icon: "clock.arrow.trianglehead.counterclockwise.rotate.90", color: .brown) {
+                    HelpItem(heading: "What it tracks") {
+                        Text("Monitors changes to **Policies**, **Configuration Profiles**, and **Scripts** over time. Each time you take a snapshot, Jamf Dash records the current state to a local SQLite database and computes a diff against the previous snapshot — surfacing Added, Modified, and Removed events.")
+                    }
+                    HelpItem(heading: "Taking a snapshot") {
+                        Text("Click **Snapshot Now** in the toolbar. Jamf Dash fetches the latest policies, profiles, and scripts in parallel, stores them in the local database, and immediately shows any drift events that have occurred since the last snapshot. The first snapshot establishes the baseline — no events will appear until a second snapshot is taken.")
+                    }
+                    HelpItem(heading: "Drift timeline") {
+                        Text("Events are grouped by date in a scrollable list. Each row is color-coded: **green +** for added items, **yellow ~** for modified items, and **red −** for removed items. An item-type badge (Policy / Profile / Script) appears next to the name.")
+                    }
+                    HelpItem(heading: "Diff detail") {
+                        Text("Click any drift event to open a detail sheet with a two-column table showing the field name, its previous value, and its new value — making it easy to see exactly what changed.")
+                    }
+                    HelpItem(heading: "Storage") {
+                        Text("Snapshots and events are stored locally at ~/Library/Application Support/JamfDash/drift.db. No data is sent externally. You can delete this file at any time to reset the drift history.")
+                    }
+                }
+
+                HelpSection(title: "Jamf Pro — Device Correlation", icon: "arrow.left.arrow.right", color: .purple) {
+                    HelpItem(heading: "What it does") {
+                        Text("When both Jamf Pro and Jamf Protect are connected, the Device Correlation view joins computers from both products by serial number, giving you a single unified table that shows the complete picture — security agent status alongside MDM management state — for every device.")
+                    }
+                    HelpItem(heading: "Match states") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("Matched — device found in both Pro and Protect", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                            Label("Pro only — managed by Jamf Pro but not enrolled in Protect", systemImage: "circle.lefthalf.filled").foregroundStyle(.blue)
+                            Label("Protect only — in Protect but not found in Jamf Pro", systemImage: "circle.righthalf.filled").foregroundStyle(.orange)
+                        }
+                        .font(.caption)
+                        .padding(.top, 2)
+                    }
+                    HelpItem(heading: "Detail panel") {
+                        Text("Select any device row to open a split detail panel. The **left side** shows Protect details: plan assignment, connection status, FDA state, web protection, agent version, and alert count. The **right side** shows Pro details: management state, OS version, last contact date, and quick-action buttons.")
+                    }
+                    HelpItem(heading: "Availability") {
+                        Text("The Device Correlation item only appears in the sidebar when Protect data has been loaded. Navigate to any Protect view first if it is not visible.")
+                    }
+                }
+
+                HelpSection(title: "Jamf Pro — Notifications", icon: "bell.badge.fill", color: .red) {
+                    HelpItem(heading: "Notification bell") {
+                        Text("When Jamf Pro has active system alerts, a bell icon with a badge count appears in the main toolbar. Click it to open a popover listing all current notifications with their severity, title, and creation date. The badge clears automatically when the notification list is empty.")
                     }
                 }
 

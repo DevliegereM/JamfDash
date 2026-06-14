@@ -1,13 +1,31 @@
-import SwiftUI
 import AppKit
+import OSLog
 import Sparkle
+import SwiftUI
+import UserNotifications
+
+private let appLogger = Logger(subsystem: "com.jamfdash", category: "App")
 
 @main
 struct JamfDashApp: App {
-    @State private var env = AppEnvironment()
+    @State private var env: AppEnvironment
     @State private var appState: AppState
 
     init() {
+        // Apply debug logging before ANY other initialisation so that the very
+        // first log message in this init() is already captured at debug level.
+        // Supports three activation paths:
+        //   1. Previously enabled via Settings (plist already on disk).
+        //   2. --debug launch argument: open -a "JamfDash" --args --debug
+        //   3. Manually installed plist (see Developer tab for the Terminal command).
+        // --debug is a developer convenience and does not bypass any security
+        // boundary — it only routes OSLog output to disk, which an attacker who
+        // can control launch arguments already has access to.
+        if CommandLine.arguments.contains("--debug") {
+            DebugLoggingService.shared.isEnabled = true
+        }
+        DebugLoggingService.shared.applyOnLaunch()
+        appLogger.info("JamfDash launching (debug logging: \(DebugLoggingService.shared.isEnabled, privacy: .public))")
         NSWindow.allowsAutomaticWindowTabbing = false
         let env = AppEnvironment()
         self._env = State(initialValue: env)
@@ -20,6 +38,10 @@ struct JamfDashApp: App {
                 .environment(appState)
                 .environment(env)
                 .task { await appState.bootstrap() }
+                .task {
+                    _ = try? await UNUserNotificationCenter.current()
+                        .requestAuthorization(options: [.alert, .sound])
+                }
                 .onChange(of: appState.demoModeRequested) { _, requested in
                     guard requested else { return }
                     let demoEnv = AppEnvironment.demo()

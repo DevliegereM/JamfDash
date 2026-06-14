@@ -8,16 +8,24 @@ struct DevicesView: View {
     @State private var selectedOSVersion: String? = nil
     @State private var selectedDeviceIDs: Set<Computer.ID> = []
     @State private var sortOrder: [KeyPathComparator<Computer>] = []
-    @State private var filterManaged: Bool? = nil
+    @State private var exportError: String? = nil
+    @State private var refreshTask: Task<Void, Never>? = nil
     @FocusState private var isSearchFocused: Bool
 
     private let versionColors: [Color] = [
         .blue, .green, .orange, .purple, .pink, .teal, .indigo, .yellow, .mint, .cyan
     ]
 
+    private var versionColorMap: [String: Color] {
+        Dictionary(uniqueKeysWithValues:
+            vm.osDistribution.enumerated().map { idx, row in
+                (row.version, versionColors[idx % versionColors.count])
+            }
+        )
+    }
+
     private func colorForVersion(_ version: String) -> Color {
-        let idx = vm.osDistribution.firstIndex(where: { $0.version == version }) ?? 0
-        return versionColors[idx % versionColors.count]
+        versionColorMap[version] ?? versionColors[0]
     }
 
     var body: some View {
@@ -65,6 +73,8 @@ struct DevicesView: View {
                 }
             }
         }
+        // NotificationCenter broadcast: posted by JamfDashApp (Cmd+F shortcut) to focus search
+        // across multiple views simultaneously — this cross-view pattern is intentional.
         .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
             isSearchFocused = true
         }
@@ -78,20 +88,31 @@ struct DevicesView: View {
                 .help("Export device list as CSV")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { Task { await vm.load(force: true) } } label: {
+                Button {
+                    refreshTask?.cancel()
+                    refreshTask = Task { await vm.load(force: true) }
+                } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .disabled(vm.state.isLoading)
+                .help("Refresh device inventory")
             }
         }
         .liquidGlassToolbar()
+        .alert("Export Failed", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK") { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
+        }
     }
 
     // MARK: - All Devices
 
     private var allDevicesFiltered: [Computer] {
-        let base = filterManaged == nil ? vm.filtered : vm.filtered.filter { $0.managed == filterManaged }
-        return sortOrder.isEmpty ? base : base.sorted(using: sortOrder)
+        sortOrder.isEmpty ? vm.filteredManaged : vm.filteredManaged.sorted(using: sortOrder)
     }
 
     private var allDevicesTab: some View {
@@ -103,23 +124,23 @@ struct DevicesView: View {
                 Spacer()
                 Menu {
                     Button {
-                        filterManaged = nil
+                        vm.filterManaged = nil
                     } label: {
-                        Label("All Devices", systemImage: filterManaged == nil ? "checkmark" : "")
+                        Label("All Devices", systemImage: vm.filterManaged == nil ? "checkmark" : "")
                     }
                     Button {
-                        filterManaged = true
+                        vm.filterManaged = true
                     } label: {
-                        Label("Managed Only", systemImage: filterManaged == true ? "checkmark" : "")
+                        Label("Managed Only", systemImage: vm.filterManaged == true ? "checkmark" : "")
                     }
                     Button {
-                        filterManaged = false
+                        vm.filterManaged = false
                     } label: {
-                        Label("Unmanaged Only", systemImage: filterManaged == false ? "checkmark" : "")
+                        Label("Unmanaged Only", systemImage: vm.filterManaged == false ? "checkmark" : "")
                     }
                 } label: {
-                    Label(filterManaged == nil ? "Filter" : filterManaged == true ? "Managed" : "Unmanaged",
-                          systemImage: "line.3.horizontal.decrease.circle\(filterManaged != nil ? ".fill" : "")")
+                    Label(vm.filterManaged == nil ? "Filter" : vm.filterManaged == true ? "Managed" : "Unmanaged",
+                          systemImage: "line.3.horizontal.decrease.circle\(vm.filterManaged != nil ? ".fill" : "")")
                         .font(.callout)
                 }
                 .menuStyle(.borderlessButton)
@@ -132,7 +153,7 @@ struct DevicesView: View {
             Divider()
 
             if allDevicesFiltered.isEmpty {
-                emptyState(icon: "desktopcomputer", label: vm.searchText.isEmpty && filterManaged == nil ? "No devices enrolled" : "No results")
+                emptyState(icon: "desktopcomputer", label: vm.searchText.isEmpty && vm.filterManaged == nil ? "No devices enrolled" : "No results")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(allDevicesFiltered, selection: $selectedDeviceIDs, sortOrder: $sortOrder) {
@@ -241,34 +262,16 @@ struct DevicesView: View {
                 emptyState(icon: "checkmark.seal", label: "No stale devices — all checked in within \(vm.staleThresholdDays) days")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        HStack {
-                            Text("Name").frame(maxWidth: .infinity, alignment: .leading)
-                            Text("Serial").frame(width: 130, alignment: .leading)
-                            Text("Last Contact").frame(width: 150, alignment: .trailing)
-                        }
-                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                        .padding(.horizontal, 20).padding(.vertical, 6)
-                        .background(Color.primary.opacity(0.04))
-
-                        Divider()
-
-                        ForEach(Array(vm.staleDevices.enumerated()), id: \.element.id) { idx, device in
-                            HStack {
-                                Text(device.name).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                                Text(device.serialNumber ?? "—")
-                                    .font(.caption).foregroundStyle(.secondary).frame(width: 130, alignment: .leading)
-                                    .textSelection(.enabled)
-                                staleLabel(for: device).frame(width: 150, alignment: .trailing)
-                            }
-                            .padding(.horizontal, 20).padding(.vertical, 8)
-                            .background(idx.isMultiple(of: 2) ? Color.primary.opacity(0.02) : Color.clear)
-                            if idx < vm.staleDevices.count - 1 { Divider().padding(.horizontal, 20) }
-                        }
+                Table(vm.staleDevices) {
+                    TableColumn("Name") { (device: Computer) in
+                        Text(device.name).lineLimit(1)
                     }
-                    .padding(.vertical, 8)
+                    TableColumn("Serial") { (device: Computer) in
+                        Text(device.serialNumber ?? "—").font(.caption).foregroundStyle(.secondary)
+                    }
+                    TableColumn("Last Contact") { (device: Computer) in
+                        staleLabel(for: device)
+                    }
                 }
             }
         }
@@ -462,7 +465,15 @@ struct DevicesView: View {
         panel.allowedContentTypes = [UTType.commaSeparatedText]
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            try? csv.write(to: url, atomically: true, encoding: .utf8)
+            Task.detached {
+                do {
+                    try csv.write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    await MainActor.run {
+                        self.exportError = error.localizedDescription
+                    }
+                }
+            }
         }
     }
 

@@ -24,6 +24,8 @@ enum CLICommand: Sendable {
     // MARK: DDM Monitor
     case ddmStatusItems(managementId: String)
     case ddmComputers
+    case reportDDMStatus
+    case proNotifications
 
     // MARK: Blueprints
     case blueprints
@@ -42,6 +44,7 @@ enum CLICommand: Sendable {
     case protectAlerts
     case protectInsights
     case protectAuditLogs
+    case protectExceptionSets
     case protectAnalyticSets
     case protectExceptionSetDetail(name: String)
 
@@ -53,6 +56,8 @@ enum CLICommand: Sendable {
     case schoolUserGroups
     case schoolClasses
     case schoolApps
+    case schoolProfiles
+    case schoolDepDevices
 
     // MARK: Device actions (safe)
     case blankPush(serial: String)
@@ -96,6 +101,9 @@ enum CLICommand: Sendable {
     case reportInventorySummary
     case reportSoftwareInstalls
 
+    // MARK: Audit
+    case proAudit(category: String)
+
     // MARK: Bulk Operations
     case bulkEnablePolicies(category: String)
     case bulkDisablePolicies(pattern: String)
@@ -116,7 +124,14 @@ enum CLICommand: Sendable {
 
     // MARK: Patch Management
     case patchTitles
-    case patchPolicies
+    case patchPolicies                      // Classic API list (id+name only)
+    case patchPoliciesUAPI                  // UAPI v2 list (full data: enabled, targetVersion, softwareTitle)
+    case patchSoftwareTitleConfigurations   // modern patch titles (UAPI v2)
+    case patchSoftwareSummary               // modern patch compliance summary (requires title ID)
+    case appInstallerTitles                 // App Installer catalogue
+    case appInstallerDeployments            // App Installer deployments
+    case restrictedSoftware                 // restricted software list (id+name only)
+    case restrictedSoftwareDetail(id: String) // full detail with "general" sub-object
 
     // MARK: Enrollment
     case depTokens
@@ -178,6 +193,16 @@ enum CLICommand: Sendable {
     case packageDetail(id: Int)
     case protectExceptionSetExport(name: String)
 
+    private static func protectList(_ sub: String) -> [String] {
+        ["protect", sub, "list", "-o", "json"]
+    }
+    private static func protectGet(_ sub: String, _ name: String) -> [String] {
+        ["protect", sub, "get", name, "-o", "json"]
+    }
+    private static func protectExport(_ sub: String, _ name: String) -> [String] {
+        ["protect", sub, "export", name]
+    }
+
     var baseArguments: [String] {
         switch self {
         // Jamf Pro — data
@@ -216,7 +241,8 @@ enum CLICommand: Sendable {
         case .protectPlans:         return ["protect", "plans", "list", "-o", "json"]
         case .protectAlerts:        return ["protect", "analytics", "list", "-o", "json"]
         case .protectInsights:      return ["protect", "analytic-sets", "list", "-o", "json"]
-        case .protectAuditLogs:     return ["protect", "exception-sets", "list", "-o", "json"]
+        case .protectAuditLogs:     return ["protect", "audit-logs", "list", "-o", "json"]
+        case .protectExceptionSets: return Self.protectList("exception-sets")
         case .protectAnalyticSets:              return ["protect", "analytic-sets", "list", "-o", "json"]
         case .protectExceptionSetDetail(let n): return ["protect", "exception-sets", "get", n, "-o", "json"]
 
@@ -228,6 +254,8 @@ enum CLICommand: Sendable {
         case .schoolUserGroups:     return ["school", "user-groups", "list", "-o", "json"]
         case .schoolClasses:        return ["school", "cls", "list", "-o", "json"]
         case .schoolApps:           return ["school", "apps", "list", "-o", "json"]
+        case .schoolProfiles:       return ["school", "profiles", "list", "-o", "json"]
+        case .schoolDepDevices:     return ["school", "dep-devices", "list", "-o", "json"]
 
         // Safe actions
         case .blankPush(let s):           return ["pro", "computers", "blank-push", "--serial", s, "--yes"]
@@ -270,6 +298,9 @@ enum CLICommand: Sendable {
         case .reportDeviceCompliance:         return ["pro", "report", "device-compliance", "-o", "json"]
         case .reportInventorySummary:         return ["pro", "report", "inventory-summary", "-o", "json"]
         case .reportSoftwareInstalls:         return ["pro", "report", "software-installs", "-o", "json"]
+        case .reportDDMStatus:                return ["pro", "report", "ddm-status", "-o", "json"]
+        case .proNotifications:               return ["pro", "notifications", "list", "-o", "json"]
+        case .proAudit(let cat):              return ["pro", "audit", "--checks", cat, "-o", "json"]
 
         // Bulk Operations
         case .bulkEnablePolicies(let c):          return ["pro", "bulk", "enable-policies", "--category", c, "--yes"]
@@ -290,8 +321,14 @@ enum CLICommand: Sendable {
         case .computerExtensionAttributes: return ["pro", "computer-extension-attributes", "list", "-o", "json"]
 
         // Patch Management
-        case .patchTitles:   return ["pro", "classic-patch-titles", "list", "-o", "json"]
-        case .patchPolicies: return ["pro", "classic-patch-policies", "list", "-o", "json"]
+        case .patchTitles:       return ["pro", "classic-patch-titles",  "list", "-o", "json"]
+        case .patchPolicies:     return ["pro", "classic-patch-policies", "list", "-o", "json"]
+        case .patchPoliciesUAPI: return ["pro", "patch-policies",         "list", "-o", "json"]
+        case .patchSoftwareTitleConfigurations: return ["pro", "patch-software-title-configurations", "list", "-o", "json"]
+        case .patchSoftwareSummary:             return ["pro", "patch-software-title-configurations", "patch-summary", "-o", "json"]
+        case .appInstallerTitles:               return ["pro", "app-installer-titles", "list", "-o", "json"]
+        case .appInstallerDeployments:          return ["pro", "app-installer-deployments", "list", "-o", "json"]
+        case .restrictedSoftware:               return ["pro", "classic-restricted-software", "list", "-o", "json"]
 
         // Enrollment
         case .depTokens:             return ["pro", "device-enrollment-instances", "list", "-o", "json"]
@@ -306,47 +343,48 @@ enum CLICommand: Sendable {
         case .clientCheckInSettings: return ["pro", "client-check-in", "get", "-o", "json"]
 
         // Protect extended
-        case .protectRemovableStorage:               return ["protect", "rscs", "list", "-o", "json"]
-        case .protectRemovableStorageDetail(let n):  return ["protect", "rscs", "get", n, "-o", "json"]
-        case .protectRemovableStorageExport(let n):  return ["protect", "rscs", "export", n]
-        case .protectUnifiedLogging:                 return ["protect", "ulf", "list", "-o", "json"]
-        case .protectUnifiedLoggingDetail(let n):    return ["protect", "ulf", "get", n, "-o", "json"]
-        case .protectUnifiedLoggingExport(let n):    return ["protect", "ulf", "export", n]
-        case .protectActionConfigs:                  return ["protect", "ac", "list", "-o", "json"]
-        case .protectActionConfigDetail(let n):      return ["protect", "ac", "get", n, "-o", "json"]
-        case .protectActionConfigExport(let n):      return ["protect", "ac", "export", n]
-        case .protectTelemetryConfigs:               return ["protect", "telemetry", "list", "-o", "json"]
-        case .protectTelemetryDetail(let n):         return ["protect", "telemetry", "get", n, "-o", "json"]
-        case .protectTelemetryExport(let n):         return ["protect", "telemetry", "export", n]
-        case .protectCustomPreventLists:             return ["protect", "cpl", "list", "-o", "json"]
-        case .protectCustomPreventListDetail(let n): return ["protect", "cpl", "get", n, "-o", "json"]
-        case .protectCustomPreventListExport(let n): return ["protect", "cpl", "export", n]
-        case .protectRoles:                          return ["protect", "roles", "list", "-o", "json"]
-        case .protectRoleDetail(let n):              return ["protect", "roles", "get", n, "-o", "json"]
-        case .protectRoleExport(let n):              return ["protect", "roles", "export", n]
-        case .protectUsers:                          return ["protect", "users", "list", "-o", "json"]
-        case .protectUserDetail(let e):              return ["protect", "users", "get", e, "-o", "json"]
-        case .protectUserExport(let e):              return ["protect", "users", "export", e]
-        case .protectGroups:                         return ["protect", "groups", "list", "-o", "json"]
-        case .protectGroupDetail(let n):             return ["protect", "groups", "get", n, "-o", "json"]
-        case .protectGroupExport(let n):             return ["protect", "groups", "export", n]
-        case .protectAPIClients:                     return ["protect", "apic", "list", "-o", "json"]
-        case .protectAPIClientDetail(let n):         return ["protect", "apic", "get", n, "-o", "json"]
-        case .protectAPIClientExport(let n):         return ["protect", "apic", "export", n]
+        case .protectRemovableStorage:               return Self.protectList("rscs")
+        case .protectRemovableStorageDetail(let n):  return Self.protectGet("rscs", n)
+        case .protectRemovableStorageExport(let n):  return Self.protectExport("rscs", n)
+        case .protectUnifiedLogging:                 return Self.protectList("ulf")
+        case .protectUnifiedLoggingDetail(let n):    return Self.protectGet("ulf", n)
+        case .protectUnifiedLoggingExport(let n):    return Self.protectExport("ulf", n)
+        case .protectActionConfigs:                  return Self.protectList("ac")
+        case .protectActionConfigDetail(let n):      return Self.protectGet("ac", n)
+        case .protectActionConfigExport(let n):      return Self.protectExport("ac", n)
+        case .protectTelemetryConfigs:               return Self.protectList("telemetry")
+        case .protectTelemetryDetail(let n):         return Self.protectGet("telemetry", n)
+        case .protectTelemetryExport(let n):         return Self.protectExport("telemetry", n)
+        case .protectCustomPreventLists:             return Self.protectList("cpl")
+        case .protectCustomPreventListDetail(let n): return Self.protectGet("cpl", n)
+        case .protectCustomPreventListExport(let n): return Self.protectExport("cpl", n)
+        case .protectRoles:                          return Self.protectList("roles")
+        case .protectRoleDetail(let n):              return Self.protectGet("roles", n)
+        case .protectRoleExport(let n):              return Self.protectExport("roles", n)
+        case .protectUsers:                          return Self.protectList("users")
+        case .protectUserDetail(let e):              return Self.protectGet("users", e)
+        case .protectUserExport(let e):              return Self.protectExport("users", e)
+        case .protectGroups:                         return Self.protectList("groups")
+        case .protectGroupDetail(let n):             return Self.protectGet("groups", n)
+        case .protectGroupExport(let n):             return Self.protectExport("groups", n)
+        case .protectAPIClients:                     return Self.protectList("apic")
+        case .protectAPIClientDetail(let n):         return Self.protectGet("apic", n)
+        case .protectAPIClientExport(let n):         return Self.protectExport("apic", n)
         case .protectDataForwarding:                 return ["protect", "df", "get", "-o", "json"]
         case .protectDataRetention:                  return ["protect", "dr", "get", "-o", "json"]
         case .protectConfigFreeze:                   return ["protect", "cf", "get", "-o", "json"]
         case .protectConfigFreezeEnable:             return ["protect", "cf", "enable", "--yes"]
         case .protectConfigFreezeDisable:            return ["protect", "cf", "disable", "--yes"]
         case .protectDownloadsSummary:               return ["protect", "downloads", "summary", "-o", "json"]
-        case .protectPlanExport(let n):              return ["protect", "plans", "export", n]
-        case .protectAnalyticDetail(let n):          return ["protect", "analytics", "get", n, "-o", "json"]
-        case .protectAnalyticExport(let n):          return ["protect", "analytics", "export", n]
-        case .protectAnalyticSetExport(let n):       return ["protect", "analytic-sets", "export", n]
+        case .protectPlanExport(let n):              return Self.protectExport("plans", n)
+        case .protectAnalyticDetail(let n):          return Self.protectGet("analytics", n)
+        case .protectAnalyticExport(let n):          return Self.protectExport("analytics", n)
+        case .protectAnalyticSetExport(let n):       return Self.protectExport("analytic-sets", n)
 
         // Patch Management detail
-        case .patchTitleDetail(let id):  return ["pro", "classic-patch-titles",  "get", id, "-o", "json"]
-        case .patchPolicyDetail(let id): return ["pro", "classic-patch-policies", "get", id, "-o", "json"]
+        case .patchTitleDetail(let id):          return ["pro", "classic-patch-titles",   "get", id, "-o", "json"]
+        case .patchPolicyDetail(let id):         return ["pro", "classic-patch-policies", "get", id, "-o", "json"]
+        case .restrictedSoftwareDetail(let id):  return ["pro", "classic-restricted-software", "get", id, "-o", "json"]
         case .scriptDetail(let id):      return ["pro", "scripts", "get", id, "-o", "json"]
         case .packageDetail(let id):     return ["pro", "classic-packages", "get", "\(id)", "-o", "json"]
         case .protectExceptionSetExport(let n):      return ["protect", "exception-sets", "export", n]
@@ -361,7 +399,7 @@ enum CLICommand: Sendable {
              .bulkEnablePolicies, .bulkDisablePolicies,
              .reportPatchStatus, .reportPolicyStatus, .reportUpdateStatus,
              .reportDeviceCompliance, .reportSoftwareInstalls,
-             .ddmStatusItems(_), .ddmComputers:
+             .ddmStatusItems(_), .ddmComputers, .reportDDMStatus:
             return 120
         default: return 60
         }
@@ -432,6 +470,8 @@ actor CLIManager: CLIRunning {
     private let executor: any CLIExecuting
     private let versionStore: CLIVersionStore
     private let logger = Logger(subsystem: "com.jamfdash", category: "CLIManager")
+    private let supportDirectory: URL
+    private let binDirectory: URL
 
     private(set) var installedVersion: CLIVersion?
 
@@ -448,22 +488,14 @@ actor CLIManager: CLIRunning {
         let supportDir = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(Self.appSupportName, isDirectory: true)
+        self.supportDirectory = supportDir
+        self.binDirectory = supportDir.appendingPathComponent("bin", isDirectory: true)
         self.versionStore = CLIVersionStore(supportDirectory: supportDir)
     }
 
     // MARK: - Paths
 
     static let appSupportName = "JamfDash"
-
-    private var supportDirectory: URL {
-        FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(Self.appSupportName, isDirectory: true)
-    }
-
-    private var binDirectory: URL {
-        supportDirectory.appendingPathComponent("bin", isDirectory: true)
-    }
 
     var binaryURL: URL {
         binDirectory.appendingPathComponent("jamf-cli")
@@ -732,7 +764,7 @@ actor CLIManager: CLIRunning {
         let profile = profileService.selectedProfile
         let args = profile.isDefault ? command.baseArguments : ["--profile", profile.name] + command.baseArguments
 
-        logger.debug("Running: jamf-cli \(args.joined(separator: " "))")
+        logger.debug("Running: jamf-cli \(args.joined(separator: " "), privacy: .private)")
 
         do {
             return try await executor.execute(
@@ -752,7 +784,7 @@ actor CLIManager: CLIRunning {
         let profile = profileService.selectedProfile
         let args = command.arguments(outputFormat: outputFormat)
         let finalArgs = profile.isDefault ? args : ["--profile", profile.name] + args
-        logger.debug("Running: jamf-cli \(finalArgs.joined(separator: " "))")
+        logger.debug("Running: jamf-cli \(finalArgs.joined(separator: " "), privacy: .private)")
         do {
             return try await executor.execute(
                 binary: binaryURL,

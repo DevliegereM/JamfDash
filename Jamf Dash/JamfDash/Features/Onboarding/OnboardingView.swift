@@ -15,6 +15,8 @@ struct OnboardingView: View {
                 }
             }
             .padding(.top, 32)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Step \(stepIndex + 1) of 4")
 
             Divider().padding(.top, 16)
 
