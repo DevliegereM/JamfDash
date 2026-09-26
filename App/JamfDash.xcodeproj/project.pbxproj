@@ -99,6 +99,7 @@
 		C57450C55500380D984F75C4 /* JSCModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B6B72843CEE1E93F140BFBC /* JSCModels.swift */; };
 		C74B899B407832285707063E /* UpdateReadinessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40DF1BC452E27146BA78BB38 /* UpdateReadinessModels.swift */; };
 		C7BBE521E5DD864A7A67D5C2 /* AIAssistantViewModel+Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2474D3B4BF10F5482B966512 /* AIAssistantViewModel+Session.swift */; };
+		C927BA81DA00EB5B5EED0874 /* SettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 809999E71240665EDC8BF4C1 /* SettingsLayoutTests.swift */; };
 		C93036997B31E15D2BBEBBE8 /* CLIExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653221465C4D79BEC6D18D31 /* CLIExecutor.swift */; };
 		CAA4F6831BCDB7869016EA9A /* CorrelationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9E62B119AB4FD99E5D9EAF /* CorrelationModels.swift */; };
 		CC33A94530162F5A001378C2 /* JamfDash.icon in Resources */ = {isa = PBXBuildFile; fileRef = CC33A94430162F5A001378C2 /* JamfDash.icon */; };
@@ -212,6 +213,7 @@
 		7A754F0CF54F07B6340158DE /* JamfDashApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfDashApp.swift; sourceTree = "<group>"; };
 		7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCLIManager.swift; sourceTree = "<group>"; };
 		7E7AC40E74CF98EE6D591239 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		809999E71240665EDC8BF4C1 /* SettingsLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsLayoutTests.swift; sourceTree = "<group>"; };
 		81A6AE0341D8E827B076C462 /* AIAssistantViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAssistantViewModel.swift; sourceTree = "<group>"; };
 		8295FFF278ACDEF29D9D1501 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		838CA2D99EE01E9CBF971E3B /* CLIWorkerService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CLIWorkerService.swift; sourceTree = "<group>"; };
@@ -551,6 +553,7 @@
 				CFB78E8D8D6A83AED291B489 /* CLISecurityTests.swift */,
 				19F65D6860AAC50376DB0026 /* MacOS27ReadinessTests.swift */,
 				536BC9B27781B2FF18C19A97 /* SetupFlowTests.swift */,
+				809999E71240665EDC8BF4C1 /* SettingsLayoutTests.swift */,
 			);
 			path = JamfDashTests;
 			sourceTree = "<group>";
@@ -968,6 +971,7 @@
 				B97FA917612AAF40CA35D426 /* CLISecurityTests.swift in Sources */,
 				94E6DBADF5A37262A242211D /* MacOS27ReadinessTests.swift in Sources */,
 				3F7F0E3C1455F0DF4DD37409 /* SetupFlowTests.swift in Sources */,
+				C927BA81DA00EB5B5EED0874 /* SettingsLayoutTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

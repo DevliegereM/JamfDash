@@ -146,7 +146,7 @@ private struct ConnectionTab: View {
 
 // MARK: - Add Connection Sheet
 
-private struct AddConnectionSheet: View {
+struct AddConnectionSheet: View {
     @Bindable var vm: SettingsViewModel
     @Binding var isPresented: Bool
 
@@ -232,7 +232,10 @@ private struct AddConnectionSheet: View {
                 .padding()
             }
         }
-        .frame(minWidth: 540, minHeight: 560)
+        // A sheet takes its content's ideal size; without a fixed width, long descriptions
+        // ask for a single line and the sheet grows wider than the Settings window.
+        .frame(width: 560)
+        .frame(minHeight: 520, idealHeight: 660, maxHeight: 760)
     }
 
     // MARK: - Jamf Pro form
@@ -240,7 +243,7 @@ private struct AddConnectionSheet: View {
     private var proForm: some View {
         VStack(spacing: 16) {
             Picker("Authentication", selection: $vm.setupMethod) {
-                Text("Platform API (recommended)").tag(SettingsViewModel.SetupMethod.platform)
+                Text("Platform API").tag(SettingsViewModel.SetupMethod.platform)
                 Text("Local Admin").tag(SettingsViewModel.SetupMethod.localAccount)
                 Text("SSO").tag(SettingsViewModel.SetupMethod.sso)
             }
