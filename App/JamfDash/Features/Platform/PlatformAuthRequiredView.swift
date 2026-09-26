@@ -28,7 +28,7 @@ struct PlatformAuthRequiredView: View {
                             .foregroundStyle(.blue)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Requires jamf-cli 1.17 or later")
+                            Text("Requires jamf-cli \(CLIManager.minimumCLIVersion) or later")
                                 .font(.callout)
                                 .fontWeight(.medium)
                             Link("Download the latest release at github.com/Jamf-Concepts/jamf-cli",
@@ -47,16 +47,13 @@ struct PlatformAuthRequiredView: View {
                     instructionSection(
                         title: "Set up a platform profile",
                         content: """
-                        jamf-cli config add-profile <name> \\
-                          --auth-method platform \\
-                          --url <gateway-url> \\
-                          --tenant-id <id>
+                        jamf-cli platform setup --profile-name <name>
                         """
                     )
 
                     instructionSection(
                         title: "Or set environment variables",
-                        content: "JAMF_URL, JAMF_CLIENT_ID, JAMF_CLIENT_SECRET, JAMF_TENANT_ID"
+                        content: "JAMF_URL (https://<region>.api.jamfcloud.com), JAMF_CLIENT_ID, JAMF_CLIENT_SECRET, and JAMF_ENVIRONMENT_ID or JAMF_TENANT_ID"
                     )
                 }
                 .frame(maxWidth: 480)

@@ -43,7 +43,7 @@ struct HelpView: View {
                         Text("Open Settings → Connection and click the **+** button. Choose your Jamf product (Pro, Protect, or School) and enter the required credentials. Each connection is stored securely in the system keychain by jamf-cli and appears as a named profile.")
                     }
                     HelpItem(heading: "Jamf Pro — Platform API") {
-                        Text("Platform API unlocks Blueprints and Compliance Benchmarks. Choose **Platform API** when adding a connection and enter the **Gateway URL**, **Tenant ID**, **Client ID**, and **Client Secret** from account.jamf.com. Requires jamf-cli 1.17 or later — update via Settings → CLI if needed.")
+                        Text("Platform API unlocks Blueprints and Compliance Benchmarks. Choose **Platform API** when adding a connection and pick your **Region**, then enter the **Environment ID** (or **Tenant ID**), **Client ID**, and **Client Secret** from account.jamf.com.")
                     }
                     HelpItem(heading: "Switching profiles") {
                         Text("If you have multiple Jamf environments (e.g., dev and production), add a connection for each. Then use the **Active Profile** picker to choose which environment Jamf Dash queries. Click **Save** to apply the change — all data views will reload automatically.")
@@ -106,7 +106,7 @@ struct HelpView: View {
                         Text("Lists all configured compliance benchmarks with name and status. Select a benchmark to view its controls and rules. Tap **Load Compliance Results** to fetch the current benchmark results for your fleet.")
                     }
                     HelpItem(heading: "Requirements") {
-                        Text("Both views require a **Platform API** connection and **jamf-cli 1.17 or later**. If you see an auth error, go to Settings → Connection and add a Platform API profile, then update jamf-cli via Settings → CLI if needed.")
+                        Text("Both views require a **Platform API** connection. If you see an auth error, go to Settings → Connection and add a Platform API profile.")
                     }
                 }
 

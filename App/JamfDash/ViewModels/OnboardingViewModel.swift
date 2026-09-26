@@ -64,8 +64,9 @@ final class OnboardingViewModel {
     var ssoClientSecret = ""
 
     // Pro — Platform API fields
-    var platformGatewayURL   = "https://us.apigw.jamf.com"
-    var platformTenantID     = ""
+    var platformRegion       = PlatformRegion.us
+    var platformScopeLevel   = PlatformScopeLevel.environment
+    var platformScopeID      = ""
     var platformClientID     = ""
     var platformClientSecret = ""
     var platformProfileName  = "Jamf Platform"
@@ -152,7 +153,7 @@ final class OnboardingViewModel {
     func clearSetupForm() {
         serverURL = ""; username = ""; password = ""
         ssoServerURL = ""; ssoClientID = ""; ssoClientSecret = ""
-        platformTenantID = ""; platformClientID = ""; platformClientSecret = ""
+        platformScopeID = ""; platformClientID = ""; platformClientSecret = ""
         protectServerURL = ""; protectClientID = ""; protectClientSecret = ""
         schoolServerURL = ""; schoolNetworkID = ""; schoolAPIKey = ""
     }
@@ -239,8 +240,7 @@ final class OnboardingViewModel {
     // MARK: - Platform API Setup
 
     var canRunPlatformSetup: Bool {
-        !platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !platformScopeID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !platformClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !platformClientSecret.isEmpty
     }
@@ -253,12 +253,11 @@ final class OnboardingViewModel {
                        : platformProfileName.trimmingCharacters(in: .whitespaces)
         Self.logger.info("Running Platform API setup — profile: \(name, privacy: .private)")
         do {
-            let trimmedURL    = platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedTenant = platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines)
-            try requireHTTPS(trimmedURL)
+            let trimmedURL = platformRegion.gatewayURL
             _ = try await cliManager.setupPlatform(
-                gatewayURL:   trimmedURL,
-                tenantID:     trimmedTenant,
+                region:       platformRegion,
+                level:        platformScopeLevel,
+                scopeID:      platformScopeID.trimmingCharacters(in: .whitespacesAndNewlines),
                 profileName:  name,
                 clientID:     platformClientID.trimmingCharacters(in: .whitespacesAndNewlines),
                 clientSecret: platformClientSecret
@@ -296,7 +295,7 @@ final class OnboardingViewModel {
         do {
             let trimmedURL = protectServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
             try requireHTTPS(trimmedURL)
-            _ = try await cliManager.setupOAuth(
+            _ = try await cliManager.setupProtect(
                 serverURL:    trimmedURL,
                 profileName:  name,
                 clientID:     protectClientID.trimmingCharacters(in: .whitespacesAndNewlines),

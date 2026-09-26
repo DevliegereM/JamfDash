@@ -25,6 +25,7 @@ Jamf Dash connects to your Jamf environment via [`jamf-cli`](https://github.com/
 - macOS 14 Sonoma or later
 - A Jamf Pro, Jamf Protect, or Jamf School account with API access
 - An internet connection for the initial `jamf-cli` download
+- `jamf-cli` 1.31.1 or later — Jamf Dash installs it, and updates an older version automatically
 
 ---
 
@@ -61,14 +62,16 @@ Then enter the server URL, Client ID, and Client Secret in Jamf Dash.
 
 ### Jamf Pro — Platform API
 
-The Platform API unlocks **Blueprints** and **Compliance Benchmarks**. It requires **jamf-cli 1.17 or later** (check and update via **Settings → CLI**).
+The Platform API unlocks **Blueprints** and **Compliance Benchmarks**.
 
-1. Sign in to [**account.jamf.com**](https://account.jamf.com) and open your tenant
-2. Go to **API Clients** and create a new API client
+1. Sign in to [**account.jamf.com**](https://account.jamf.com)
+2. Create an API client — preferably at the **platform environment** level (a group of tenants), or for a single **tenant**
 3. Note the **Client ID** and generate a **Client Secret** (shown only once)
-4. Copy your **Tenant ID** (the subdomain of your Jamf Cloud URL, e.g. `demo` from `demo.jamfcloud.com`) and the **Gateway URL** shown on the same page
+4. Copy the **Environment ID** (or **Tenant ID**) of the level you created the client at
 
-In Jamf Dash, go to **Settings → Connection → Add Connection**, choose **Platform API**, and fill in the Gateway URL, Tenant ID, Client ID, Client Secret, and a profile name.
+In Jamf Dash, go to **Settings → Connection → Add Connection**, choose **Platform API**, and pick your **Region** (US, EU or APAC), the level the client was created at, its ID, the Client ID and Client Secret, and a profile name.
+
+Profiles created with the retired `*.apigw.jamf.com` gateway are moved to the new `https://<region>.api.jamfcloud.com` gateway automatically the first time Jamf Dash uses them.
 
 > **Recommendation:** Use Platform API instead of SSO / Client Credentials when possible — it gives access to the full Jamf platform surface, including features not available through the classic Jamf Pro API.
 
@@ -227,10 +230,10 @@ Cross-checks your Jamf Pro environment against a built-in set of security and hy
 **Settings Inspector**
 Browse all Jamf Pro settings endpoints exposed by `jamf-cli` in a searchable two-pane layout — settings category list on the left, raw structured output on the right. Useful for auditing configuration values without opening the Jamf Pro web console.
 
-**Blueprints** *(requires Platform API, jamf-cli 1.17+)*
+**Blueprints** *(requires Platform API)*
 Browse all DDM (Declarative Device Management) blueprints. Select any blueprint to see a structured detail view: deployment state badge, last deployment timestamp, scope, and the complete applied settings. The **Scope** section lists the exact device group and device names the blueprint is deployed to. Each declaration card humanises the type identifier (e.g. `com.jamf.ddm.passcode-settings` → **Passcode Settings**), renders all payload keys as readable label/value rows, and displays booleans as checkmark/cross icons.
 
-**Compliance Benchmarks** *(requires Platform API, jamf-cli 1.17+)*
+**Compliance Benchmarks** *(requires Platform API)*
 List all configured compliance benchmarks. Select a benchmark to view its name, status badge, framework version, and rule summary. The **Applied To** section shows which device groups, devices, users, and user groups the benchmark is scoped to. Rules are grouped into **Active** and **Inactive** sections; expand any rule row to read its full description and remediation guidance inline.
 
 ---

@@ -11,6 +11,8 @@ enum CLIError: Error, Sendable {
     case versionNotFound(String)
     case timeout
     case untrustedBinary(String)
+    case unexpectedPrompt(String)
+    case cliTooOld(installed: String, minimum: String)
 }
 
 extension CLIError: LocalizedError {
@@ -34,6 +36,10 @@ extension CLIError: LocalizedError {
             return "jamf-cli version '\(ver)' was not found locally or in the release repository."
         case .timeout:
             return "The CLI command timed out."
+        case .unexpectedPrompt(let question):
+            return "jamf-cli asked a question Jamf Dash doesn't know how to answer (“\(question)”), so setup was stopped before answering it. Update Jamf Dash, or set up the profile in Terminal with jamf-cli."
+        case .cliTooOld(let installed, let minimum):
+            return "Jamf Dash needs jamf-cli \(minimum) or later (installed: \(installed)). Update it from Settings → CLI."
         case .untrustedBinary(let reason):
             return "jamf-cli failed its code signature check and was not run: \(reason). Reinstall it from Settings → CLI."
         }

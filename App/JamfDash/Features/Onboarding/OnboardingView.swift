@@ -237,7 +237,7 @@ private struct AuthMethodStep: View {
                     AuthMethodCard(
                         title: "Platform API",
                         badge: "Recommended",
-                        description: "Access Blueprints, Compliance Benchmarks & DDM Reports via the Jamf Platform Gateway. Requires jamf-cli 1.17+",
+                        description: "Access Blueprints, Compliance Benchmarks & DDM Reports via the Jamf Platform Gateway",
                         icon: "globe",
                         action: { vm.chooseAuthMethod(.platform) }
                     )
@@ -475,11 +475,22 @@ private struct PlatformSetupStep: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 formRows {
-                    row("Gateway URL") {
-                        TextField("https://us.apigw.jamf.com", text: $vm.platformGatewayURL)
+                    row("Region") {
+                        Picker("Region", selection: $vm.platformRegion) {
+                            ForEach(PlatformRegion.allCases) { Text("\($0.label) — \($0.gatewayURL)").tag($0) }
+                        }
+                        .labelsHidden()
                     }
-                    row("Tenant ID") {
-                        TextField("Tenant ID from account.jamf.com", text: $vm.platformTenantID)
+                    row("Created at") {
+                        Picker("Created at", selection: $vm.platformScopeLevel) {
+                            ForEach(PlatformScopeLevel.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .help("The level the API client was created at in Jamf Account. Environment is preferred.")
+                    }
+                    row(vm.platformScopeLevel.label) {
+                        TextField(vm.platformScopeLevel.placeholder, text: $vm.platformScopeID)
                     }
                     row("Profile Name") {
                         TextField("Jamf Platform", text: $vm.platformProfileName)

@@ -88,40 +88,44 @@ actor CLIExecutor {
         }
     }
 
-    /// Like `execute()` but uses a PTY as stdin so that tools that call
-    /// `tcgetattr()` (e.g. Go's `term.ReadPassword`) don't get ENOTTY.
-    func executeInteractive(
+    /// Runs an interactive jamf-cli command (setup flows) and answers its questions.
+    ///
+    /// stdin is a PTY, so tools that call `tcgetattr()` (e.g. Go's `term.ReadPassword`)
+    /// work. Instead of piping all answers up front, the output is watched and each answer
+    /// is written only after the question it belongs to has been printed — `rules` are
+    /// matched by prompt text, in whatever order jamf-cli asks them. If jamf-cli stops at a
+    /// question none of the rules recognise, the process is stopped and
+    /// `CLIError.unexpectedPrompt` is thrown, so an answer (e.g. a password) can never be
+    /// typed into the wrong question. Secret answers are redacted from all returned output
+    /// and error messages.
+    func executeScripted(
         binary: URL,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data,
-        timeout: TimeInterval = 60
+        rules: [PromptRule],
+        timeout: TimeInterval,
+        unansweredPromptGrace: TimeInterval
     ) async throws -> Data {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-            // Open a PTY master
+        let secrets = rules.filter(\.isSecret).map(\.answer)
+        let result: Result<Data, Error> = await withCheckedContinuation { continuation in
             let masterFD = posix_openpt(O_RDWR | O_NOCTTY)
             guard masterFD >= 0 else {
-                continuation.resume(throwing: CLIError.launchFailed("posix_openpt failed: \(String(cString: strerror(errno)))"))
+                continuation.resume(returning: .failure(CLIError.launchFailed("posix_openpt failed: \(String(cString: strerror(errno)))")))
                 return
             }
-            guard grantpt(masterFD) == 0, unlockpt(masterFD) == 0 else {
+            guard grantpt(masterFD) == 0, unlockpt(masterFD) == 0, let slavePath = ptsname(masterFD) else {
                 close(masterFD)
-                continuation.resume(throwing: CLIError.launchFailed("PTY grant/unlock failed"))
+                continuation.resume(returning: .failure(CLIError.launchFailed("PTY setup failed")))
                 return
             }
-            guard let slavePathCStr = ptsname(masterFD) else {
-                close(masterFD)
-                continuation.resume(throwing: CLIError.launchFailed("ptsname failed"))
-                return
-            }
-            let slaveFD = open(slavePathCStr, O_RDWR)
+            let slaveFD = open(slavePath, O_RDWR)
             guard slaveFD >= 0 else {
                 close(masterFD)
-                continuation.resume(throwing: CLIError.launchFailed("open slave PTY failed"))
+                continuation.resume(returning: .failure(CLIError.launchFailed("open slave PTY failed")))
                 return
             }
 
-            // Disable echo on the slave so echoed input doesn't fill the PTY buffer
+            // No echo, so typed answers never show up in the output.
             var tio = termios()
             tcgetattr(slaveFD, &tio)
             tio.c_lflag &= ~tcflag_t(ECHO | ECHOE | ECHOK | ECHONL)
@@ -130,7 +134,6 @@ actor CLIExecutor {
             let process = Process()
             let stdoutPipe = Pipe()
             let stderrPipe = Pipe()
-
             process.executableURL  = binary
             process.arguments      = arguments
             process.environment    = environment
@@ -140,14 +143,15 @@ actor CLIExecutor {
 
             let stdoutBuffer = LockedBuffer()
             let stderrBuffer = LockedBuffer()
+            let driver = PromptDriver(rules: rules, masterFD: masterFD)
 
             stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
-                if !chunk.isEmpty { stdoutBuffer.append(chunk) }
+                if !chunk.isEmpty { stdoutBuffer.append(chunk); driver.feed(chunk) }
             }
             stderrPipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
-                if !chunk.isEmpty { stderrBuffer.append(chunk) }
+                if !chunk.isEmpty { stderrBuffer.append(chunk); driver.feed(chunk) }
             }
 
             let timedOut = TimeoutFlag()
@@ -158,18 +162,30 @@ actor CLIExecutor {
                 }
             })
 
+            // Watches for a question nobody answers: output that ends like a prompt and
+            // then stays silent. jamf-cli would wait forever; stop it with a clear error.
+            let watchdog = DispatchSource.makeTimerSource(queue: .global())
+            watchdog.schedule(deadline: .now() + 0.5, repeating: 0.5)
+            watchdog.setEventHandler {
+                if process.isRunning, driver.isStuckAtUnansweredPrompt(grace: unansweredPromptGrace) {
+                    process.terminate()
+                }
+            }
+
             process.terminationHandler = { proc in
                 timeout0.cancel()
+                watchdog.cancel()
                 stdoutPipe.fileHandleForReading.readabilityHandler = nil
                 stderrPipe.fileHandleForReading.readabilityHandler = nil
-                close(masterFD)
+                driver.close()
+                stdoutBuffer.append((try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data())
+                stderrBuffer.append((try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data())
 
-                let remainingOut = (try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data()
-                stdoutBuffer.append(remainingOut)
-                let remainingErr = (try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data()
-                stderrBuffer.append(remainingErr)
-
-                continuation.resume(with: CLIExecutor.completion(
+                if let question = driver.unansweredPrompt {
+                    continuation.resume(returning: .failure(CLIError.unexpectedPrompt(question)))
+                    return
+                }
+                continuation.resume(returning: CLIExecutor.completion(
                     for: proc,
                     timedOut: timedOut.isSet,
                     stdout: stdoutBuffer.drain(),
@@ -179,26 +195,17 @@ actor CLIExecutor {
 
             do {
                 try process.run()
-                // Write to master; the slave side (process stdin) sees it as keyboard input.
-                // Zero the buffer immediately after writing to minimise the credential's
-                // time-in-memory window (memset_s is guaranteed not to be elided by the
-                // compiler, unlike plain memset).
-                var mutableStdin = stdinData
-                mutableStdin.withUnsafeMutableBytes { buf in
-                    if let ptr = buf.baseAddress, buf.count > 0 {
-                        _ = Darwin.write(masterFD, ptr, buf.count)
-                        memset_s(ptr, buf.count, 0, buf.count)
-                    }
-                }
             } catch {
-                close(masterFD)
-                continuation.resume(throwing: CLIError.launchFailed(error.localizedDescription))
+                driver.close()
+                continuation.resume(returning: .failure(CLIError.launchFailed(error.localizedDescription)))
                 return
             }
-
             timeout0.schedule(after: timeout)
+            watchdog.resume()
         }
+        return try Self.redacting(result, secrets: secrets).get()
     }
+
 }
 
 extension CLIExecutor {
@@ -259,6 +266,146 @@ extension CLIExecutor {
     }
 }
 
+extension CLIExecutor {
+    /// Removes secret answers from output and error messages before they leave the executor.
+    static func redacting(_ result: Result<Data, Error>, secrets: [String]) -> Result<Data, Error> {
+        let secrets = secrets.filter { !$0.isEmpty }
+        guard !secrets.isEmpty else { return result }
+        switch result {
+        case .success(let data):
+            let text = String(decoding: data, as: UTF8.self)
+            return .success(Data(redact(text, secrets: secrets).utf8))
+        case .failure(CLIError.nonZeroExit(let code, let stderr)):
+            return .failure(CLIError.nonZeroExit(code: code, stderr: redact(stderr, secrets: secrets)))
+        case .failure(CLIError.unexpectedPrompt(let question)):
+            return .failure(CLIError.unexpectedPrompt(redact(question, secrets: secrets)))
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    /// Replaces every occurrence of each secret — raw, and as it appears inside a JSON string
+    /// written by Go (which escapes `&`, `<`, `>` as `\u0026` etc.) — with a placeholder.
+    static func redact(_ text: String, secrets: [String]) -> String {
+        var result = text
+        for secret in secrets where !secret.isEmpty {
+            for form in Set([secret, goJSONEscaped(secret), jsonEscaped(secret)]) where !form.isEmpty {
+                result = result.replacingOccurrences(of: form, with: "••••••")
+            }
+        }
+        return result
+    }
+
+    private static func jsonEscaped(_ s: String) -> String {
+        var out = ""
+        for scalar in s.unicodeScalars {
+            switch scalar {
+            case "\"": out += "\\\""
+            case "\\": out += "\\\\"
+            case "\n": out += "\\n"
+            case "\r": out += "\\r"
+            case "\t": out += "\\t"
+            case _ where scalar.value < 0x20: out += String(format: "\\u%04x", scalar.value)
+            default: out.unicodeScalars.append(scalar)
+            }
+        }
+        return out
+    }
+
+    private static func goJSONEscaped(_ s: String) -> String {
+        jsonEscaped(s)
+            .replacingOccurrences(of: "&", with: "\\u0026")
+            .replacingOccurrences(of: "<", with: "\\u003c")
+            .replacingOccurrences(of: ">", with: "\\u003e")
+    }
+}
+
+/// One question an interactive jamf-cli command may ask, and the answer to give.
+struct PromptRule: Sendable, Equatable {
+    /// Text that identifies the question (case-insensitive), e.g. `"Password:"`.
+    let prompt: String
+    let answer: String
+    /// Secret answers are redacted from all output and error messages.
+    let isSecret: Bool
+
+    init(_ prompt: String, answer: String, isSecret: Bool = false) {
+        self.prompt = prompt
+        self.answer = answer
+        self.isSecret = isSecret
+    }
+}
+
+/// Answers questions printed by an interactive process, each at most once, only after the
+/// matching prompt text has appeared.
+final class PromptDriver: @unchecked Sendable {
+    private let lock = NSLock()
+    private var remaining: [PromptRule]
+    private var masterFD: Int32
+    /// Output since the last answered question.
+    private var pending = ""
+    private var lastOutput = Date()
+    private var stuckPrompt: String?
+
+    init(rules: [PromptRule], masterFD: Int32) {
+        self.remaining = rules
+        self.masterFD = masterFD
+    }
+
+    /// The question the process stopped at when none of the rules matched it.
+    var unansweredPrompt: String? { lock.withLock { stuckPrompt } }
+
+    func feed(_ chunk: Data) {
+        lock.withLock {
+            pending += String(decoding: chunk, as: UTF8.self)
+            lastOutput = Date()
+            answerMatchingPrompts()
+        }
+    }
+
+    /// True (and records the question) when the output has ended in something that looks
+    /// like a question for longer than `grace` without any rule answering it.
+    func isStuckAtUnansweredPrompt(grace: TimeInterval) -> Bool {
+        lock.withLock {
+            guard stuckPrompt == nil, Date().timeIntervalSince(lastOutput) >= grace else { return stuckPrompt != nil }
+            let tail = pending.trimmingCharacters(in: .whitespaces)
+            guard let last = tail.last, [":", "?", "]", ")"].contains(last), !tail.hasSuffix("\n") else { return false }
+            let line = tail.components(separatedBy: .newlines).last?.trimmingCharacters(in: .whitespaces) ?? tail
+            stuckPrompt = String(line.suffix(200))
+            return true
+        }
+    }
+
+    func close() {
+        lock.withLock {
+            if masterFD >= 0 { Darwin.close(masterFD); masterFD = -1 }
+        }
+    }
+
+    private func answerMatchingPrompts() {
+        var matched = true
+        while matched, masterFD >= 0 {
+            matched = false
+            let haystack = pending.lowercased()
+            // Earliest prompt in the output first, so answers follow the process's order.
+            let hits = remaining.enumerated().compactMap { index, rule -> (Int, Range<String.Index>)? in
+                guard let r = haystack.range(of: rule.prompt.lowercased()) else { return nil }
+                return (index, r)
+            }
+            guard let (index, range) = hits.min(by: { $0.1.lowerBound < $1.1.lowerBound }) else { return }
+            let rule = remaining.remove(at: index)
+            var bytes = Array((rule.answer + "\n").utf8)
+            _ = bytes.withUnsafeMutableBytes { buf in
+                let n = Darwin.write(masterFD, buf.baseAddress, buf.count)
+                memset_s(buf.baseAddress, buf.count, 0, buf.count)
+                return n
+            }
+            let offset = haystack.distance(from: haystack.startIndex, to: range.upperBound)
+            pending = String(pending.dropFirst(offset))
+            matched = true
+        }
+    }
+}
+
 // MARK: - CLIExecuting Protocol
 
 /// Shared interface implemented by both the in-process executor and the XPC executor.
@@ -272,16 +419,27 @@ protocol CLIExecuting: Sendable {
         timeout: TimeInterval
     ) async throws -> Data
 
-    func executeInteractive(
+    func executeScripted(
         binary: URL,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data,
+        rules: [PromptRule],
         timeout: TimeInterval
     ) async throws -> Data
 }
 
-extension CLIExecutor: CLIExecuting {}
+extension CLIExecutor: CLIExecuting {
+    func executeScripted(
+        binary: URL,
+        arguments: [String],
+        environment: [String: String],
+        rules: [PromptRule],
+        timeout: TimeInterval
+    ) async throws -> Data {
+        try await executeScripted(binary: binary, arguments: arguments, environment: environment,
+                                  rules: rules, timeout: timeout, unansweredPromptGrace: 4)
+    }
+}
 
 extension CLIExecuting {
     func execute(

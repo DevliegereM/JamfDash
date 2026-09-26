@@ -27,8 +27,9 @@ final class SettingsViewModel {
     var ssoClientSecret = ""
 
     // Pro — Platform API fields
-    var platformGatewayURL   = "https://us.apigw.jamf.com"
-    var platformTenantID     = ""
+    var platformRegion       = PlatformRegion.us
+    var platformScopeLevel   = PlatformScopeLevel.environment
+    var platformScopeID      = ""
     var platformClientID     = ""
     var platformClientSecret = ""
     var platformProfileName  = "Jamf Platform"
@@ -103,8 +104,7 @@ final class SettingsViewModel {
                        !ssoClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                        !ssoClientSecret.isEmpty
             case .platform:
-                return !platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-                       !platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                return !platformScopeID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                        !platformClientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                        !platformClientSecret.isEmpty
             }
@@ -163,12 +163,11 @@ final class SettingsViewModel {
                                ? "Jamf Platform"
                                : platformProfileName.trimmingCharacters(in: .whitespaces)
                     scopeForProfile = .fullAdmin
-                    let trimURL    = platformGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let trimTenant = platformTenantID.trimmingCharacters(in: .whitespacesAndNewlines)
-                    try requireHTTPS(trimURL)
+                    let trimURL = platformRegion.gatewayURL
                     _ = try await cliManager.setupPlatform(
-                        gatewayURL:   trimURL,
-                        tenantID:     trimTenant,
+                        region:       platformRegion,
+                        level:        platformScopeLevel,
+                        scopeID:      platformScopeID.trimmingCharacters(in: .whitespacesAndNewlines),
                         profileName:  name,
                         clientID:     platformClientID.trimmingCharacters(in: .whitespacesAndNewlines),
                         clientSecret: platformClientSecret
@@ -185,7 +184,7 @@ final class SettingsViewModel {
                                : protectProfileName.trimmingCharacters(in: .whitespaces)
                 let trimURL = protectServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
                 try requireHTTPS(trimURL)
-                _ = try await cliManager.setupOAuth(
+                _ = try await cliManager.setupProtect(
                     serverURL:    trimURL,
                     profileName:  name,
                     clientID:     protectClientID.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -265,7 +264,7 @@ final class SettingsViewModel {
     private func clearSetupForm() {
         serverURLText = ""; username = ""; password = ""
         ssoServerURL = ""; ssoClientID = ""; ssoClientSecret = ""
-        platformTenantID = ""; platformClientID = ""; platformClientSecret = ""
+        platformScopeID = ""; platformClientID = ""; platformClientSecret = ""
         protectServerURL = ""; protectClientID = ""; protectClientSecret = ""
         schoolServerURL = ""; schoolNetworkID = ""; schoolAPIKey = ""
     }

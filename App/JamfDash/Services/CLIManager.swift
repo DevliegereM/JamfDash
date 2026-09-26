@@ -536,6 +536,42 @@ actor CLIManager: CLIRunning {
         return CLIExecutor()
     }
 
+    // MARK: - Minimum jamf-cli version
+
+    /// Oldest jamf-cli whose setup prompts and gateway handling Jamf Dash supports.
+    static let minimumCLIVersion = "1.31.1"
+
+    static func meetsMinimum(_ version: String) -> Bool {
+        !CLIVersion(semver: version, architecture: currentArchitecture).isOlderThan(minimumCLIVersion)
+    }
+
+    /// True when the installed jamf-cli is at least `minimumCLIVersion`.
+    var meetsMinimumVersion: Bool {
+        guard let v = installedVersion?.semver else { return false }
+        return Self.meetsMinimum(v)
+    }
+
+    private func requireMinimumVersion() throws {
+        guard let v = installedVersion?.semver else { return }   // unknown: let jamf-cli decide
+        guard Self.meetsMinimum(v) else {
+            throw CLIError.cliTooOld(installed: v, minimum: Self.minimumCLIVersion)
+        }
+    }
+
+    /// Updates jamf-cli when it is older than `minimumCLIVersion`. A pin to an older
+    /// version is removed, since that version can no longer be used.
+    func ensureMinimumVersion() async throws {
+        await refreshVersion()
+        guard isBinaryInstalled, !meetsMinimumVersion else { return }
+        let old = installedVersion?.semver ?? "unknown"
+        logger.notice("jamf-cli \(old, privacy: .public) is older than \(Self.minimumCLIVersion, privacy: .public) — updating")
+        if let pinned = await versionStore.pinnedVersion, !Self.meetsMinimum(pinned) {
+            await versionStore.unpin()
+        }
+        try await performUpdate()
+        try requireMinimumVersion()
+    }
+
     // MARK: - Paths
 
     static let appSupportName = "JamfDash"
@@ -568,7 +604,7 @@ actor CLIManager: CLIRunning {
             try await versionStore.install(version: tag)
         }
 
-        await refreshVersion()
+        try await ensureMinimumVersion()
     }
 
     /// Read and cache the installed version. Safe to call on any launch.
@@ -632,6 +668,9 @@ actor CLIManager: CLIRunning {
 
     /// Pins the active binary to a specific locally-installed version.
     func pin(version: String) async throws {
+        guard Self.meetsMinimum(version) else {
+            throw CLIError.cliTooOld(installed: version, minimum: Self.minimumCLIVersion)
+        }
         try await versionStore.pin(version)
         await refreshVersion()
     }
@@ -643,12 +682,18 @@ actor CLIManager: CLIRunning {
 
     /// Activates the previous version and pins to it.
     func rollback() async throws {
+        if let target = await versionStore.rollbackVersion, !Self.meetsMinimum(target) {
+            throw CLIError.cliTooOld(installed: target, minimum: Self.minimumCLIVersion)
+        }
         try await versionStore.rollback()
         await refreshVersion()
     }
 
     /// Downloads and installs a specific version without making it active.
     func downloadVersion(_ version: String) async throws {
+        guard Self.meetsMinimum(version) else {
+            throw CLIError.cliTooOld(installed: version, minimum: Self.minimumCLIVersion)
+        }
         let tag = try await downloader.download(version: version, to: binaryURL, arch: Self.currentArchitecture)
         try setExecutable(binaryURL)
         try await versionStore.install(version: tag)
@@ -667,77 +712,88 @@ actor CLIManager: CLIRunning {
 
     // MARK: - Setup
 
-    /// Drives `jamf-cli config add-profile` for Platform Gateway authentication.
-    /// The user must have created API client credentials at account.jamf.com beforehand.
+    // Setup commands are interactive: jamf-cli only accepts credentials at a prompt.
+    // Everything that has a flag is passed as a flag; the remaining questions are answered
+    // by prompt text (see `CLIExecutor.executeScripted`), never by position.
+
+    /// Platform API gateway profile (`config add-profile --auth-method platform`).
+    /// The API client must have been created at account.jamf.com beforehand.
     func setupPlatform(
-        gatewayURL: String,
-        tenantID: String,
+        region: PlatformRegion,
+        level: PlatformScopeLevel,
+        scopeID: String,
         profileName: String,
         clientID: String,
         clientSecret: String
     ) async throws -> String {
-        guard isBinaryInstalled else { throw CLIError.binaryMissing }
-        let stdin = "\(clientID)\n\(clientSecret)\n"
-        let data = try await executor.executeInteractive(
-            binary: binaryURL,
-            arguments: ["config", "add-profile", profileName,
-                        "--url", gatewayURL,
-                        "--auth-method", "platform",
-                        "--tenant-id", tenantID],
-            environment: Self.minimalEnvironment(),
-            stdinData: stdin.data(using: .utf8) ?? Data(),
-            timeout: 30
+        let output = try await runSetup(
+            ["config", "add-profile", profileName,
+             "--url", region.gatewayURL,
+             "--auth-method", "platform",
+             level.flag, scopeID],
+            rules: Self.clientCredentialRules(clientID: clientID, clientSecret: clientSecret)
         )
         profileService.selectedProfile = JamfProfile(name: profileName)
-        return String(data: data, encoding: .utf8) ?? ""
+        return output
     }
 
-    /// Drives `jamf-cli config add-profile` for SSO / no-local-account instances.
-    /// The user must have created an API role and client in Jamf Pro beforehand.
+    /// Jamf Pro profile for an existing API client (`config add-profile --auth-method oauth2`).
     func setupOAuth(
         serverURL: String,
         profileName: String,
         clientID: String,
         clientSecret: String
     ) async throws -> String {
-        guard isBinaryInstalled else { throw CLIError.binaryMissing }
-        let stdin = "\(clientID)\n\(clientSecret)\n"
-        let data = try await executor.executeInteractive(
-            binary: binaryURL,
-            arguments: ["config", "add-profile", profileName,
-                        "--url", serverURL, "--auth-method", "oauth2"],
-            environment: Self.minimalEnvironment(),
-            stdinData: stdin.data(using: .utf8) ?? Data(),
-            timeout: 30
+        let output = try await runSetup(
+            ["config", "add-profile", profileName, "--url", serverURL, "--auth-method", "oauth2"],
+            rules: Self.clientCredentialRules(clientID: clientID, clientSecret: clientSecret)
         )
-        // Persist the chosen profile so commands use it immediately
         profileService.selectedProfile = JamfProfile(name: profileName)
-        return String(data: data, encoding: .utf8) ?? ""
+        return output
     }
 
-    /// Drives `jamf-cli config add-profile` for Jamf School (API key auth).
-    /// The user must have obtained their Network ID and API Key from Jamf School → Organisation → API.
+    /// Jamf Protect profile (`protect setup`).
+    func setupProtect(
+        serverURL: String,
+        profileName: String,
+        clientID: String,
+        clientSecret: String
+    ) async throws -> String {
+        let output = try await preservingDefaultProfile {
+            try await runSetup(
+                ["protect", "setup", "--url", serverURL, "--profile-name", profileName],
+                rules: Self.clientCredentialRules(clientID: clientID, clientSecret: clientSecret)
+            )
+        }
+        profileService.selectedProfile = JamfProfile(name: profileName)
+        return output
+    }
+
+    /// Jamf School profile (`school setup`). Network ID from Devices → Enroll Device(s),
+    /// API key from Organisation → Settings → API.
     func setupSchool(
         serverURL: String,
         profileName: String,
         networkID: String,
         apiKey: String
     ) async throws -> String {
-        guard isBinaryInstalled else { throw CLIError.binaryMissing }
-        let stdin = "\(networkID)\n\(apiKey)\n"
-        let data = try await executor.executeInteractive(
-            binary: binaryURL,
-            arguments: ["config", "add-profile", profileName,
-                        "--url", serverURL, "--auth-method", "apikey"],
-            environment: Self.minimalEnvironment(),
-            stdinData: stdin.data(using: .utf8) ?? Data(),
-            timeout: 30
-        )
+        let output = try await preservingDefaultProfile {
+            try await runSetup(
+                ["school", "setup", "--url", serverURL, "--profile-name", profileName],
+                rules: [
+                    PromptRule("Network ID:", answer: networkID),
+                    PromptRule("API Key:", answer: apiKey, isSecret: true),
+                    // Optional Platform API access for School blueprints — not set up here.
+                    PromptRule("Configure Platform API access", answer: "n"),
+                ]
+            )
+        }
         profileService.selectedProfile = JamfProfile(name: profileName)
-        return String(data: data, encoding: .utf8) ?? ""
+        return output
     }
 
-    /// Drives `jamf-cli pro setup` non-interactively by piping answers to stdin.
+    /// Jamf Pro local account: jamf-cli signs in, creates an API role and client with
+    /// `scope`, and saves the client — the username and password are not stored.
     func setup(
         serverURL: String,
         username: String,
@@ -745,18 +801,58 @@ actor CLIManager: CLIRunning {
         scope: Int,
         profileName: String
     ) async throws -> String {
+        let scopeName: String
+        switch scope {
+        case 1:  scopeName = "read-only"
+        case 3:  scopeName = "full-admin"
+        default: scopeName = "standard"
+        }
+        return try await runSetup(
+            ["pro", "setup",
+             "--url", serverURL,
+             "--credentials", "create",
+             "--scope", scopeName,
+             "--profile-name", profileName],
+            rules: [
+                PromptRule("Username:", answer: username),
+                PromptRule("Password:", answer: password, isSecret: true),
+                // Global MCP report folder: leave whatever the user has configured.
+                PromptRule("HTML report directory", answer: ""),
+            ]
+        )
+    }
+
+    private static func clientCredentialRules(clientID: String, clientSecret: String) -> [PromptRule] {
+        [
+            PromptRule("Client ID:", answer: clientID),
+            PromptRule("Client Secret:", answer: clientSecret, isSecret: true),
+        ]
+    }
+
+    private func runSetup(_ arguments: [String], rules: [PromptRule]) async throws -> String {
         guard isBinaryInstalled else { throw CLIError.binaryMissing }
-        // Answers in the order jamf-cli prompts for them
-        let stdin = [serverURL, username, password, "\(scope)", profileName]
-            .joined(separator: "\n") + "\n"
-        let data = try await executor.executeInteractive(
+        try requireMinimumVersion()
+        let data = try await executor.executeScripted(
             binary: binaryURL,
-            arguments: ["pro", "setup"],
+            arguments: arguments,
             environment: Self.minimalEnvironment(),
-            stdinData: stdin.data(using: .utf8) ?? Data(),
-            timeout: 60
+            rules: rules,
+            timeout: 90
         )
         return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// `protect setup` and `school setup` make the new profile jamf-cli's default. Jamf Dash
+    /// always passes `--profile`, so put the user's previous default back afterwards.
+    private func preservingDefaultProfile<T>(_ body: () async throws -> T) async throws -> T {
+        let config = JamfCLIConfigFile(url: JamfCLIConfigFile.standardURL)
+        let previous = try? config.defaultProfile()
+        let result = try await body()
+        if let previous {
+            do { try config.setDefaultProfile(previous) }
+            catch { logger.error("Could not restore jamf-cli default profile: \(error.localizedDescription, privacy: .public)") }
+        }
+        return result
     }
 
     /// True when at least one jamf-cli profile is configured.
@@ -806,50 +902,58 @@ actor CLIManager: CLIRunning {
         if case .lock(let serial, let pin) = command {
             return try await lockComputer(serial: serial, pin: pin)
         }
+        return try await runJamfCLI(command.baseArguments, timeout: command.timeout)
+    }
 
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        return try await runJamfCLI(command.arguments(outputFormat: outputFormat), timeout: command.timeout)
+    }
+
+    /// Runs jamf-cli with the selected profile. If the profile still points at the retired
+    /// Platform gateway, its URL is updated to the one jamf-cli names and the call is retried once.
+    private func runJamfCLI(_ commandArgs: [String], timeout: TimeInterval, allowGatewayFix: Bool = true) async throws -> Data {
         let profile = profileService.selectedProfile
-        let args = profile.isDefault ? command.baseArguments : ["--profile", profile.name] + command.baseArguments
-
+        let args = profile.isDefault ? commandArgs : ["--profile", profile.name] + commandArgs
         logger.debug("Running: jamf-cli \(args.joined(separator: " "), privacy: .private)")
-
         do {
             let start = Date()
             let data = try await executor.execute(
                 binary: binaryURL,
                 arguments: args,
                 environment: Self.minimalEnvironment(),
-                timeout: command.timeout
+                timeout: timeout
             )
             let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
             logger.debug("jamf-cli finished in \(elapsed, privacy: .public)s — \(data.count, privacy: .public) bytes")
             return data
+        } catch CLIError.nonZeroExit(let code, let message)
+            where allowGatewayFix && JamfCLIConfigFile.retiredGatewayReplacement(in: message) != nil {
+            let newURL = JamfCLIConfigFile.retiredGatewayReplacement(in: message)!
+            guard (try? migrateRetiredGateway(profile: profile, to: newURL)) == true else {
+                throw CLIError.nonZeroExit(code: code, stderr: message)
+            }
+            return try await runJamfCLI(commandArgs, timeout: timeout, allowGatewayFix: false)
         } catch {
             logger.error("jamf-cli failed: \(error.localizedDescription, privacy: .public)")
             throw error
         }
     }
 
-    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
-        guard isBinaryInstalled else { throw CLIError.binaryMissing }
-        let profile = profileService.selectedProfile
-        let args = command.arguments(outputFormat: outputFormat)
-        let finalArgs = profile.isDefault ? args : ["--profile", profile.name] + args
-        logger.debug("Running: jamf-cli \(finalArgs.joined(separator: " "), privacy: .private)")
-        do {
-            let start = Date()
-            let data = try await executor.execute(
-                binary: binaryURL,
-                arguments: finalArgs,
-                environment: Self.minimalEnvironment(),
-                timeout: command.timeout
-            )
-            let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
-            logger.debug("jamf-cli finished in \(elapsed, privacy: .public)s — \(data.count, privacy: .public) bytes")
-            return data
-        } catch {
-            logger.error("jamf-cli failed: \(error.localizedDescription, privacy: .public)")
-            throw error
-        }
+    /// Points a profile at the current Platform API gateway (`https://<region>.api.jamfcloud.com`),
+    /// as jamf-cli instructs for profiles created against the retired `*.apigw.jamf.com`.
+    /// Returns true when the config file was changed (or another call already changed it).
+    private func migrateRetiredGateway(profile: JamfProfile, to newURL: String) throws -> Bool {
+        let config = JamfCLIConfigFile(url: JamfCLIConfigFile.standardURL)
+        let name = profile.isDefault ? try config.defaultProfile() : profile.name
+        guard !name.isEmpty else { return false }
+        let current = try config.profileURL(name)
+        if current == newURL { return true }        // a concurrent call already migrated it
+        guard let current, current.contains("apigw.jamf.com") else { return false }
+        try config.setURL(newURL, forProfile: name)
+        profileService.setServerURL(newURL, for: name)
+        logger.notice("Updated profile \(name, privacy: .private) from the retired gateway \(current, privacy: .public) to \(newURL, privacy: .public)")
+        return true
     }
 
     /// Locks a Mac with the user's PIN. Resolves the device's management ID from its
@@ -932,9 +1036,12 @@ actor CLIManager: CLIRunning {
             "TERM", "LANG", "LC_ALL", "LC_CTYPE",
             "XPC_SERVICE_NAME", "__CF_USER_TEXT_ENCODING"
         ]
-        return keepKeys.reduce(into: [:]) { dict, key in
+        var result = keepKeys.reduce(into: [String: String]()) { dict, key in
             if let val = env[key] { dict[key] = val }
         }
+        // Jamf Dash manages jamf-cli updates itself.
+        result["JAMF_CLI_NO_UPDATE_CHECK"] = "1"
+        return result
     }
 
     private func createDirectoriesIfNeeded() throws {

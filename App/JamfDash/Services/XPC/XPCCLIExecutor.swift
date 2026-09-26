@@ -54,23 +54,25 @@ actor XPCCLIExecutor: CLIExecuting {
         }
     }
 
-    func executeInteractive(
+    func executeScripted(
         binary: URL,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data,
+        rules: [PromptRule],
         timeout: TimeInterval
     ) async throws -> Data {
         if let fallback, await !isWorkerReachable() {
-            return try await fallback.executeInteractive(binary: binary, arguments: arguments, environment: environment,
-                                                         stdinData: stdinData, timeout: timeout)
+            return try await fallback.executeScripted(binary: binary, arguments: arguments, environment: environment,
+                                                      rules: rules, timeout: timeout)
         }
         return try await call { proxy, reply in
-            proxy.executeInteractive(
+            proxy.executeScripted(
                 binaryPath: binary.path,
                 arguments: arguments,
                 environment: environment,
-                stdinData: stdinData,
+                prompts: rules.map(\.prompt),
+                answers: rules.map(\.answer),
+                secret: rules.map(\.isSecret),
                 timeout: timeout,
                 withReply: reply
             )
@@ -170,6 +172,7 @@ actor XPCCLIExecutor: CLIExecuting {
         case .nonZeroExit:     return .nonZeroExit(code: exitCode, stderr: stderr)
         case .timeout:         return .timeout
         case .untrustedBinary: return .untrustedBinary(nsError.localizedDescription)
+        case .unexpectedPrompt: return .unexpectedPrompt(nsError.localizedDescription)
         case .launchFailed, .unknown, .none:
             return .launchFailed(nsError.localizedDescription)
         }

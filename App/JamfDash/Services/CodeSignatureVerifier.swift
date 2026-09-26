@@ -125,17 +125,17 @@ actor VerifyingCLIExecutor: CLIExecuting {
         )
     }
 
-    func executeInteractive(
+    func executeScripted(
         binary: URL,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data,
+        rules: [PromptRule],
         timeout: TimeInterval
     ) async throws -> Data {
         try ensureTrusted(binary)
-        return try await base.executeInteractive(
+        return try await base.executeScripted(
             binary: binary, arguments: arguments, environment: environment,
-            stdinData: stdinData, timeout: timeout
+            rules: rules, timeout: timeout
         )
     }
 

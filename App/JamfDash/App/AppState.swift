@@ -42,6 +42,17 @@ final class AppState {
         }
 
         await env.cliManager.refreshVersion()
+        if await !env.cliManager.meetsMinimumVersion {
+            do {
+                try await env.cliManager.ensureMinimumVersion()
+            } catch {
+                // Onboarding's install step updates jamf-cli and shows the error if it fails again.
+                Self.logger.error("jamf-cli below \(CLIManager.minimumCLIVersion, privacy: .public) and update failed: \(error.localizedDescription, privacy: .public)")
+                updateError = error.localizedDescription
+                phase = .onboarding
+                return
+            }
+        }
         let hasProfiles = await env.cliManager.hasProfiles()
         let newPhase: Phase = hasProfiles ? .main : .setup
         Self.logger.info("Phase: launching → \(String(describing: newPhase), privacy: .public)")

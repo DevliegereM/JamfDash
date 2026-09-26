@@ -30,12 +30,15 @@ import Foundation
     /// execution when it fails.
     func ping(withReply reply: @escaping (Bool) -> Void)
 
-    /// Like `execute` but uses a PTY as stdin so tools that call `tcgetattr()` don't get ENOTTY.
-    func executeInteractive(
+    /// Interactive setup commands: answers the process's questions by prompt text.
+    /// `prompts`, `answers` and `secret` are parallel arrays describing `PromptRule`s.
+    func executeScripted(
         binaryPath: String,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data,
+        prompts: [String],
+        answers: [String],
+        secret: [Bool],
         timeout: Double,
         withReply reply: @escaping (Data?, NSError?) -> Void
     )
@@ -51,6 +54,7 @@ enum CLIWorkerError {
         case nonZeroExit     = 2
         case timeout         = 3
         case untrustedBinary = 4
+        case unexpectedPrompt = 5
         case unknown         = 99
     }
 

@@ -11,6 +11,7 @@
 		01526116222E211B4E2C1C76 /* JamfDashCLIWorker in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = FF8D851EE66BD88E93F215DC /* JamfDashCLIWorker */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		015DBB0500EC985185EDBE05 /* CLIWorkerXPCProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = D97EBD5596E79391C347A4F9 /* CLIWorkerXPCProtocol.swift */; };
 		06C683AD96013344491F2E04 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF24109F0390A8BB5B9CE979 /* AppEnvironment.swift */; };
+		08A44500F621EFF454CD6EB6 /* JamfCLIConfigFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB433244F94F9BA7AA03334D /* JamfCLIConfigFile.swift */; };
 		0EE525FBB70B39EBB669DF28 /* DDMDeclarationDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E0A9E413A9BB7D077DC160 /* DDMDeclarationDetailView.swift */; };
 		0FA4D793D45D7F898D3123FD /* CLIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97BA6CE2A38E8EFC87ACFB98 /* CLIError.swift */; };
 		121867D86EC6F19581FFEBA4 /* XPCCLIExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA47B9A26C5F5E21390659BA /* XPCCLIExecutor.swift */; };
@@ -32,6 +33,8 @@
 		3C36AFB1B93EF17DF225DDB5 /* DriftModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE709B0EFFC47F75239C075 /* DriftModels.swift */; };
 		3F4F9E37FC794AE4F0D53BBF /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8663AE6BAA28E59A85B3AC6F /* ReportView.swift */; };
 		3F75BA147C03A8208CBA0FEB /* BrandingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85BE1475E583C5EDFCDEC602 /* BrandingService.swift */; };
+		3F7F0E3C1455F0DF4DD37409 /* SetupFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 536BC9B27781B2FF18C19A97 /* SetupFlowTests.swift */; };
+		405FC0803C204EB7B7BD4FFF /* PlatformSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF97D92D1246498EA6D506 /* PlatformSetup.swift */; };
 		4346FA5BF62044A17DB33EFF /* CLIWorkerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838CA2D99EE01E9CBF971E3B /* CLIWorkerService.swift */; };
 		44625331157216107A9C749F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB50A66360EC92E3FC979988 /* RootView.swift */; };
 		447A8469FDC4444D2F8FCAB4 /* DigestHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14F0DCA6FFBA2126BBC3C89 /* DigestHistoryView.swift */; };
@@ -189,10 +192,12 @@
 		4D3CD911E87878616E8AE684 /* ComputerDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputerDetail.swift; sourceTree = "<group>"; };
 		4F66827CB13BDDEFA833FD15 /* DDMMonitorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDMMonitorViewModel.swift; sourceTree = "<group>"; };
 		532790D3E5E50C49B9B659F4 /* DriftViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DriftViewModel.swift; sourceTree = "<group>"; };
+		536BC9B27781B2FF18C19A97 /* SetupFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SetupFlowTests.swift; sourceTree = "<group>"; };
 		5760BEAEF4ED7958F25A3D76 /* PlatformAuthRequiredView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformAuthRequiredView.swift; sourceTree = "<group>"; };
 		593DEFAA86551BAAE2D3142D /* DeviceSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSearchViewModel.swift; sourceTree = "<group>"; };
 		5D6DB8BA0D1CC0EF525ADA88 /* JamfSecurityRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfSecurityRepository.swift; sourceTree = "<group>"; };
 		5F84D27D8889FB7720A57B3F /* JamfDashIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JamfDashIntents.swift; sourceTree = "<group>"; };
+		64CF97D92D1246498EA6D506 /* PlatformSetup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlatformSetup.swift; sourceTree = "<group>"; };
 		653221465C4D79BEC6D18D31 /* CLIExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIExecutor.swift; sourceTree = "<group>"; };
 		67645110CD028E2CE7C68EAE /* FleetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetModels.swift; sourceTree = "<group>"; };
 		6776F556AFF8D6E2DAB81DEC /* OSDistributionChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OSDistributionChart.swift; sourceTree = "<group>"; };
@@ -237,6 +242,7 @@
 		A57655D2D81B3538CDA41FAA /* JamfProduct.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfProduct.swift; sourceTree = "<group>"; };
 		A6FDD39F52A288F77CA1CE74 /* SyncBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncBar.swift; sourceTree = "<group>"; };
 		AA08AC8A88F0EEE747937BE3 /* CLIVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIVersion.swift; sourceTree = "<group>"; };
+		AB433244F94F9BA7AA03334D /* JamfCLIConfigFile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JamfCLIConfigFile.swift; sourceTree = "<group>"; };
 		AB936842570B6FC032714727 /* AITools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITools.swift; sourceTree = "<group>"; };
 		AF24109F0390A8BB5B9CE979 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		AF8646BC2548A6FFCC1CB88F /* CLIDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIDownloader.swift; sourceTree = "<group>"; };
@@ -363,6 +369,7 @@
 				D12B3D21B884C13C0A245F2D /* XPC */,
 				0C9BD1B387D17ED51B8D421B /* CodeSignatureVerifier.swift */,
 				09D1F672BC28420E0CCD8A78 /* ProfileDeprecationScanner.swift */,
+				AB433244F94F9BA7AA03334D /* JamfCLIConfigFile.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -386,6 +393,7 @@
 				6C1F7CEB1B62559F7CE13A51 /* SecurityReport.swift */,
 				D680C907B1E954A20B5DBF2C /* DeprecationRules.swift */,
 				40DF1BC452E27146BA78BB38 /* UpdateReadinessModels.swift */,
+				64CF97D92D1246498EA6D506 /* PlatformSetup.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -542,6 +550,7 @@
 				2BD108C8D309D947048115E1 /* ModelDecodingTests.swift */,
 				CFB78E8D8D6A83AED291B489 /* CLISecurityTests.swift */,
 				19F65D6860AAC50376DB0026 /* MacOS27ReadinessTests.swift */,
+				536BC9B27781B2FF18C19A97 /* SetupFlowTests.swift */,
 			);
 			path = JamfDashTests;
 			sourceTree = "<group>";
@@ -946,6 +955,8 @@
 				FAE1A614C651AAC80AF9524A /* UpdateReadinessViewModel.swift in Sources */,
 				DB2FE90347DCC6051EC79147 /* UpdateReadinessView.swift in Sources */,
 				C2E7C2392F62DA2E5B5456BB /* JamfDashIntents.swift in Sources */,
+				08A44500F621EFF454CD6EB6 /* JamfCLIConfigFile.swift in Sources */,
+				405FC0803C204EB7B7BD4FFF /* PlatformSetup.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -956,6 +967,7 @@
 				953B82338107F00CC2CC41DC /* ModelDecodingTests.swift in Sources */,
 				B97FA917612AAF40CA35D426 /* CLISecurityTests.swift in Sources */,
 				94E6DBADF5A37262A242211D /* MacOS27ReadinessTests.swift in Sources */,
+				3F7F0E3C1455F0DF4DD37409 /* SetupFlowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

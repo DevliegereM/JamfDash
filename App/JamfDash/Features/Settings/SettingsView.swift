@@ -330,13 +330,26 @@ private struct AddConnectionSheet: View {
     private var platformForm: some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
             GridRow {
-                Text("Gateway URL").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                TextField("https://us.apigw.jamf.com", text: $vm.platformGatewayURL)
-                    .textFieldStyle(.roundedBorder)
+                Text("Region").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                Picker("Region", selection: $vm.platformRegion) {
+                    ForEach(PlatformRegion.allCases) { Text("\($0.label) — \($0.gatewayURL)").tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
             }
             GridRow {
-                Text("Tenant ID").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
-                TextField("Tenant ID from account.jamf.com", text: $vm.platformTenantID)
+                Text("Created at").gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                Picker("Created at", selection: $vm.platformScopeLevel) {
+                    ForEach(PlatformScopeLevel.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+                .help("The level the API client was created at in Jamf Account. Environment is preferred.")
+            }
+            GridRow {
+                Text(vm.platformScopeLevel.label).gridColumnAlignment(.trailing).foregroundStyle(.secondary)
+                TextField(vm.platformScopeLevel.placeholder, text: $vm.platformScopeID)
                     .textFieldStyle(.roundedBorder)
             }
             GridRow {

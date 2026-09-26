@@ -36,31 +36,36 @@ import Security
                 binaryPath: binaryPath,
                 arguments: arguments,
                 environment: environment,
-                stdinData: stdinData.isEmpty ? nil : stdinData,
+                mode: .plain(stdinData: stdinData.isEmpty ? nil : stdinData),
                 timeout: timeout,
-                interactive: false,
                 reply: r.call
             )
         }
     }
 
-    func executeInteractive(
+    func executeScripted(
         binaryPath: String,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data,
+        prompts: [String],
+        answers: [String],
+        secret: [Bool],
         timeout: Double,
         withReply reply: @escaping (Data?, NSError?) -> Void
     ) {
         let r = Reply(call: reply)
+        guard prompts.count == answers.count, prompts.count == secret.count else {
+            r.call(nil, CLIWorkerError.nsError(code: .launchFailed, description: "Malformed prompt rules"))
+            return
+        }
+        let rules = prompts.indices.map { PromptRule(prompts[$0], answer: answers[$0], isSecret: secret[$0]) }
         Task {
             await run(
                 binaryPath: binaryPath,
                 arguments: arguments,
                 environment: environment,
-                stdinData: stdinData,
+                mode: .scripted(rules),
                 timeout: timeout,
-                interactive: true,
                 reply: r.call
             )
         }
@@ -68,13 +73,17 @@ import Security
 
     // MARK: - Shared runner
 
+    private enum Mode: Sendable {
+        case plain(stdinData: Data?)
+        case scripted([PromptRule])
+    }
+
     private func run(
         binaryPath: String,
         arguments: [String],
         environment: [String: String],
-        stdinData: Data?,
+        mode: Mode,
         timeout: Double,
-        interactive: Bool,
         reply: @escaping (Data?, NSError?) -> Void
     ) async {
         // Allowlist: only execute binaries from the JamfDash bin directory.
@@ -97,15 +106,16 @@ import Security
         }
         do {
             let output: Data
-            if interactive {
-                output = try await executor.executeInteractive(
+            switch mode {
+            case .scripted(let rules):
+                output = try await executor.executeScripted(
                     binary: binary,
                     arguments: arguments,
                     environment: environment,
-                    stdinData: stdinData ?? Data(),
+                    rules: rules,
                     timeout: timeout
                 )
-            } else {
+            case .plain(let stdinData):
                 output = try await executor.execute(
                     binary: binary,
                     arguments: arguments,
@@ -166,6 +176,8 @@ import Security
             )
         case .timeout:
             return CLIWorkerError.nsError(code: .timeout, description: "Process timed out")
+        case .unexpectedPrompt(let question):
+            return CLIWorkerError.nsError(code: .unexpectedPrompt, description: question)
         case .untrustedBinary:
             return CLIWorkerError.nsError(code: .untrustedBinary, description: error.localizedDescription)
         default:
