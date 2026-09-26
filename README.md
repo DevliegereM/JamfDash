@@ -1,6 +1,8 @@
 # Jamf Dash
 ![Welcome screen](Images/jamfdash-banner.svg)
 
+A native macOS dashboard for Jamf Pro, Jamf Protect, and Jamf School. Browse your fleet, review security posture, inspect configuration and analytics, manage enrollment, and export reports — all from one app.
+
 ---
 
 ## Overview
@@ -11,9 +13,10 @@ Jamf Dash connects to your Jamf environment via [`jamf-cli`](https://github.com/
 
 | Product | Sections |
 |---|---|
-| Jamf Pro | Overview · Security Posture · Fleet & Config · Devices · Mobile Devices · Device Lookup · Reports · Bulk Actions · Org Browser · Extension Attributes · Patch Management · Enrollment · Webhooks · Blueprints · Compliance Benchmarks |
+| Jamf Pro | Overview · Security Posture · Fleet & Config · Devices · Mobile Devices · Device Lookup · Reports · Bulk Actions · Org Browser · Extension Attributes · Patch Management · Enrollment · Webhooks · DDM Monitor · Configuration Drift · Audit Dashboard · Settings Inspector · Blueprints · Compliance Benchmarks · AI Assistant |
 | Jamf Protect | Overview · Events · Computers · Plans · Alerts · Insights · Audit Logs · Removable Storage · Unified Logging · Action Configs · Telemetry · Prevent Lists · Roles · Users · Groups · API Clients |
 | Jamf School | Overview · Devices · Device Groups · Users · User Groups · Classes · Apps |
+| Cross-product | Device Correlation *(requires both Pro and Protect)* |
 
 ---
 
@@ -109,9 +112,10 @@ High-level statistics from the Jamf Pro overview endpoint — device counts, lic
 
 **Security Posture**
 A full security compliance report including:
+- **Fleet Health Score** — computed 0–100 score (A–F grade) based on FileVault, SIP, Gatekeeper, Firewall, patch compliance, and stale-device ratio. Displayed as a circular gauge at the top of the view with a per-component breakdown. When the score drops below a configurable threshold, the Dock tile badge updates and a macOS notification is posted.
 - Compliance summary (FileVault, Gatekeeper, SIP, Firewall) with percentage bars
-- OS version distribution donut chart
-- Per-device security breakdown table with selectable serial numbers
+- OS version distribution bar chart
+- Per-device security breakdown table with selectable serial numbers and Jamf Pro deep links
 
 ![Security Posture](Images/JamfProSecurity.png)
 
@@ -131,10 +135,8 @@ Browse all configuration objects in one place, with inline detail sheets:
 **Devices**
 Three-tab Mac inventory view:
 - *All Devices* — searchable list with name, serial, OS version, and last contact time
-- *Stale Check-in* — devices not checked in within a configurable number of days (adjustable stepper, default 30 days)
+- *Stale Check-in* — devices not checked in within a configurable number of days (type a value directly or use the stepper arrows, default 30 days)
 - *macOS Versions* — interactive donut chart with a version legend; click a segment to filter devices by that version
-
-![Device Lookup](Images/JamfProLookup.png)
 
 Serial numbers and device names are text-selectable for easy copying.
 
@@ -146,6 +148,8 @@ Look up any Mac by serial number and view full hardware, OS, security, location,
 - Safe: Blank Push, Renew MDM, DDM Sync, Flush Failed Commands, Flush All Commands
 - Moderate: Redeploy Framework, Enable/Disable Remote Desktop, Restart, Shutdown
 - Destructive (confirmation required): Remove MDM, Set Recovery Lock, Lock (with PIN), Erase
+
+A **Software Update Readiness** section shows whether the Mac is ready for macOS 27 update management (see *Update Readiness* below).
 
 ![Device Lookup](Images/JamfProLookup.png)
 
@@ -192,9 +196,16 @@ Three-tab enrollment dashboard:
 Table of all configured Jamf Pro webhooks — name, event type, enabled state, and endpoint URL.
 
 **DDM Monitor**
-Two-view panel for Declarative Device Management status:
-- *Per Device* — searchable device list on the left; select any device to see its full DDM declaration status items on the right, including each declaration identifier, status, and any errors reported by the device.
-- *Fleet Overview* — table showing all declarations across the fleet with counts of succeeded, failed, and pending devices per declaration.
+Declarative Device Management status in four views:
+- *Per Device* — searchable device list on the left; select any device to see its full DDM declaration status items on the right, including each declaration identifier, status, and any errors reported by the device. A summary card highlights enrollment type, Lockdown Mode and other status items, and tags keys introduced in OS 27.
+- *Fleet Overview* — table showing all declarations across the fleet with counts of succeeded, failed, and pending devices per declaration, plus a **Declaration coverage** bar (DDM-enabled devices vs. inventory and overall success rate).
+- *Status Items* — every DDM device in one table with sortable, filterable columns for the status items reported by the device.
+- *Update Readiness* — see below.
+
+If your Jamf Pro version no longer serves a DDM endpoint, the monitor says so instead of showing an empty list.
+
+**Update Readiness** *(macOS 27)*
+macOS 27 removes the legacy MDM software update commands and the software update deferral restrictions — updates are managed declaratively only. Update Readiness checks every Mac against that change: OS version, whether DDM is enabled, Managed Software Update plans, reported update status, and any installed profiles that still carry deferral or Software Update payloads. Each Mac gets a readiness level with the reason and what to change.
 
 **Configuration Drift**
 Point-in-time snapshots of your Jamf Pro policies, configuration profiles, and scripts stored locally in SQLite. Click **Snapshot Now** to capture the current state. Each subsequent snapshot is diffed against the previous one and any Added, Modified, or Removed objects appear in a chronological timeline grouped by date.
@@ -211,6 +222,7 @@ Cross-checks your Jamf Pro environment against a built-in set of security and hy
 - Filter by severity or search by keyword
 - Click any finding for a detail sheet with a full description and remediation guidance
 - Findings refresh on demand or on each view load
+- **OS 27 deprecation rules** — flags configuration profiles using payloads that are removed or deprecated in macOS 27 (Software Update payload, update deferral restrictions, `com.apple.applicationaccess.new`, `com.apple.AssetCache.managed`, DNS settings / DNS proxy / relay) and names the declaration that replaces each. The detail sheet lists the affected profiles.
 
 **Settings Inspector**
 Browse all Jamf Pro settings endpoints exposed by `jamf-cli` in a searchable two-pane layout — settings category list on the left, raw structured output on the right. Useful for auditing configuration values without opening the Jamf Pro web console.
@@ -231,7 +243,7 @@ Dashie is an on-device AI fleet assistant powered by Apple Intelligence (macOS 2
 - Fleet-wide questions: device counts, compliance percentages, OS distribution, patch status
 - Device lookup: hardware specs, installed apps, smart group memberships
 - Security posture: FileVault, SIP, Gatekeeper, and firewall compliance breakdowns
-- Management actions: blank push, MDM profile renew, redeploy framework, restart (each requires explicit confirmation)
+- Management actions: blank push, MDM profile renew, redeploy framework, flush failed commands, restart, run a policy on a Mac, and bulk enable/disable policies. Every action except blank push asks for your confirmation before anything is sent.
 
 **Requirements:**
 - macOS 26 or later
@@ -241,8 +253,20 @@ Dashie is an on-device AI fleet assistant powered by Apple Intelligence (macOS 2
 **Context compaction:**
 When a conversation grows large, Dashie automatically summarises the history into a compact JSON file — capturing message counts, key topics, devices discussed, actions taken, and important findings — then continues seamlessly with a fresh context. Summaries are saved to `~/Library/Application Support/JamfDash/conversation-summary-<timestamp>.json` and the path is shown in the chat.
 
+**macOS 27:**
+On macOS 27 Dashie measures how full its context window is and summarises before it runs out. You can opt in to Apple's **Private Cloud Compute** model under **Settings → AI** for a larger context; it is off by default, and Dashie falls back to the on-device model if it is unavailable.
+
 **Limitations:**
-Dashie cannot create, update, or delete Jamf Pro objects. For configuration changes use the Jamf Pro web console. All data stays on-device.
+Apart from enabling or disabling policies, Dashie cannot create, update, or delete Jamf Pro objects. For configuration changes use the Jamf Pro web console. With the default on-device model, all data stays on your Mac.
+
+---
+
+### Shortcuts & Siri
+
+Jamf Dash provides read-only App Intents you can use in Shortcuts, Spotlight and Siri:
+- **Get Fleet Compliance** — the fleet's security compliance percentage
+- **Get Devices Needing Updates** — Macs with pending software updates
+- **Get DDM Declaration Failures** — declarations failing across the fleet
 
 ---
 
@@ -372,6 +396,20 @@ In Demo Mode a banner appears in the toolbar and a product switcher (Pro / Prote
 ## jamf-cli Updates
 
 Jamf Dash checks for `jamf-cli` updates automatically on launch. When a newer version is available, an **Update** button appears in the toolbar. You can also check manually from **Settings → CLI**.
+
+### Verification
+
+Every `jamf-cli` binary is verified twice before it is used:
+- its SHA-256 checksum against the checksum file in the GitHub release, and
+- its code signature: it must be signed with JAMF Software's Developer ID (Team ID `483DWKW443`).
+
+The signature is checked when a version is downloaded, when you switch or roll back versions, and before the binary is run. A binary that fails the check is never executed.
+
+`jamf-cli` runs in a separate helper process (`JamfDashCLIWorker`, an XPC service inside the app) that only accepts requests from Jamf Dash and only runs signed `jamf-cli` binaries from Jamf Dash's own folder. To run it inside the app process instead, for troubleshooting:
+
+```bash
+defaults write be.devliegere.JamfDash UseInProcessCLI -bool YES
+```
 
 ---
 

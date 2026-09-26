@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The CLI worker is intentionally NOT sandboxed, for the same reason as the host app
+  (see JamfDash/JamfDash.entitlements): jamf-cli must read its own Keychain items and
+  config under the user's home directory, and a child process inherits its parent's
+  sandbox. `com.apple.security.inherit` is only valid for helpers of a sandboxed app,
+  which JamfDash is not.
+
+  What the worker adds is a separate, hardened-runtime process that only executes
+  binaries that pass both the bin-directory allowlist and the Jamf code-signature
+  requirement, and only accepts connections from JamfDash signed by the same team.
+-->
+<plist version="1.0">
+<dict/>
+</plist>

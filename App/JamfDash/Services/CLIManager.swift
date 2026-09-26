@@ -1,0 +1,966 @@
+import Foundation
+import OSLog
+import UniformTypeIdentifiers
+
+// MARK: - CLI Commands
+
+enum CLICommand: Sendable {
+    // MARK: Jamf Pro — data fetching
+    case overview
+    case securityReport
+    case policies
+    case smartComputerGroups
+    case categories
+    case scripts
+    case packages
+    case configProfiles
+    case policyDetail(id: Int)
+    case configProfileDetail(id: Int)
+    case computers
+    case computerDetail(serial: String)
+    case computerDetailById(id: String)
+    case smartGroupDetail(id: String)
+
+    // MARK: DDM Monitor
+    case ddmStatusItems(managementId: String)
+    case ddmComputers
+    case reportDDMStatus
+    case proNotifications
+
+    // MARK: Blueprints
+    case blueprints
+    case blueprintDetail(name: String)
+
+    // MARK: Compliance Benchmarks
+    case complianceBenchmarks
+    case complianceBenchmarkDetail(name: String)
+
+    // MARK: Jamf Protect — data fetching
+    case protectOverview
+    case protectEvents
+    case protectComputers
+    case protectComputerDetail(name: String)
+    case protectPlans
+    case protectAlerts
+    case protectInsights
+    case protectAuditLogs
+    case protectExceptionSets
+    case protectAnalyticSets
+    case protectExceptionSetDetail(name: String)
+
+    // MARK: Jamf School — data fetching
+    case schoolOverview
+    case schoolDevices
+    case schoolDeviceGroups
+    case schoolUsers
+    case schoolUserGroups
+    case schoolClasses
+    case schoolApps
+    case schoolProfiles
+    case schoolDepDevices
+
+    // MARK: Device actions (safe)
+    case blankPush(serial: String)
+    case renewMDM(serial: String)
+    case ddmSync(serial: String)
+    case flushFailedCommands(serial: String)
+    case flushAllCommands(serial: String)
+
+    // MARK: Device actions (moderate)
+    case redeployFramework(serial: String)
+    case enableRemoteDesktop(serial: String)
+    case disableRemoteDesktop(serial: String)
+    case restart(serial: String)
+    case shutdown(serial: String)
+
+    // MARK: Device actions (destructive)
+    case removeMDM(serial: String)
+    case setRecoveryLock(serial: String)
+    case lock(serial: String, pin: String)
+    case erase(serial: String)
+
+    // MARK: Mobile Device actions
+    case mobileDeviceList
+    case mobileDeviceErase(serial: String)
+    case mobileDeviceLock(serial: String)
+    case mobileDeviceRestart(serial: String)
+    case mobileDeviceShutdown(serial: String)
+    case mobileDeviceUnmanage(serial: String)
+    case mobileDeviceEnableLostMode(serial: String)
+    case mobileDeviceDisableLostMode(serial: String)
+    case mobileDeviceClearPasscode(serial: String)
+    case mobileDeviceUpdateInventory(serial: String)
+
+    // MARK: Reports
+    case reportPatchStatus
+    case reportPolicyStatus
+    case reportProfileStatus
+    case reportAppStatus
+    case reportUpdateStatus(includeFailures: Bool)
+    case reportDeviceCompliance
+    case reportInventorySummary
+    case reportSoftwareInstalls
+
+    // MARK: Audit
+    case proAudit(category: String)
+
+    // MARK: Bulk Operations
+    case bulkEnablePolicies(category: String)
+    case bulkDisablePolicies(pattern: String)
+    case bulkAddToGroup(group: String, file: String)
+    case bulkRemoveFromGroup(group: String, file: String)
+    case bulkSendCommand(command: String, group: String)
+
+    // MARK: Policy Execute
+    case policyExecute(name: String, serial: String)
+
+    // MARK: Org Objects
+    case buildings
+    case departments
+    case networkSegments
+
+    // MARK: Extension Attributes
+    case computerExtensionAttributes
+
+    // MARK: Patch Management
+    case patchTitles
+    case patchPolicies                      // Classic API list (id+name only)
+    case patchPoliciesUAPI                  // UAPI v2 list (full data: enabled, targetVersion, softwareTitle)
+    case patchSoftwareTitleConfigurations   // modern patch titles (UAPI v2)
+    case patchSoftwareSummary               // modern patch compliance summary (requires title ID)
+    case appInstallerTitles                 // App Installer catalogue
+    case appInstallerDeployments            // App Installer deployments
+    case restrictedSoftware                 // restricted software list (id+name only)
+    case restrictedSoftwareDetail(id: String) // full detail with "general" sub-object
+
+    // MARK: Enrollment
+    case depTokens
+    case computerPrestages
+    case mobileDevicePrestages
+
+    // MARK: Webhooks
+    case webhooks
+
+    // MARK: Self Service & Check-In
+    case selfServiceSettings
+    case clientCheckInSettings
+
+    // MARK: Protect extended - data
+    case protectRemovableStorage
+    case protectRemovableStorageDetail(name: String)
+    case protectRemovableStorageExport(name: String)
+    case protectUnifiedLogging
+    case protectUnifiedLoggingDetail(name: String)
+    case protectUnifiedLoggingExport(name: String)
+    case protectActionConfigs
+    case protectActionConfigDetail(name: String)
+    case protectActionConfigExport(name: String)
+    case protectTelemetryConfigs
+    case protectTelemetryDetail(name: String)
+    case protectTelemetryExport(name: String)
+    case protectCustomPreventLists
+    case protectCustomPreventListDetail(name: String)
+    case protectCustomPreventListExport(name: String)
+    case protectRoles
+    case protectRoleDetail(name: String)
+    case protectRoleExport(name: String)
+    case protectUsers
+    case protectUserDetail(email: String)
+    case protectUserExport(email: String)
+    case protectGroups
+    case protectGroupDetail(name: String)
+    case protectGroupExport(name: String)
+    case protectAPIClients
+    case protectAPIClientDetail(name: String)
+    case protectAPIClientExport(name: String)
+    case protectDataForwarding
+    case protectDataRetention
+    case protectConfigFreeze
+    case protectConfigFreezeEnable
+    case protectConfigFreezeDisable
+    case protectDownloadsSummary
+    case protectPlanExport(name: String)
+    case protectAnalyticDetail(name: String)
+    case protectAnalyticExport(name: String)
+    case protectAnalyticSetExport(name: String)
+
+    // MARK: Patch Management detail
+    case patchTitleDetail(id: String)
+    case patchPolicyDetail(id: String)
+
+    // MARK: Script & Package detail
+    case scriptDetail(id: String)
+    case packageDetail(id: Int)
+    case protectExceptionSetExport(name: String)
+
+    // MARK: macOS 27 readiness (appended)
+    /// DDM-based managed software update plans (Jamf Pro API `/v1/managed-software-updates/plans`).
+    case softwareUpdatePlans
+    /// Plans for a single computer — `computerId` must be the numeric Jamf Pro ID.
+    case softwareUpdatePlansForComputer(computerId: String)
+    /// Managed software update statuses (`/v1/managed-software-updates/update-statuses`).
+    case softwareUpdateStatuses
+    /// Computers with OS version, DDM flag and installed configuration profiles.
+    case computersUpdateReadiness
+
+    private static func protectList(_ sub: String) -> [String] {
+        ["protect", sub, "list", "-o", "json"]
+    }
+    private static func protectGet(_ sub: String, _ name: String) -> [String] {
+        ["protect", sub, "get", name, "-o", "json"]
+    }
+    private static func protectExport(_ sub: String, _ name: String) -> [String] {
+        ["protect", sub, "export", name]
+    }
+
+    var baseArguments: [String] {
+        switch self {
+        // Jamf Pro — data
+        case .overview:             return ["pro", "overview", "-o", "json"]
+        case .securityReport:       return ["pro", "report", "security", "-o", "json"]
+        case .policies:             return ["pro", "classic-policies", "list", "-o", "json"]
+        case .smartComputerGroups:  return ["pro", "smart-computer-groups", "list", "-o", "json"]
+        case .categories:           return ["pro", "categories", "list", "-o", "json"]
+        case .scripts:              return ["pro", "scripts", "list", "-o", "json"]
+        case .packages:             return ["pro", "classic-packages", "list", "-o", "json"]
+        case .configProfiles:                     return ["pro", "classic-macos-config-profiles", "list", "-o", "json"]
+        case .policyDetail(let id):               return ["pro", "classic-policies", "get", "\(id)", "-o", "json"]
+        case .configProfileDetail(let id):        return ["pro", "classic-macos-config-profiles", "get", "\(id)", "-o", "json"]
+        case .computers:                          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "-o", "json"]
+        case .computerDetail(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "STORAGE", "--section", "DISK_ENCRYPTION", "--section", "SECURITY", "--section", "LOCATION", "--section", "PURCHASING", "--section", "NETWORK", "--section", "GROUP_MEMBERSHIPS", "--section", "LOCAL_USER_ACCOUNTS", "--section", "SOFTWARE_UPDATES", "--section", "CONFIGURATION_PROFILES", "--section", "EXTENSION_ATTRIBUTES", "-o", "json"]
+        case .computerDetailById(let id):         return ["pro", "computers-inventory", "get", id, "-o", "json"]
+        case .smartGroupDetail(let id):           return ["pro", "smart-computer-groups", "get", id, "-o", "json"]
+
+        // DDM Monitor
+        case .ddmStatusItems(let managementId): return ["pro", "ddm-status", "status-items", managementId, "-o", "json"]
+        case .ddmComputers: return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "-o", "json"]
+
+        // Blueprints
+        case .blueprints:                          return ["pro", "bp", "list", "-o", "json"]
+        case .blueprintDetail(let n):              return ["pro", "bp", "get", n, "-o", "json"]
+
+        // Compliance Benchmarks
+        case .complianceBenchmarks:                return ["pro", "cb", "list", "-o", "json"]
+        case .complianceBenchmarkDetail(let n):    return ["pro", "cb", "get", n, "-o", "json"]
+
+        // Jamf Protect — data
+        case .protectEvents:        return ["protect", "alerts", "list", "-o", "json"]
+        case .protectOverview:      return ["protect", "overview", "-o", "json"]
+        case .protectComputers:             return ["protect", "comp", "list", "-o", "json"]
+        case .protectComputerDetail(let n): return ["protect", "comp", "get", n, "-o", "json"]
+        case .protectPlans:         return ["protect", "plans", "list", "-o", "json"]
+        case .protectAlerts:        return ["protect", "analytics", "list", "-o", "json"]
+        case .protectInsights:      return ["protect", "analytic-sets", "list", "-o", "json"]
+        case .protectAuditLogs:     return ["protect", "audit-logs", "list", "-o", "json"]
+        case .protectExceptionSets: return Self.protectList("exception-sets")
+        case .protectAnalyticSets:              return ["protect", "analytic-sets", "list", "-o", "json"]
+        case .protectExceptionSetDetail(let n): return ["protect", "exception-sets", "get", n, "-o", "json"]
+
+        // Jamf School — data
+        case .schoolOverview:       return ["school", "overview", "-o", "json"]
+        case .schoolDevices:        return ["school", "dev", "list", "-o", "json"]
+        case .schoolDeviceGroups:   return ["school", "dg", "list", "-o", "json"]
+        case .schoolUsers:          return ["school", "users", "list", "-o", "json"]
+        case .schoolUserGroups:     return ["school", "user-groups", "list", "-o", "json"]
+        case .schoolClasses:        return ["school", "cls", "list", "-o", "json"]
+        case .schoolApps:           return ["school", "apps", "list", "-o", "json"]
+        case .schoolProfiles:       return ["school", "profiles", "list", "-o", "json"]
+        case .schoolDepDevices:     return ["school", "dep-devices", "list", "-o", "json"]
+
+        // Safe actions
+        case .blankPush(let s):           return ["pro", "computers", "blank-push", "--serial", s, "--yes"]
+        case .renewMDM(let s):            return ["pro", "computers", "renew-mdm", "--serial", s, "--yes"]
+        case .ddmSync(let s):             return ["pro", "computers", "ddm-sync", "--serial", s, "--yes"]
+        case .flushFailedCommands(let s): return ["pro", "computers", "flush-commands", "--serial", s, "--yes"]
+        case .flushAllCommands(let s):    return ["pro", "computers", "flush-commands", "--serial", s, "--status", "both", "--yes"]
+
+        // Moderate actions
+        case .redeployFramework(let s):    return ["pro", "computers", "redeploy-framework", "--serial", s, "--yes"]
+        case .enableRemoteDesktop(let s):  return ["pro", "computers", "enable-remote-desktop", "--serial", s, "--yes"]
+        case .disableRemoteDesktop(let s): return ["pro", "computers", "disable-remote-desktop", "--serial", s, "--yes"]
+        case .restart(let s):              return ["pro", "computers", "restart", "--serial", s, "--yes"]
+        case .shutdown(let s):             return ["pro", "computers", "shutdown", "--serial", s, "--yes"]
+
+        // Destructive actions
+        case .removeMDM(let s):       return ["pro", "computers", "remove-mdm", "--serial", s, "--yes"]
+        case .setRecoveryLock(let s): return ["pro", "computers", "set-recovery-lock", "--serial", s, "--yes"]
+        // jamf-cli's `computers lock` has no PIN flag, so the lock is sent as a raw
+        // DEVICE_LOCK MDM command (body on stdin, see CLIManager.lockComputer).
+        case .lock:                   return ["pro", "mdm-commands", "commands", "-o", "json"]
+        case .erase(let s):           return ["pro", "computers", "erase", "--serial", s, "--yes"]
+
+        // Mobile Devices
+        case .mobileDeviceList:                    return ["pro", "md", "list", "--all", "-o", "json"]
+        case .mobileDeviceErase(let s):            return ["pro", "md", "erase", "--serial", s, "--yes"]
+        case .mobileDeviceLock(let s):             return ["pro", "md", "lock", "--serial", s, "--yes", "--confirm-destructive"]
+        case .mobileDeviceRestart(let s):          return ["pro", "md", "restart", "--serial", s, "--yes"]
+        case .mobileDeviceShutdown(let s):         return ["pro", "md", "shutdown", "--serial", s, "--yes"]
+        case .mobileDeviceUnmanage(let s):         return ["pro", "md", "unmanage", "--serial", s, "--yes"]
+        case .mobileDeviceEnableLostMode(let s):   return ["pro", "md", "enable-lost-mode", "--serial", s, "--yes"]
+        case .mobileDeviceDisableLostMode(let s):  return ["pro", "md", "disable-lost-mode", "--serial", s, "--yes"]
+        case .mobileDeviceClearPasscode(let s):    return ["pro", "md", "clear-passcode", "--serial", s, "--yes"]
+        case .mobileDeviceUpdateInventory(let s):  return ["pro", "md", "update-inventory", "--serial", s, "--yes"]
+
+        // Reports
+        case .reportPatchStatus:              return ["pro", "report", "patch-status", "-o", "json"]
+        case .reportPolicyStatus:             return ["pro", "report", "policy-status", "-o", "json"]
+        case .reportProfileStatus:            return ["pro", "report", "profile-status", "-o", "json"]
+        case .reportAppStatus:                return ["pro", "report", "app-status", "-o", "json"]
+        case .reportUpdateStatus(let f):      return f ? ["pro", "report", "update-status", "--scan-failures", "-o", "json"] : ["pro", "report", "update-status", "-o", "json"]
+        case .reportDeviceCompliance:         return ["pro", "report", "device-compliance", "-o", "json"]
+        case .reportInventorySummary:         return ["pro", "report", "inventory-summary", "-o", "json"]
+        case .reportSoftwareInstalls:         return ["pro", "report", "software-installs", "-o", "json"]
+        case .reportDDMStatus:                return ["pro", "report", "ddm-status", "-o", "json"]
+        case .proNotifications:               return ["pro", "notifications", "list", "-o", "json"]
+        case .proAudit(let cat):              return ["pro", "audit", "--checks", cat, "-o", "json"]
+
+        // Bulk Operations
+        case .bulkEnablePolicies(let c):          return ["pro", "bulk", "enable-policies", "--category", c, "--yes"]
+        case .bulkDisablePolicies(let p):         return ["pro", "bulk", "disable-policies", "--name", p, "--yes"]
+        case .bulkAddToGroup(let g, let f):       return ["pro", "bulk", "add-to-group", "--group", g, "--from-file", f, "--yes"]
+        case .bulkRemoveFromGroup(let g, let f):  return ["pro", "bulk", "remove-from-group", "--group", g, "--from-file", f, "--yes"]
+        case .bulkSendCommand(let cmd, let grp):  return ["pro", "bulk", "send-command", "--command", cmd, "--group", grp, "--yes"]
+
+        // Policy Execute
+        case .policyExecute(let n, let s): return ["pro", "policy-execute", n, "--target", s, "--yes"]
+
+        // Org Objects
+        case .buildings:       return ["pro", "bld", "list", "-o", "json"]
+        case .departments:     return ["pro", "dept", "list", "-o", "json"]
+        case .networkSegments: return ["pro", "classic-network-segments", "list", "-o", "json"]
+
+        // Extension Attributes
+        case .computerExtensionAttributes: return ["pro", "computer-extension-attributes", "list", "-o", "json"]
+
+        // Patch Management
+        case .patchTitles:       return ["pro", "classic-patch-titles",  "list", "-o", "json"]
+        case .patchPolicies:     return ["pro", "classic-patch-policies", "list", "-o", "json"]
+        case .patchPoliciesUAPI: return ["pro", "patch-policies",         "list", "-o", "json"]
+        case .patchSoftwareTitleConfigurations: return ["pro", "patch-software-title-configurations", "list", "-o", "json"]
+        case .patchSoftwareSummary:             return ["pro", "patch-software-title-configurations", "patch-summary", "-o", "json"]
+        case .appInstallerTitles:               return ["pro", "app-installer-titles", "list", "-o", "json"]
+        case .appInstallerDeployments:          return ["pro", "app-installer-deployments", "list", "-o", "json"]
+        case .restrictedSoftware:               return ["pro", "classic-restricted-software", "list", "-o", "json"]
+
+        // Enrollment
+        case .depTokens:             return ["pro", "device-enrollment-instances", "list", "-o", "json"]
+        case .computerPrestages:     return ["pro", "computer-prestages", "list", "-o", "json"]
+        case .mobileDevicePrestages: return ["pro", "mobile-device-prestages", "list", "-o", "json"]
+
+        // Webhooks
+        case .webhooks: return ["pro", "webhooks", "list", "-o", "json"]
+
+        // Self Service & Check-In
+        case .selfServiceSettings:   return ["pro", "self-service-settings", "get", "-o", "json"]
+        case .clientCheckInSettings: return ["pro", "client-check-in", "get", "-o", "json"]
+
+        // Protect extended
+        case .protectRemovableStorage:               return Self.protectList("rscs")
+        case .protectRemovableStorageDetail(let n):  return Self.protectGet("rscs", n)
+        case .protectRemovableStorageExport(let n):  return Self.protectExport("rscs", n)
+        case .protectUnifiedLogging:                 return Self.protectList("ulf")
+        case .protectUnifiedLoggingDetail(let n):    return Self.protectGet("ulf", n)
+        case .protectUnifiedLoggingExport(let n):    return Self.protectExport("ulf", n)
+        case .protectActionConfigs:                  return Self.protectList("ac")
+        case .protectActionConfigDetail(let n):      return Self.protectGet("ac", n)
+        case .protectActionConfigExport(let n):      return Self.protectExport("ac", n)
+        case .protectTelemetryConfigs:               return Self.protectList("telemetry")
+        case .protectTelemetryDetail(let n):         return Self.protectGet("telemetry", n)
+        case .protectTelemetryExport(let n):         return Self.protectExport("telemetry", n)
+        case .protectCustomPreventLists:             return Self.protectList("cpl")
+        case .protectCustomPreventListDetail(let n): return Self.protectGet("cpl", n)
+        case .protectCustomPreventListExport(let n): return Self.protectExport("cpl", n)
+        case .protectRoles:                          return Self.protectList("roles")
+        case .protectRoleDetail(let n):              return Self.protectGet("roles", n)
+        case .protectRoleExport(let n):              return Self.protectExport("roles", n)
+        case .protectUsers:                          return Self.protectList("users")
+        case .protectUserDetail(let e):              return Self.protectGet("users", e)
+        case .protectUserExport(let e):              return Self.protectExport("users", e)
+        case .protectGroups:                         return Self.protectList("groups")
+        case .protectGroupDetail(let n):             return Self.protectGet("groups", n)
+        case .protectGroupExport(let n):             return Self.protectExport("groups", n)
+        case .protectAPIClients:                     return Self.protectList("apic")
+        case .protectAPIClientDetail(let n):         return Self.protectGet("apic", n)
+        case .protectAPIClientExport(let n):         return Self.protectExport("apic", n)
+        case .protectDataForwarding:                 return ["protect", "df", "get", "-o", "json"]
+        case .protectDataRetention:                  return ["protect", "dr", "get", "-o", "json"]
+        case .protectConfigFreeze:                   return ["protect", "cf", "get", "-o", "json"]
+        case .protectConfigFreezeEnable:             return ["protect", "cf", "enable", "--yes"]
+        case .protectConfigFreezeDisable:            return ["protect", "cf", "disable", "--yes"]
+        case .protectDownloadsSummary:               return ["protect", "downloads", "summary", "-o", "json"]
+        case .protectPlanExport(let n):              return Self.protectExport("plans", n)
+        case .protectAnalyticDetail(let n):          return Self.protectGet("analytics", n)
+        case .protectAnalyticExport(let n):          return Self.protectExport("analytics", n)
+        case .protectAnalyticSetExport(let n):       return Self.protectExport("analytic-sets", n)
+
+        // Patch Management detail
+        case .patchTitleDetail(let id):          return ["pro", "classic-patch-titles",   "get", id, "-o", "json"]
+        case .patchPolicyDetail(let id):         return ["pro", "classic-patch-policies", "get", id, "-o", "json"]
+        case .restrictedSoftwareDetail(let id):  return ["pro", "classic-restricted-software", "get", id, "-o", "json"]
+        case .scriptDetail(let id):      return ["pro", "scripts", "get", id, "-o", "json"]
+        case .packageDetail(let id):     return ["pro", "classic-packages", "get", "\(id)", "-o", "json"]
+        case .protectExceptionSetExport(let n):      return ["protect", "exception-sets", "export", n]
+
+        // macOS 27 readiness (appended)
+        case .softwareUpdatePlans:               return ["pro", "managed-software-updates-plans", "list", "-o", "json"]
+        case .softwareUpdatePlansForComputer(let id):
+            let digits = id.filter { $0.isASCII && $0.isNumber }
+            return ["pro", "managed-software-updates-plans", "list", "--filter", "device.deviceId==\(digits);device.objectType==COMPUTER", "-o", "json"]
+        case .softwareUpdateStatuses:            return ["pro", "managed-software-updates", "update-statuses", "-o", "json"]
+        case .computersUpdateReadiness:          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "CONFIGURATION_PROFILES", "-o", "json"]
+        }
+    }
+
+    var timeout: TimeInterval {
+        switch self {
+        case .securityReport, .computers, .erase, .lock(_, _),
+             .mobileDeviceList, .mobileDeviceErase, .mobileDeviceLock,
+             .bulkAddToGroup, .bulkRemoveFromGroup, .bulkSendCommand,
+             .bulkEnablePolicies, .bulkDisablePolicies,
+             .reportPatchStatus, .reportPolicyStatus, .reportUpdateStatus,
+             .reportDeviceCompliance, .reportSoftwareInstalls,
+             .ddmStatusItems(_), .ddmComputers, .reportDDMStatus:
+            return 120
+        case .computersUpdateReadiness, .softwareUpdatePlans, .softwareUpdateStatuses:
+            return 120
+        default: return 60
+        }
+    }
+
+    /// RSQL filter matching one serial number. The value is quoted and `\` / `"` are
+    /// escaped so a crafted serial cannot close the string and append clauses.
+    static func serialFilter(_ serial: String) -> String {
+        let escaped = serial
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "hardware.serialNumber==\"\(escaped)\""
+    }
+
+    /// True for commands that permanently alter or destroy device state.
+    var isDestructive: Bool {
+        switch self {
+        case .removeMDM, .setRecoveryLock, .lock(_, _), .erase,
+             .mobileDeviceErase, .mobileDeviceLock, .mobileDeviceUnmanage,
+             .mobileDeviceEnableLostMode,
+             .protectConfigFreezeEnable, .protectConfigFreezeDisable:
+            return true
+        default: return false
+        }
+    }
+}
+
+// MARK: - Report Output Format
+enum ReportOutputFormat: String, CaseIterable, Identifiable {
+    case json = "json", table = "table", csv = "csv", yaml = "yaml", plain = "plain"
+    var id: String { rawValue }
+    var fileExtension: String {
+        switch self {
+        case .json: return "json"
+        case .table: return "txt"
+        case .csv: return "csv"
+        case .yaml: return "yaml"
+        case .plain: return "txt"
+        }
+    }
+    var contentType: UTType {
+        switch self {
+        case .json: return .json
+        case .csv: return .commaSeparatedText
+        case .yaml, .plain, .table: return .plainText
+        }
+    }
+}
+
+// MARK: - CLICommand Output Format Helper
+
+extension CLICommand {
+    func arguments(outputFormat: ReportOutputFormat) -> [String] {
+        guard outputFormat != .json else { return baseArguments }
+        var args = baseArguments
+        if let oIdx = args.lastIndex(of: "-o") {
+            args.removeSubrange(oIdx...(oIdx + 1))
+        }
+        return args + ["-o", outputFormat.rawValue]
+    }
+}
+
+// MARK: - CLIRunning Protocol
+
+
+protocol CLIRunning: Sendable {
+    func run(_ command: CLICommand) async throws -> Data
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data
+}
+
+// MARK: - CLIManager Actor
+
+actor CLIManager: CLIRunning {
+    private let downloader: CLIDownloader
+    private let profileService: ProfileService
+    private let keychain: KeychainService
+    private let executor: any CLIExecuting
+    private let versionStore: CLIVersionStore
+    private let logger = Logger(subsystem: "com.jamfdash", category: "CLIManager")
+    private let supportDirectory: URL
+    private let binDirectory: URL
+
+    private(set) var installedVersion: CLIVersion?
+
+    init(
+        downloader: CLIDownloader,
+        profileService: ProfileService,
+        keychain: KeychainService,
+        executor: any CLIExecuting = CLIManager.defaultExecutor()
+    ) {
+        self.downloader = downloader
+        self.profileService = profileService
+        self.keychain = keychain
+        // Every launch of jamf-cli goes through the signature check.
+        self.executor = VerifyingCLIExecutor(wrapping: executor)
+        let supportDir = FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(Self.appSupportName, isDirectory: true)
+        self.supportDirectory = supportDir
+        self.binDirectory = supportDir.appendingPathComponent("bin", isDirectory: true)
+        self.versionStore = CLIVersionStore(supportDirectory: supportDir)
+    }
+
+    /// Runs jamf-cli in the embedded `JamfDashCLIWorker` XPC service when it is bundled,
+    /// otherwise in-process. `defaults write be.devliegere.JamfDash UseInProcessCLI -bool YES`
+    /// forces in-process execution for troubleshooting.
+    static func defaultExecutor() -> any CLIExecuting {
+        if XPCCLIExecutor.isWorkerEmbedded && !UserDefaults.standard.bool(forKey: "UseInProcessCLI") {
+            Logger(subsystem: "com.jamfdash", category: "CLIManager").info("Using CLI worker XPC service")
+            return XPCCLIExecutor(fallback: CLIExecutor())
+        }
+        return CLIExecutor()
+    }
+
+    // MARK: - Paths
+
+    static let appSupportName = "JamfDash"
+
+    var binaryURL: URL {
+        binDirectory.appendingPathComponent("jamf-cli")
+    }
+
+    var isBinaryInstalled: Bool {
+        FileManager.default.fileExists(atPath: binaryURL.path)
+    }
+
+    // MARK: - Lifecycle
+
+    /// Downloads the binary if missing. Call only from onboarding (user-triggered).
+    func ensureBinary() async throws {
+        try createDirectoriesIfNeeded()
+
+        // Migrate a pre-versioning binary into the version store.
+        let hasStored = await versionStore.hasStoredVersions
+        if isBinaryInstalled && !hasStored {
+            await refreshVersion()
+            await versionStore.migrateIfNeeded(currentVersion: installedVersion?.semver)
+        }
+
+        if !isBinaryInstalled {
+            logger.info("jamf-cli not found, downloading")
+            let tag = try await downloader.download(to: binaryURL, arch: Self.currentArchitecture)
+            try setExecutable(binaryURL)
+            try await versionStore.install(version: tag)
+        }
+
+        await refreshVersion()
+    }
+
+    /// Read and cache the installed version. Safe to call on any launch.
+    func refreshVersion() async {
+        guard isBinaryInstalled else {
+            self.installedVersion = nil
+            return
+        }
+        do {
+            let data = try await executor.execute(
+                binary: binaryURL,
+                arguments: ["--version"],
+                environment: Self.minimalEnvironment(),
+                timeout: 10
+            )
+            let text = String(data: data, encoding: .utf8) ?? ""
+            // Output format: "jamf-cli 1.6.0\n  commit: ...\n  built: ..."
+            // Take only the first line so the build timestamp is not mistaken for the version.
+            let firstLine = text.components(separatedBy: "\n").first ?? text
+            let semver = firstLine
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(separator: " ")
+                .last
+                .map(String.init) ?? firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.installedVersion = semver.isEmpty ? nil : CLIVersion(semver: semver, architecture: Self.currentArchitecture)
+        } catch {
+            self.installedVersion = nil
+            logger.error("Failed to read jamf-cli version: \(error.localizedDescription)")
+        }
+        logger.info("jamf-cli version: \(self.installedVersion?.semver ?? "unknown")")
+    }
+
+    func checkForUpdate() async throws -> String? {
+        // Never offer an update when the user has pinned a specific version.
+        guard await versionStore.pinnedVersion == nil else { return nil }
+        let latest = try await downloader.latestVersion()
+        guard let current = installedVersion else { return latest }
+        return current.isOlderThan(latest) ? latest : nil
+    }
+
+    func performUpdate() async throws {
+        let tag = try await downloader.download(to: binaryURL, arch: Self.currentArchitecture)
+        try setExecutable(binaryURL)
+        try await versionStore.install(version: tag)
+        await versionStore.prune(keepLatest: 3)
+        await refreshVersion()
+        logger.info("jamf-cli updated to \(self.installedVersion?.semver ?? "unknown")")
+    }
+
+    // MARK: - Version management
+
+    /// Lists all versions stored locally in the version archive.
+    var localVersions: [String] {
+        get async { await versionStore.installedVersions }
+    }
+
+    /// The version tag that the user has pinned, or nil when tracking latest.
+    var pinnedVersion: String? {
+        get async { await versionStore.pinnedVersion }
+    }
+
+    /// Pins the active binary to a specific locally-installed version.
+    func pin(version: String) async throws {
+        try await versionStore.pin(version)
+        await refreshVersion()
+    }
+
+    /// Removes the version pin so the app will track the latest release again.
+    func unpin() async {
+        await versionStore.unpin()
+    }
+
+    /// Activates the previous version and pins to it.
+    func rollback() async throws {
+        try await versionStore.rollback()
+        await refreshVersion()
+    }
+
+    /// Downloads and installs a specific version without making it active.
+    func downloadVersion(_ version: String) async throws {
+        let tag = try await downloader.download(version: version, to: binaryURL, arch: Self.currentArchitecture)
+        try setExecutable(binaryURL)
+        try await versionStore.install(version: tag)
+        // Re-activate whatever was active before so the downloaded version is archived but not yet live.
+        if let pin = await versionStore.pinnedVersion {
+            try await versionStore.activate(version: pin)
+        } else if let active = installedVersion?.semver {
+            try? await versionStore.activate(version: active)
+        }
+    }
+
+    /// Lists the version tags available on the remote repository.
+    func remoteVersions(limit: Int = 10) async throws -> [String] {
+        try await downloader.availableVersions(limit: limit)
+    }
+
+    // MARK: - Setup
+
+    /// Drives `jamf-cli config add-profile` for Platform Gateway authentication.
+    /// The user must have created API client credentials at account.jamf.com beforehand.
+    func setupPlatform(
+        gatewayURL: String,
+        tenantID: String,
+        profileName: String,
+        clientID: String,
+        clientSecret: String
+    ) async throws -> String {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        let stdin = "\(clientID)\n\(clientSecret)\n"
+        let data = try await executor.executeInteractive(
+            binary: binaryURL,
+            arguments: ["config", "add-profile", profileName,
+                        "--url", gatewayURL,
+                        "--auth-method", "platform",
+                        "--tenant-id", tenantID],
+            environment: Self.minimalEnvironment(),
+            stdinData: stdin.data(using: .utf8) ?? Data(),
+            timeout: 30
+        )
+        profileService.selectedProfile = JamfProfile(name: profileName)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// Drives `jamf-cli config add-profile` for SSO / no-local-account instances.
+    /// The user must have created an API role and client in Jamf Pro beforehand.
+    func setupOAuth(
+        serverURL: String,
+        profileName: String,
+        clientID: String,
+        clientSecret: String
+    ) async throws -> String {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        let stdin = "\(clientID)\n\(clientSecret)\n"
+        let data = try await executor.executeInteractive(
+            binary: binaryURL,
+            arguments: ["config", "add-profile", profileName,
+                        "--url", serverURL, "--auth-method", "oauth2"],
+            environment: Self.minimalEnvironment(),
+            stdinData: stdin.data(using: .utf8) ?? Data(),
+            timeout: 30
+        )
+        // Persist the chosen profile so commands use it immediately
+        profileService.selectedProfile = JamfProfile(name: profileName)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// Drives `jamf-cli config add-profile` for Jamf School (API key auth).
+    /// The user must have obtained their Network ID and API Key from Jamf School → Organisation → API.
+    func setupSchool(
+        serverURL: String,
+        profileName: String,
+        networkID: String,
+        apiKey: String
+    ) async throws -> String {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        let stdin = "\(networkID)\n\(apiKey)\n"
+        let data = try await executor.executeInteractive(
+            binary: binaryURL,
+            arguments: ["config", "add-profile", profileName,
+                        "--url", serverURL, "--auth-method", "apikey"],
+            environment: Self.minimalEnvironment(),
+            stdinData: stdin.data(using: .utf8) ?? Data(),
+            timeout: 30
+        )
+        profileService.selectedProfile = JamfProfile(name: profileName)
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// Drives `jamf-cli pro setup` non-interactively by piping answers to stdin.
+    func setup(
+        serverURL: String,
+        username: String,
+        password: String,
+        scope: Int,
+        profileName: String
+    ) async throws -> String {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        // Answers in the order jamf-cli prompts for them
+        let stdin = [serverURL, username, password, "\(scope)", profileName]
+            .joined(separator: "\n") + "\n"
+        let data = try await executor.executeInteractive(
+            binary: binaryURL,
+            arguments: ["pro", "setup"],
+            environment: Self.minimalEnvironment(),
+            stdinData: stdin.data(using: .utf8) ?? Data(),
+            timeout: 60
+        )
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    /// True when at least one jamf-cli profile is configured.
+    /// Uses keychain-based discovery (same source as SettingsViewModel) rather than
+    /// running `jamf-cli profiles list` which is not a valid command.
+    func hasProfiles() async -> Bool {
+        let profiles = await keychain.jamfCLIProfiles()
+        return !profiles.isEmpty
+    }
+
+    /// Verifies the current profile can authenticate by running a lightweight overview command.
+    /// Throws `CLIError.nonZeroExit` (containing the auth error message) on failure.
+    func verifyConnection() async throws {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        let product = profileService.currentProduct
+        let command: CLICommand
+        switch product {
+        case .pro:      command = .overview
+        case .protect:  command = .protectOverview
+        case .school:   command = .schoolOverview
+        }
+        _ = try await run(command)
+    }
+
+    /// Verifies a specific profile (by name and product) without changing the active profile.
+    func verifyConnection(profileName: String, product: JamfProduct) async throws {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        let command: CLICommand
+        switch product {
+        case .pro:      command = .overview
+        case .protect:  command = .protectOverview
+        case .school:   command = .schoolOverview
+        }
+        let args = ["--profile", profileName] + command.baseArguments
+        _ = try await executor.execute(
+            binary: binaryURL,
+            arguments: args,
+            environment: Self.minimalEnvironment(),
+            timeout: command.timeout
+        )
+    }
+
+    // MARK: - Execution
+
+    func run(_ command: CLICommand) async throws -> Data {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        if case .lock(let serial, let pin) = command {
+            return try await lockComputer(serial: serial, pin: pin)
+        }
+
+        let profile = profileService.selectedProfile
+        let args = profile.isDefault ? command.baseArguments : ["--profile", profile.name] + command.baseArguments
+
+        logger.debug("Running: jamf-cli \(args.joined(separator: " "), privacy: .private)")
+
+        do {
+            let start = Date()
+            let data = try await executor.execute(
+                binary: binaryURL,
+                arguments: args,
+                environment: Self.minimalEnvironment(),
+                timeout: command.timeout
+            )
+            let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+            logger.debug("jamf-cli finished in \(elapsed, privacy: .public)s — \(data.count, privacy: .public) bytes")
+            return data
+        } catch {
+            logger.error("jamf-cli failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+    }
+
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        let profile = profileService.selectedProfile
+        let args = command.arguments(outputFormat: outputFormat)
+        let finalArgs = profile.isDefault ? args : ["--profile", profile.name] + args
+        logger.debug("Running: jamf-cli \(finalArgs.joined(separator: " "), privacy: .private)")
+        do {
+            let start = Date()
+            let data = try await executor.execute(
+                binary: binaryURL,
+                arguments: finalArgs,
+                environment: Self.minimalEnvironment(),
+                timeout: command.timeout
+            )
+            let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
+            logger.debug("jamf-cli finished in \(elapsed, privacy: .public)s — \(data.count, privacy: .public) bytes")
+            return data
+        } catch {
+            logger.error("jamf-cli failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+    }
+
+    /// Locks a Mac with the user's PIN. Resolves the device's management ID from its
+    /// serial, then queues a DEVICE_LOCK command with the PIN in the request body.
+    private func lockComputer(serial: String, pin: String) async throws -> Data {
+        guard pin.count == 6, pin.allSatisfy(\.isASCII), pin.allSatisfy(\.isNumber) else {
+            throw CLIError.nonZeroExit(code: -1, stderr: "The lock PIN must be exactly 6 digits.")
+        }
+        let profile = profileService.selectedProfile
+        let profileArgs = profile.isDefault ? [] : ["--profile", profile.name]
+
+        let lookup = try await executor.execute(
+            binary: binaryURL,
+            arguments: profileArgs + [
+                "pro", "computers-inventory", "list",
+                "--filter", CLICommand.serialFilter(serial),
+                "--section", "GENERAL", "-o", "json"
+            ],
+            environment: Self.minimalEnvironment(),
+            timeout: 60
+        )
+        guard let managementId = Self.managementId(in: lookup) else {
+            throw CLIError.nonZeroExit(code: -1, stderr: "No computer with serial \(serial) was found, or it has no management ID.")
+        }
+
+        let body: [String: Any] = [
+            "clientData": [["managementId": managementId]],
+            "commandData": ["commandType": "DEVICE_LOCK", "pin": pin]
+        ]
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        logger.debug("Sending DEVICE_LOCK for \(serial, privacy: .private)")
+        return try await executor.execute(
+            binary: binaryURL,
+            arguments: profileArgs + CLICommand.lock(serial: serial, pin: pin).baseArguments,
+            environment: Self.minimalEnvironment(),
+            stdinData: bodyData,
+            timeout: CLICommand.lock(serial: serial, pin: pin).timeout
+        )
+    }
+
+    /// Extracts `general.managementId` from a `computers-inventory list` response,
+    /// which is either a bare array or wrapped in `results`.
+    static func managementId(in data: Data) -> String? {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        let rows = (json as? [[String: Any]])
+            ?? ((json as? [String: Any])?["results"] as? [[String: Any]])
+            ?? []
+        guard rows.count == 1,
+              let general = rows[0]["general"] as? [String: Any],
+              let id = general["managementId"] as? String, !id.isEmpty
+        else { return nil }
+        return id
+    }
+
+    // MARK: - Profile helpers
+
+    func availableProfiles() -> [String] {
+        profileService.availableProfiles(binaryURL: binaryURL)
+    }
+
+    func removeProfile(_ name: String) async throws {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        _ = try await executor.execute(
+            binary: binaryURL,
+            arguments: ["config", "remove-profile", name],
+            environment: Self.minimalEnvironment(),
+            timeout: 10
+        )
+    }
+
+    // MARK: - Private helpers
+
+    /// Returns a minimal environment containing only the keys the jamf-cli Go binary
+    /// needs to run. Stripping the full process environment prevents accidental
+    /// credential or secret leakage into child processes via inherited variables.
+    private static func minimalEnvironment() -> [String: String] {
+        let env = ProcessInfo.processInfo.environment
+        let keepKeys: Set<String> = [
+            "HOME", "PATH", "TMPDIR", "USER", "LOGNAME",
+            "TERM", "LANG", "LC_ALL", "LC_CTYPE",
+            "XPC_SERVICE_NAME", "__CF_USER_TEXT_ENCODING"
+        ]
+        return keepKeys.reduce(into: [:]) { dict, key in
+            if let val = env[key] { dict[key] = val }
+        }
+    }
+
+    private func createDirectoriesIfNeeded() throws {
+        for dir in [supportDirectory, binDirectory] {
+            if !FileManager.default.fileExists(atPath: dir.path) {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+        }
+    }
+
+    private func setExecutable(_ url: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    static var currentArchitecture: CLIVersion.Architecture {
+        #if arch(arm64)
+        return .arm64
+        #else
+        return .x86_64
+        #endif
+    }
+}
+
+extension CLIRunning {
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
+        // Default implementation: ignore format, return same as JSON
+        return try await run(command)
+    }
+}

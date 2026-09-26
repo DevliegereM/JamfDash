@@ -1,0 +1,118 @@
+name: JamfDash
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.0.0"
+options:
+  bundleIdPrefix: be.devliegere.JamfDash
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_APP_SANDBOX: NO
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MARKETING_VERSION: "0.6"
+    CURRENT_PROJECT_VERSION: "20260614.21"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: 4FZ2H85CA5
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_HARDENED_RUNTIME: YES
+
+targets:
+  JamfDash:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: JamfDash
+        excludes:
+          - "**/*.entitlements"
+    resources:
+      - path: JamfDash/Resources
+    info:
+      path: JamfDash/Info.plist
+      properties:
+        CFBundleDisplayName: "Jamf Dash"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+        LSApplicationCategoryType: "public.app-category.utilities"
+        NSHumanReadableCopyright: "Copyright © 2026 Jamf Dash"
+        SUFeedURL: "https://raw.githubusercontent.com/DevliegereM/JamfDash/main/appcast.xml"
+        SUPublicEDKey: "NyVmezEHuA07O6hVYV64fvpQ0RCF8A6yiSdFsxO+Log="
+    entitlements:
+      path: JamfDash/JamfDash.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: be.devliegere.JamfDash
+        CODE_SIGN_ENTITLEMENTS: JamfDash/JamfDash.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: JamfDash
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
+      - target: JamfDashCLIWorker
+
+  JamfDashCLIWorker:
+    type: xpc-service
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: JamfDashCLIWorker
+        excludes:
+          - "*.entitlements"
+          - "Info.plist"
+      - path: JamfDash/Services/XPC/CLIWorkerXPCProtocol.swift
+      - path: JamfDash/Services/CLIExecutor.swift
+      - path: JamfDash/Services/CLIError.swift
+      - path: JamfDash/Services/CodeSignatureVerifier.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: be.devliegere.JamfDash.CLIWorker
+        PRODUCT_NAME: be.devliegere.JamfDash.CLIWorker
+        INFOPLIST_FILE: JamfDashCLIWorker/Info.plist
+        CODE_SIGN_ENTITLEMENTS: JamfDashCLIWorker/JamfDashCLIWorker.entitlements
+        SKIP_INSTALL: YES
+
+  JamfDashTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: JamfDashTests
+        excludes:
+          - "Fixtures/**"
+    resources:
+      - path: JamfDashTests/Fixtures/overview.json
+      - path: JamfDashTests/Fixtures/security.json
+      - path: JamfDashTests/Fixtures/policies.json
+    dependencies:
+      - target: JamfDash
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: be.devliegere.JamfDash.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+
+schemes:
+  JamfDash:
+    build:
+      targets:
+        JamfDash: all
+        JamfDashTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - JamfDashTests
+    archive:
+      config: Release

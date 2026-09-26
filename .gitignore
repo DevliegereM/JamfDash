@@ -1,0 +1,20 @@
+# macOS / Xcode
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Local tooling and notes (not published)
+.claude/
+App/.claude/
+App/test_fm
+PROJECT_STATUS.md
+report.sh
+scripts/release.sh
+docs/RELEASING.md
+
+# Release artifacts — published as GitHub release assets, not in git
+Versions/
+scripts/generate_keys
+scripts/sign_update
