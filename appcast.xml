@@ -9,6 +9,24 @@
     <language>en</language>
 
     <item>
+            <title>0.7.4</title>
+            <pubDate>Sat, 26 Sep 2026 23:07:24 +0200</pubDate>
+            <sparkle:version>20260926.6</sparkle:version>
+            <sparkle:shortVersionString>0.7.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Fixes
+
+- **DDM Monitor → Update Readiness** — no longer stretches the window to fit every Mac. The list scrolls inside the window, and long permission notes are shortened to two lines (hover for the full text).
+- **DDM Monitor → Fleet Overview** — the summary and table start at the top instead of in the middle of the window.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash_v0.7.4.zip" length="8322322" type="application/octet-stream" sparkle:edSignature="19HKcxF8n+fpl5ckJaCdkFOZCRhD9boZnachwUzz+aypAkZqsEFvA42ogXtcN3yQYuzxSmMStZrJcm2LnbHzDA=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="605298" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="lHj12qB4+VPpF+VKJ31+S5DaDj98/DBKioUmDBGs1BUZJD6/02yjT3NOW6QIICU14/tuxSb1IGPVPKggn0J0Bw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="750394" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Di1tjC6t2zdjWiecQ1NGMThrqOUbjtB0tBoM6IqvqwsTOg9a9QPPReJjOXUdKqbrN+2SFA+NxaqnYAHPaOWCDg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="766366" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qaY8Tg+8F6/V4FuYCPQaR0B6hhz3kCKiuKRDOgG/1acPootLpnFu2hE1p7dQoVECK4Qb+DjHo4+4O44fUADSDQ=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.7.3</title>
             <pubDate>Sat, 26 Sep 2026 22:47:02 +0200</pubDate>
             <sparkle:version>20260926.5</sparkle:version>
