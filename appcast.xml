@@ -9,6 +9,23 @@
     <language>en</language>
 
     <item>
+            <title>0.7.2</title>
+            <pubDate>Sat, 26 Sep 2026 22:23:57 +0200</pubDate>
+            <sparkle:version>20260926.4</sparkle:version>
+            <sparkle:shortVersionString>0.7.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Fixes
+
+- **Add Connection window** — the setup sheet in **Settings → Connection** could grow much wider than the Settings window, cutting off the product choice, labels and descriptions. It now fits the window, with the descriptions wrapping as they should.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash_v0.7.2.zip" length="8308035" type="application/octet-stream" sparkle:edSignature="MeATQ6JBaoX4in8elXBkL8BV7leXtIztB0GyDLJLuJlltY/3shWXp9AeVbwYiZOwq+yPLo2gcbClj4am4rlICA=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="470254" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="gW1F42y1EJjCltz24iyM5N5UQqP+GkxVLzf9abKzuexNaP+//KUb8h0FmIX9ygRi5Kz+jLmFftQhmPequW9nAw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4553998" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="VD2yjuOShVh9nKg4eZqpkfygUZp7Tjc+BY42qFU1Ls0T1DP/0sKPVuPPF0ZN2NLUdLeqTtLdWl3JK23qA1izDg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260527.13.delta" sparkle:deltaFrom="20260527.13" length="4851034" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Nkorh//vt8ayH72fhmZPif7xmOj69u5EQih/HKVtI8tG/VjOCcIC73SR9TY6X/UNtiszJWTzS9nGpOtNY3U9Dw=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.7.1</title>
             <pubDate>Sat, 26 Sep 2026 21:57:06 +0200</pubDate>
             <sparkle:version>20260926.3</sparkle:version>
