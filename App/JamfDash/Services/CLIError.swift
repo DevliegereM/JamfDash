@@ -76,6 +76,10 @@ struct JamfCLIErrorPayload: Decodable, Equatable {
         case "permission_denied":
             text = "The API client doesn't have permission for this."
             if hint == nil, !detail.isEmpty { text += "\n\n" + detail }
+        case "unsupported":
+            // jamf-cli refuses Jamf Pro commands the Platform gateway doesn't publish (exit 8).
+            text = "This isn't available through the Jamf Platform API. Use a Jamf Pro connection (an API client or local admin account for your Jamf Pro instance) for this."
+            return text
         case "authentication":
             text = "Authentication failed" + (detail.isEmpty ? "." : ": " + detail)
         default:

@@ -7,6 +7,12 @@ struct SecurityReport: Sendable {
     var osVersions: [OSVersionRow] = []
     var devices: [DeviceSecurity] = []
 
+    init(summary: SecuritySummary?, osVersions: [OSVersionRow], devices: [DeviceSecurity]) {
+        self.summary = summary
+        self.osVersions = osVersions
+        self.devices = devices
+    }
+
     init(from envelopes: [SecurityEnvelope]) {
         for envelope in envelopes {
             switch envelope.section {
@@ -121,5 +127,78 @@ struct SecurityEnvelope: Decodable, Sendable {
             self.osVersionRow = nil
             self.device = nil
         }
+    }
+}
+
+// MARK: - Building the report from computer inventory
+
+extension SecurityReport {
+    private struct InventoryPage: Decodable { let results: [InventoryComputer] }
+
+    private struct InventoryComputer: Decodable {
+        struct General: Decodable { let name: String? }
+        struct Hardware: Decodable { let serialNumber: String? }
+        struct OS: Decodable { let version: String?; let fileVault2Status: String? }
+        struct Security: Decodable { let sipStatus: String?; let gatekeeperStatus: String?; let firewallEnabled: Bool? }
+        struct DiskEncryption: Decodable {
+            struct Boot: Decodable { let partitionFileVault2State: String? }
+            let bootPartitionEncryptionDetails: Boot?
+        }
+        let general: General?
+        let hardware: Hardware?
+        let operatingSystem: OS?
+        let security: Security?
+        let diskEncryption: DiskEncryption?
+    }
+
+    /// Builds the same report `jamf-cli pro report security` produces, from
+    /// `pro computers-inventory list` output (a bare array or `{"results": [...]}`).
+    init(inventory data: Data) throws {
+        let decoder = JSONDecoder()
+        let computers: [InventoryComputer]
+        if let array = try? decoder.decode([InventoryComputer].self, from: data) {
+            computers = array
+        } else {
+            computers = try decoder.decode(InventoryPage.self, from: data).results
+        }
+
+        let devices = computers.map { c -> DeviceSecurity in
+            let partition = c.diskEncryption?.bootPartitionEncryptionDetails?.partitionFileVault2State?.uppercased()
+            let osStatus = c.operatingSystem?.fileVault2Status?.uppercased()
+            let encrypted = partition == "ENCRYPTED" || osStatus == "ALL_ENCRYPTED" || osStatus == "BOOT_ENCRYPTED"
+            return DeviceSecurity(
+                name: c.general?.name ?? "",
+                serial: c.hardware?.serialNumber ?? "",
+                osVersion: c.operatingSystem?.version ?? "",
+                filevault: encrypted ? "ENCRYPTED" : "NOT_ENCRYPTED",
+                gatekeeper: c.security?.gatekeeperStatus?.uppercased() ?? "NOT_COLLECTED",
+                sip: c.security?.sipStatus?.uppercased() ?? "NOT_COLLECTED",
+                firewall: c.security?.firewallEnabled ?? false
+            )
+        }
+
+        let total = devices.count
+        func pct(_ n: Int) -> String {
+            total == 0 ? "0.0%" : String(format: "%.1f%%", Double(n) * 100 / Double(total))
+        }
+        let fv = devices.filter(\.isFilevaultEncrypted).count
+        let gk = devices.filter(\.isGatekeeperEnabled).count
+        let sip = devices.filter(\.isSIPEnabled).count
+        let fw = devices.filter(\.firewall).count
+        let summary = SecuritySummary(
+            totalDevices: total,
+            filevaultEncrypted: fv, filevaultEncryptedPct: pct(fv),
+            gatekeeperEnabled: gk, gatekeeperEnabledPct: pct(gk),
+            sipEnabled: sip, sipEnabledPct: pct(sip),
+            firewallEnabled: fw, firewallEnabledPct: pct(fw)
+        )
+
+        let counts = Dictionary(grouping: devices.map(\.osVersion).filter { !$0.isEmpty }, by: { $0 }).mapValues(\.count)
+        let osVersions = counts
+            .sorted { $0.value != $1.value ? $0.value > $1.value
+                                            : $0.key.compare($1.key, options: .numeric) == .orderedDescending }
+            .map { OSVersionRow(osVersion: $0.key, count: $0.value, pct: pct($0.value)) }
+
+        self.init(summary: summary, osVersions: osVersions, devices: devices)
     }
 }

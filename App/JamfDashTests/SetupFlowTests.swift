@@ -258,3 +258,57 @@ final class JamfCLIErrorPayloadTests: XCTestCase {
                        "jamf-cli exited with code 1: boom")
     }
 }
+
+// MARK: - Security report fallback and gateway-refused commands
+
+final class GatewayCompatibilityTests: XCTestCase {
+    func testSecurityReportFromInventory() throws {
+        let json = #"""
+        {"totalCount": 3, "results": [
+          {"general": {"name": "Mac-1"}, "hardware": {"serialNumber": "S1"},
+           "operatingSystem": {"version": "15.6"},
+           "security": {"sipStatus": "ENABLED", "gatekeeperStatus": "APP_STORE_AND_IDENTIFIED_DEVELOPERS", "firewallEnabled": true},
+           "diskEncryption": {"bootPartitionEncryptionDetails": {"partitionFileVault2State": "ENCRYPTED"}}},
+          {"general": {"name": "Mac-2"}, "hardware": {"serialNumber": "S2"},
+           "operatingSystem": {"version": "15.6", "fileVault2Status": "NOT_ENCRYPTED"},
+           "security": {"sipStatus": "DISABLED", "gatekeeperStatus": "DISABLED", "firewallEnabled": false},
+           "diskEncryption": {"bootPartitionEncryptionDetails": {"partitionFileVault2State": "UNENCRYPTED"}}},
+          {"general": {"name": "Mac-3"}, "hardware": {"serialNumber": "S3"},
+           "operatingSystem": {"version": "26.0", "fileVault2Status": "ALL_ENCRYPTED"},
+           "security": {"sipStatus": "ENABLED", "gatekeeperStatus": "APP_STORE", "firewallEnabled": true}}
+        ]}
+        """#
+        let report = try SecurityReport(inventory: Data(json.utf8))
+        XCTAssertEqual(report.devices.map(\.serial), ["S1", "S2", "S3"])
+        XCTAssertEqual(report.devices.map(\.isFilevaultEncrypted), [true, false, true])
+        XCTAssertEqual(report.devices.map(\.hasIssue), [false, true, false])
+        let s = try XCTUnwrap(report.summary)
+        XCTAssertEqual(s.totalDevices, 3)
+        XCTAssertEqual(s.filevaultEncrypted, 2)
+        XCTAssertEqual(s.filevaultEncryptedPct, "66.7%")
+        XCTAssertEqual(s.sipEnabled, 2)
+        XCTAssertEqual(s.gatekeeperEnabled, 2)
+        XCTAssertEqual(s.firewallEnabled, 2)
+        XCTAssertEqual(report.osVersions.map(\.osVersion), ["15.6", "26.0"])
+        XCTAssertEqual(report.osVersions.first?.pct, "66.7%")
+    }
+
+    func testSecurityReportFromBareArray() throws {
+        let report = try SecurityReport(inventory: Data(#"[{"hardware": {"serialNumber": "S1"}}]"#.utf8))
+        XCTAssertEqual(report.devices.count, 1)
+        XCTAssertEqual(report.summary?.totalDevices, 1)
+    }
+
+    func testDetectsMissingV4InventoryEndpoint() {
+        let stderr = #"{"error": "not_found", "exitCode": 4, "exitCodeName": "not_found", "hint": "run the matching 'list' command to see valid IDs/names", "message": "fetching computer inventory: fetching page 0: resource not found (HTTP 404): GET /pro/v4/computers-inventory?section=GENERAL"}"#
+        XCTAssertTrue(SecurityRepository.isMissingInventoryEndpoint(stderr))
+        XCTAssertFalse(SecurityRepository.isMissingInventoryEndpoint(#"{"error": "not_found", "message": "policy 12 not found"}"#))
+        XCTAssertFalse(SecurityRepository.isMissingInventoryEndpoint("plain failure"))
+    }
+
+    func testGatewayRefusedCommandMessage() {
+        let stderr = #"{"error": "unsupported", "exitCode": 8, "exitCodeName": "unsupported", "hint": "auth-method platform against the gateway, from profile \"Jamf Platform\"", "message": "jamf-cli pro computer-inventory lock is not part of the Jamf Platform gateway's published API"}"#
+        XCTAssertEqual(CLIError.nonZeroExit(code: 8, stderr: stderr).localizedDescription,
+                       "This isn't available through the Jamf Platform API. Use a Jamf Pro connection (an API client or local admin account for your Jamf Pro instance) for this.")
+    }
+}

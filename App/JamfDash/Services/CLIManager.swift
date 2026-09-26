@@ -8,6 +8,9 @@ enum CLICommand: Sendable {
     // MARK: Jamf Pro — data fetching
     case overview
     case securityReport
+    /// Inventory with the sections needed to build a security report locally —
+    /// the fallback when `pro report security` hits the gateway's missing /v4 endpoint.
+    case securityInventory
     case policies
     case smartComputerGroups
     case categories
@@ -218,6 +221,7 @@ enum CLICommand: Sendable {
         // Jamf Pro — data
         case .overview:             return ["pro", "overview", "-o", "json"]
         case .securityReport:       return ["pro", "report", "security", "-o", "json"]
+        case .securityInventory:    return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "SECURITY", "--section", "DISK_ENCRYPTION", "-o", "json"]
         case .policies:             return ["pro", "classic-policies", "list", "-o", "json"]
         case .smartComputerGroups:  return ["pro", "smart-computer-groups", "list", "-o", "json"]
         case .categories:           return ["pro", "categories", "list", "-o", "json"]
@@ -413,7 +417,7 @@ enum CLICommand: Sendable {
 
     var timeout: TimeInterval {
         switch self {
-        case .securityReport, .computers, .erase, .lock(_, _),
+        case .securityReport, .securityInventory, .computers, .erase, .lock(_, _),
              .mobileDeviceList, .mobileDeviceErase, .mobileDeviceLock,
              .bulkAddToGroup, .bulkRemoveFromGroup, .bulkSendCommand,
              .bulkEnablePolicies, .bulkDisablePolicies,
