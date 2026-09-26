@@ -916,7 +916,12 @@ actor CLIManager: CLIRunning {
 
     /// Runs jamf-cli with the selected profile. If the profile still points at the retired
     /// Platform gateway, its URL is updated to the one jamf-cli names and the call is retried once.
-    private func runJamfCLI(_ commandArgs: [String], timeout: TimeInterval, allowGatewayFix: Bool = true) async throws -> Data {
+    private func runJamfCLI(
+        _ commandArgs: [String],
+        timeout: TimeInterval,
+        allowGatewayFix: Bool = true,
+        allowTokenRefresh: Bool = true
+    ) async throws -> Data {
         let profile = profileService.selectedProfile
         let args = profile.isDefault ? commandArgs : ["--profile", profile.name] + commandArgs
         logger.debug("Running: jamf-cli \(args.joined(separator: " "), privacy: .private)")
@@ -937,10 +942,34 @@ actor CLIManager: CLIRunning {
             guard (try? migrateRetiredGateway(profile: profile, to: newURL)) == true else {
                 throw CLIError.nonZeroExit(code: code, stderr: message)
             }
-            return try await runJamfCLI(commandArgs, timeout: timeout, allowGatewayFix: false)
+            return try await runJamfCLI(commandArgs, timeout: timeout, allowGatewayFix: false,
+                                        allowTokenRefresh: allowTokenRefresh)
+        } catch CLIError.nonZeroExit(let code, let message)
+            where allowTokenRefresh && JamfCLIErrorPayload(output: message)?.isPermissionDenied == true {
+            // jamf-cli caches Platform gateway tokens, and a token keeps the permissions it was
+            // issued with. After permissions are granted in Jamf Account, get a fresh token once.
+            guard await refreshPlatformToken(profile: profile) else {
+                throw CLIError.nonZeroExit(code: code, stderr: message)
+            }
+            return try await runJamfCLI(commandArgs, timeout: timeout, allowGatewayFix: false,
+                                        allowTokenRefresh: false)
         } catch {
             logger.error("jamf-cli failed: \(error.localizedDescription, privacy: .public)")
             throw error
+        }
+    }
+
+    /// Forces a new Platform gateway token exchange. Returns false for non-platform profiles
+    /// (jamf-cli refuses the command) or when the exchange fails. The token is discarded.
+    private func refreshPlatformToken(profile: JamfProfile) async -> Bool {
+        let args = (profile.isDefault ? [] : ["--profile", profile.name]) + ["platform", "auth", "token", "--refresh"]
+        do {
+            _ = try await executor.execute(binary: binaryURL, arguments: args,
+                                           environment: Self.minimalEnvironment(), timeout: 30)
+            logger.notice("Refreshed the Platform token after a permission error; retrying once")
+            return true
+        } catch {
+            return false
         }
     }
 

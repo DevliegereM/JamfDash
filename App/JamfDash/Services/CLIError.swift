@@ -68,6 +68,8 @@ struct JamfCLIErrorPayload: Decodable, Equatable {
 
     private var kind: String { exitCodeName ?? error ?? "" }
 
+    var isPermissionDenied: Bool { kind == "permission_denied" }
+
     /// A sentence for the UI, with the hint on its own paragraph.
     var readableMessage: String {
         let detail = message.map(Self.clean) ?? ""
