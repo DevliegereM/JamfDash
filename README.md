@@ -46,6 +46,23 @@ Jamf Dash guides you through a step-by-step onboarding flow on first launch:
 
 ![Auth method](Images/JamfDashWelcome4.png)
 
+### Jamf Pro — Platform API (recommended)
+
+> **Recommended: Jamf Platform API (environment level).** The only connection that shows every section, including Blueprints and Compliance Benchmarks. Create the API integration at the *platform environment* level in Jamf Account, not for a single tenant — a tenant-level integration can't read Blueprints or Compliance Benchmarks.
+>
+> *Device actions (lock, restart, recovery lock, …) aren't available through the Platform API yet. Jamf is still expanding it, so more will become available over time. Until then, add a Jamf Pro API client connection for device actions.*
+
+1. Sign in to [**account.jamf.com**](https://account.jamf.com)
+2. Create an API integration at the **platform environment** level
+3. Give it read access, including *Deployment → Blueprints: Read* and *Compliance → Compliance Benchmarks: Read*
+4. Note the **Client ID** and **Environment ID**, and generate a **Client Secret** (shown only once)
+
+In Jamf Dash, go to **Settings → Connection → Add Connection**, choose **Platform API**, and pick your **Region** (US, EU or APAC), **Environment ID**, the Client ID and Client Secret, and a profile name.
+
+Jamf Dash checks what the active connection can read: when a connection can't load Blueprints or Compliance Benchmarks, they are greyed out with the reason. Profiles created with the retired `*.apigw.jamf.com` gateway are moved to the new `https://<region>.api.jamfcloud.com` gateway automatically the first time Jamf Dash uses them.
+
+> Local Jamf Pro accounts (used by the **Local Admin** option below) are deprecated for cloud-hosted Jamf Pro, with removal expected in the second half of 2027.
+
 ### Jamf Pro — Local Admin Account
 
 If your instance has local admin accounts enabled, enter your server URL, admin username, and password. Jamf Dash will automatically create a dedicated API client.
@@ -59,23 +76,6 @@ If your instance uses SSO or has local admin accounts disabled, create an API cl
 3. Create an **API Client**, assign the role, and save the **Client ID** and **Client Secret** (shown only once)
 
 Then enter the server URL, Client ID, and Client Secret in Jamf Dash.
-
-### Jamf Pro — Platform API
-
-The Platform API is Jamf's gateway API for Jamf Pro and the wider Jamf platform.
-
-> **Blueprints and Compliance Benchmarks** are only available through the Platform API, and only to an API integration created at the **platform environment** level with *Deployment → Blueprints: Read* and *Compliance → Compliance Benchmarks: Read*. A tenant-level integration is refused. Jamf Dash checks the active connection and greys these two out, with the reason, when it can't read them.
-
-1. Sign in to [**account.jamf.com**](https://account.jamf.com)
-2. Create an API client — preferably at the **platform environment** level (a group of tenants), or for a single **tenant**
-3. Note the **Client ID** and generate a **Client Secret** (shown only once)
-4. Copy the **Environment ID** (or **Tenant ID**) of the level you created the client at
-
-In Jamf Dash, go to **Settings → Connection → Add Connection**, choose **Platform API**, and pick your **Region** (US, EU or APAC), the level the client was created at, its ID, the Client ID and Client Secret, and a profile name.
-
-Profiles created with the retired `*.apigw.jamf.com` gateway are moved to the new `https://<region>.api.jamfcloud.com` gateway automatically the first time Jamf Dash uses them.
-
-> **Recommendation:** Use Platform API instead of SSO / Client Credentials when possible — it gives access to the full Jamf platform surface, including features not available through the classic Jamf Pro API.
 
 ### Jamf Protect
 

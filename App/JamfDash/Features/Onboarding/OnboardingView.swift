@@ -237,7 +237,7 @@ private struct AuthMethodStep: View {
                     AuthMethodCard(
                         title: "Platform API",
                         badge: "Recommended",
-                        description: "Access Blueprints, Compliance Benchmarks & DDM Reports via the Jamf Platform Gateway",
+                        description: "The only connection that shows every section, including Blueprints and Compliance Benchmarks. Create the API integration at the platform environment level in Jamf Account. Device actions aren't available through the Platform API yet.",
                         icon: "globe",
                         action: { vm.chooseAuthMethod(.platform) }
                     )
@@ -464,9 +464,13 @@ private struct PlatformSetupStep: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Before continuing:")
                         .fontWeight(.medium)
-                    Label("Go to **account.jamf.com → API Clients**", systemImage: "1.circle.fill")
-                    Label("Create an API Client and note the **Client ID**", systemImage: "2.circle.fill")
-                    Label("Generate a **Client Secret** (shown only once)", systemImage: "3.circle.fill")
+                    Label("Go to **account.jamf.com** and create an API integration at the **platform environment** level — not for a single tenant", systemImage: "1.circle.fill")
+                    Label("Give it read access, including **Deployment → Blueprints** and **Compliance → Compliance Benchmarks**", systemImage: "2.circle.fill")
+                    Label("Note the **Client ID** and **Environment ID**, and generate a **Client Secret** (shown only once)", systemImage: "3.circle.fill")
+                    Text("Device actions (lock, restart, recovery lock, …) aren't available through the Platform API yet — Jamf is still expanding it, so more will become available over time. Until then, add a Jamf Pro API client connection for device actions.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
                 }
                 .font(.callout)
                 .frame(maxWidth: .infinity, alignment: .leading)

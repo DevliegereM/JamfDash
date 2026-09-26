@@ -43,7 +43,7 @@ struct HelpView: View {
                         Text("Open Settings → Connection and click the **+** button. Choose your Jamf product (Pro, Protect, or School) and enter the required credentials. Each connection is stored securely in the system keychain by jamf-cli and appears as a named profile.")
                     }
                     HelpItem(heading: "Jamf Pro — Platform API") {
-                        Text("Platform API unlocks Blueprints and Compliance Benchmarks. Choose **Platform API** when adding a connection and pick your **Region**, then enter the **Environment ID** (or **Tenant ID**), **Client ID**, and **Client Secret** from account.jamf.com.")
+                        Text("**Recommended.** The Platform API is the only connection that shows every section, including Blueprints and Compliance Benchmarks. In account.jamf.com, create the API integration at the **platform environment** level — a tenant-level integration can't read Blueprints or Compliance Benchmarks. Then choose **Platform API** when adding a connection, pick your **Region**, and enter the **Environment ID**, **Client ID**, and **Client Secret**.\n\nDevice actions (lock, restart, recovery lock, …) aren't available through the Platform API yet — Jamf is still expanding it, so more will become available over time. Until then, add a Jamf Pro API client connection for device actions.")
                     }
                     HelpItem(heading: "Switching profiles") {
                         Text("If you have multiple Jamf environments (e.g., dev and production), add a connection for each. Then use the **Active Profile** picker to choose which environment Jamf Dash queries. Click **Save** to apply the change — all data views will reload automatically.")

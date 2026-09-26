@@ -11,7 +11,7 @@ final class SettingsViewModel {
     // MARK: - Product & Setup Method
     var selectedProduct: JamfProduct = .pro
     enum SetupMethod { case localAccount, sso, platform }
-    var setupMethod = SetupMethod.localAccount
+    var setupMethod = SetupMethod.platform
 
     // Pro — local account fields
     var serverURLText = ""

@@ -240,7 +240,7 @@ private struct AddConnectionSheet: View {
     private var proForm: some View {
         VStack(spacing: 16) {
             Picker("Authentication", selection: $vm.setupMethod) {
-                Text("Platform API").tag(SettingsViewModel.SetupMethod.platform)
+                Text("Platform API (recommended)").tag(SettingsViewModel.SetupMethod.platform)
                 Text("Local Admin").tag(SettingsViewModel.SetupMethod.localAccount)
                 Text("SSO").tag(SettingsViewModel.SetupMethod.sso)
             }
@@ -248,10 +248,15 @@ private struct AddConnectionSheet: View {
 
             switch vm.setupMethod {
             case .platform:
-                Text("Routes all Pro API traffic through the Jamf Platform Gateway. Requires API client credentials from account.jamf.com.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recommended: the only connection that shows every section, including Blueprints and Compliance Benchmarks. Create the API integration at the **platform environment** level in account.jamf.com, not for a single tenant.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Text("Device actions (lock, restart, recovery lock, …) aren't available through the Platform API yet — Jamf is still expanding it, so more will become available over time. Until then, add a Jamf Pro API client connection for device actions.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 platformForm
             case .localAccount:
                 Text("Uses your admin credentials to automatically create a dedicated API client in Jamf Pro.")
