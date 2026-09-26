@@ -181,7 +181,7 @@ struct DDMMonitorView: View {
 
 // MARK: - Fleet Overview
 
-private struct DDMFleetStatusView: View {
+struct DDMFleetStatusView: View {
     @Bindable var vm: DDMMonitorViewModel
 
     var body: some View {
@@ -192,7 +192,9 @@ private struct DDMFleetStatusView: View {
                     Divider()
                 }
                 fleetTable(stats)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
 

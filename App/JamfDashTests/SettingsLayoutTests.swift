@@ -79,4 +79,75 @@ final class SettingsLayoutTests: XCTestCase {
         await vm.readiness.load()
         _ = snapshot(UpdateReadinessView(vm: vm.readiness), size: NSSize(width: 1000, height: 700), name: "update-readiness")
     }
+
+    // MARK: - Minimum size: a view's minimum size is what a window is forced to grow to
+
+    private func minimumSize<V: View>(_ view: V) -> NSSize {
+        let host = NSHostingView(rootView: view)
+        return host.fittingSize
+    }
+
+    func testDDMViewsDoNotForceTallWindows() async {
+        let vm = DDMMonitorViewModel(cli: DemoCLIManager())
+        await vm.readiness.load()
+        await vm.loadFleetStatus()
+        await vm.load()
+        let readiness = minimumSize(UpdateReadinessView(vm: vm.readiness))
+        let status = minimumSize(DDMDeviceStatusTableView(vm: vm))
+        let fleet = minimumSize(DDMFleetStatusView(vm: vm))
+        print("MINSIZE readiness=\(readiness) status=\(status) fleet=\(fleet)")
+        XCTAssertLessThanOrEqual(readiness.height, 500, "Update Readiness forces a \(Int(readiness.height)) pt tall window")
+        XCTAssertLessThanOrEqual(status.height, 500)
+        XCTAssertLessThanOrEqual(fleet.height, 500)
+    }
+
+    func testDDMFleetOverviewRenders() async {
+        let vm = DDMMonitorViewModel(cli: DemoCLIManager())
+        await vm.loadFleetStatus()
+        await vm.load()
+        _ = snapshot(DDMFleetStatusView(vm: vm), size: NSSize(width: 1000, height: 700), name: "ddm-fleet-overview")
+    }
+
+    // MARK: - Real window sizing
+
+    /// Puts the view in an off-screen window at 1000×700 and returns the window's content
+    /// size and minimum size after SwiftUI has laid it out.
+    private func windowSizes<V: View>(_ view: V) -> (content: NSSize, min: NSSize) {
+        let controller = NSHostingController(rootView: view)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 700),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = controller
+        window.setContentSize(NSSize(width: 1000, height: 700))
+        window.layoutIfNeeded()
+        controller.view.layoutSubtreeIfNeeded()
+        return (window.contentLayoutRect.size, window.contentMinSize)
+    }
+
+    func testUpdateReadinessKeepsWindowSize() async {
+        let vm = DDMMonitorViewModel(cli: DemoCLIManager())
+        await vm.readiness.load()
+        vm.readiness.filter = .all
+        let sizes = windowSizes(UpdateReadinessView(vm: vm.readiness))
+        print("WINDOW readiness content=\(sizes.content) min=\(sizes.min) rows=\(vm.readiness.filteredRows.count)")
+        XCTAssertLessThanOrEqual(sizes.content.height, 700, "Update Readiness grew the window to \(Int(sizes.content.height)) pt")
+        XCTAssertLessThanOrEqual(sizes.min.height, 500)
+    }
+
+    func testDDMMonitorViewsKeepWindowSize() async {
+        let vm = DDMMonitorViewModel(cli: DemoCLIManager())
+        await vm.load()
+        await vm.loadFleetStatus()
+        await vm.readiness.load()
+        let cases: [(String, AnyView)] = [
+            ("monitor", AnyView(DDMMonitorView(vm: vm))),
+            ("status-items", AnyView(DDMDeviceStatusTableView(vm: vm))),
+            ("fleet", AnyView(DDMFleetStatusView(vm: vm))),
+        ]
+        for (name, view) in cases {
+            let sizes = windowSizes(view)
+            print("WINDOW \(name) content=\(sizes.content) min=\(sizes.min)")
+            XCTAssertLessThanOrEqual(sizes.min.height, 500, "\(name) forces a \(Int(sizes.min.height)) pt tall window")
+            XCTAssertLessThanOrEqual(sizes.min.width, 1000, "\(name) forces a \(Int(sizes.min.width)) pt wide window")
+        }
+    }
 }

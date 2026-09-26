@@ -28,10 +28,10 @@ struct UpdateReadinessView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            // Fill the remaining height so the header stays at the top.
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Fill the remaining height so the header stays at the top; the table scrolls.
+            .frame(maxWidth: .infinity, minHeight: 200, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(minWidth: 760, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - Header
@@ -54,15 +54,22 @@ struct UpdateReadinessView: View {
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 180)
             }
+            // Header texts are capped at a few lines (full text in the tooltip). Letting them
+            // grow freely made SwiftUI size them at the narrowest width, which forced the
+            // window to become thousands of points tall.
             ForEach(vm.notes, id: \.self) { note in
                 Label(note, systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                    .help(note)
+                    .textSelection(.enabled)
             }
             Text("On macOS 27 the MDM software update commands, the Software Update payload and restriction-based deferrals are removed — only DDM software update declarations (Jamf Pro Managed Software Update plans / Blueprints) work.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(2)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
