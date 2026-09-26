@@ -9,6 +9,26 @@
     <language>en</language>
 
     <item>
+            <title>0.7.3</title>
+            <pubDate>Sat, 26 Sep 2026 22:47:02 +0200</pubDate>
+            <sparkle:version>20260926.5</sparkle:version>
+            <sparkle:shortVersionString>0.7.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Fixes
+
+- **Add Connection window** — the setup sheet in **Settings → Connection** could grow much wider than the Settings window, cutting off the product choice, labels and descriptions. It now fits the window, with the descriptions wrapping as they should.
+- **DDM Monitor → Status Items and Update Readiness** — the content no longer starts halfway down the window.
+- **DDM Monitor → Fleet Overview** — shows an empty state instead of a format error when there is no DDM declaration data.
+- **AI Assistant with Private Cloud Compute** — if Private Cloud Compute fails to answer, Dashie now switches that chat to the on-device model and answers anyway, instead of showing an internal error.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash_v0.7.3.zip" length="8319589" type="application/octet-stream" sparkle:edSignature="zOdB3TuugWJzirhjRhSLshAqgygGYfOv1x9t8LhDuwFwHOe2YL3jCeqoJ+K1Sg9SZlkn/rNjxXi4M/hlSf2uDg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="723234" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="3nogfDWOks2oG1kPqy1Icku57haAXGsmw//gX5/48N8B3sifkASeQcFPYrzHShHfxsCmuL6gbGBhWVETJ51OAQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="739710" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="KYHNA1kUes3ilz4rdOw7zNPsXX3k4hT8d7PziflOiQNTj0PReEF+81tN13gFif0Un3Pfunhob38bK7rihi0GCA=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4569322" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="BoOCZx0cwPQL9dQdH/lYq491DDIbAHjwUT64OIqMQUGRYzHbFDMgT1fzqutWRLeTHCmtwFjLTt0SN65q76qhAA=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.7.2</title>
             <pubDate>Sat, 26 Sep 2026 22:23:57 +0200</pubDate>
             <sparkle:version>20260926.4</sparkle:version>
