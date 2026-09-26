@@ -281,7 +281,7 @@ private struct DDMCoverageBar: View {
 
 // MARK: - Status items across devices
 
-private struct DDMDeviceStatusTableView: View {
+struct DDMDeviceStatusTableView: View {
     @Bindable var vm: DDMMonitorViewModel
 
     var body: some View {
@@ -305,8 +305,12 @@ private struct DDMDeviceStatusTableView: View {
             .padding(.vertical, 8)
             .background(.regularMaterial)
             Divider()
+            // Fill the remaining height; otherwise the whole stack shrinks to fit and is
+            // centred, leaving empty space above the filter bar.
             content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder

@@ -1,6 +1,9 @@
 #if canImport(FoundationModels)
 import Foundation
 import FoundationModels
+import OSLog
+
+private let sessionLogger = Logger(subsystem: "com.jamfdash", category: "AIAssistant")
 
 @available(macOS 26, *)
 extension AIAssistantViewModel {
@@ -17,9 +20,9 @@ extension AIAssistantViewModel {
     /// Creates the chat session. On macOS 27+ with the opt-in setting on (default off) and
     /// Private Cloud Compute available, uses the PCC model; otherwise the on-device model
     /// exactly as on macOS 26.
-    private func makeSession(instructions: String) -> LanguageModelSession {
+    private func makeSession(instructions: String, allowPrivateCloudCompute: Bool = true) -> LanguageModelSession {
         let tools = Self.tools(cli: cli)
-        if #available(macOS 27, *), AIAssistantSettings.usePrivateCloudCompute {
+        if #available(macOS 27, *), allowPrivateCloudCompute, AIAssistantSettings.usePrivateCloudCompute {
             let pcc = PrivateCloudComputeLanguageModel()
             if pcc.isAvailable {
                 usesPrivateCloudCompute = true
@@ -89,6 +92,20 @@ extension AIAssistantViewModel {
     // Lower temperature → more factual, deterministic answers for fleet management.
     private static let generationOptions = GenerationOptions(temperature: 0.4)
 
+    /// If a reply fails while Private Cloud Compute is in use, switches this chat to the
+    /// on-device model and asks again once. Returns true when it did so.
+    private func fallBackToOnDevice(prompt: String, error: Error, assistantIdx: Int?) async -> Bool {
+        guard usesPrivateCloudCompute else { return false }
+        let ns = error as NSError
+        sessionLogger.error("Private Cloud Compute request failed — \(String(describing: error), privacy: .public) [domain \(ns.domain, privacy: .public), code \(ns.code, privacy: .public), userInfo \(String(describing: ns.userInfo), privacy: .private)] — falling back to the on-device model")
+        if let idx = assistantIdx { messages.remove(at: idx) }
+        _session = makeSession(instructions: Self.systemPrompt, allowPrivateCloudCompute: false)
+        messages.append(Message(role: .assistant,
+            content: "Private Cloud Compute didn't respond, so this chat now uses the on-device model."))
+        await stream(prompt: prompt, retrying: true)
+        return true
+    }
+
     private func stream(prompt: String, retrying: Bool) async {
         var assistantIdx: Int? = nil
 
@@ -114,6 +131,7 @@ extension AIAssistantViewModel {
             await stream(prompt: prompt, retrying: true)
             return
         } catch where Self.os27ErrorMessage(for: error) != nil {
+            if await fallBackToOnDevice(prompt: prompt, error: error, assistantIdx: assistantIdx) { return }
             appendError(Self.os27ErrorMessage(for: error) ?? "", at: &assistantIdx)
         } catch let error as LanguageModelSession.GenerationError {
             if case .exceededContextWindowSize = error, !retrying {
@@ -122,11 +140,14 @@ extension AIAssistantViewModel {
                 await stream(prompt: prompt, retrying: true)
                 return
             }
+            if await fallBackToOnDevice(prompt: prompt, error: error, assistantIdx: assistantIdx) { return }
             appendError(generationErrorMessage(error), at: &assistantIdx)
         } catch let nsError as NSError
                 where nsError.domain.contains("GenerationError") || nsError.domain.contains("FoundationModels") {
             // The framework sometimes bridges unknown error codes as NSError rather than the
             // typed Swift enum. Code -1 is a generic internal failure.
+            if await fallBackToOnDevice(prompt: prompt, error: nsError, assistantIdx: assistantIdx) { return }
+            sessionLogger.error("Foundation Models error — domain \(nsError.domain, privacy: .public), code \(nsError.code, privacy: .public)")
             let text: String
             switch nsError.code {
             case -1:
@@ -136,6 +157,7 @@ extension AIAssistantViewModel {
             }
             appendError(text, at: &assistantIdx)
         } catch {
+            if await fallBackToOnDevice(prompt: prompt, error: error, assistantIdx: assistantIdx) { return }
             appendError("Error: \(error.localizedDescription)", at: &assistantIdx)
         }
 

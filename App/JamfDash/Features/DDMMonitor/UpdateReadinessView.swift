@@ -21,13 +21,17 @@ struct UpdateReadinessView: View {
                 } else {
                     HSplitView {
                         table
-                            .frame(minWidth: 480)
+                            .frame(minWidth: 480, maxHeight: .infinity)
                         detail
-                            .frame(minWidth: 260, idealWidth: 320, maxWidth: 420)
+                            .frame(minWidth: 260, idealWidth: 320, maxWidth: 420, maxHeight: .infinity)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+            // Fill the remaining height so the header stays at the top.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - Header
