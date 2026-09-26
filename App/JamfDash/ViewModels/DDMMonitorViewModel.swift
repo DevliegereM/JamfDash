@@ -253,7 +253,15 @@ final class DDMMonitorViewModel {
         deviceStatusState = .loaded(rows.sorted { $0.device.name.localizedCaseInsensitiveCompare($1.device.name) == .orderedAscending })
     }
 
-    nonisolated private static func decodeFleetStatus(from data: Data) throws -> [DDMDeclarationStat] {
+    /// jamf-cli prints nothing on stdout (and "No DDM declaration data found." on stderr)
+    /// when there is no data, so empty output means an empty list, not a format error.
+    nonisolated static func isEmptyOutput(_ data: Data) -> Bool {
+        let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty || text == "null"
+    }
+
+    nonisolated static func decodeFleetStatus(from data: Data) throws -> [DDMDeclarationStat] {
+        if isEmptyOutput(data) { return [] }
         let decoder = JSONDecoder()
         if let stats = try? decoder.decode([DDMDeclarationStat].self, from: data) {
             return stats
@@ -272,6 +280,7 @@ final class DDMMonitorViewModel {
     }
 
     nonisolated static func decodeStatusItems(from data: Data) throws -> [DDMStatusItem] {
+        if isEmptyOutput(data) { return [] }
         let decoder = JSONDecoder()
         // {"statusItems": [...]}
         if let r = try? decoder.decode(DDMStatusItemResponse.self, from: data) {
