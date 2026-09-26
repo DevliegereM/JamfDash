@@ -62,7 +62,9 @@ Then enter the server URL, Client ID, and Client Secret in Jamf Dash.
 
 ### Jamf Pro — Platform API
 
-The Platform API unlocks **Blueprints** and **Compliance Benchmarks**.
+The Platform API is Jamf's gateway API for Jamf Pro and the wider Jamf platform.
+
+> **Blueprints and Compliance Benchmarks are currently unavailable.** jamf-cli only serves them through the Platform API, and the Platform API doesn't grant them at the moment, so Jamf Dash shows them greyed out.
 
 1. Sign in to [**account.jamf.com**](https://account.jamf.com)
 2. Create an API client — preferably at the **platform environment** level (a group of tenants), or for a single **tenant**
@@ -230,10 +232,10 @@ Cross-checks your Jamf Pro environment against a built-in set of security and hy
 **Settings Inspector**
 Browse all Jamf Pro settings endpoints exposed by `jamf-cli` in a searchable two-pane layout — settings category list on the left, raw structured output on the right. Useful for auditing configuration values without opening the Jamf Pro web console.
 
-**Blueprints** *(requires Platform API)*
+**Blueprints** *(currently unavailable — see below)*
 Browse all DDM (Declarative Device Management) blueprints. Select any blueprint to see a structured detail view: deployment state badge, last deployment timestamp, scope, and the complete applied settings. The **Scope** section lists the exact device group and device names the blueprint is deployed to. Each declaration card humanises the type identifier (e.g. `com.jamf.ddm.passcode-settings` → **Passcode Settings**), renders all payload keys as readable label/value rows, and displays booleans as checkmark/cross icons.
 
-**Compliance Benchmarks** *(requires Platform API)*
+**Compliance Benchmarks** *(currently unavailable — see below)*
 List all configured compliance benchmarks. Select a benchmark to view its name, status badge, framework version, and rule summary. The **Applied To** section shows which device groups, devices, users, and user groups the benchmark is scoped to. Rules are grouped into **Active** and **Inactive** sections; expand any rule row to read its full description and remediation guidance inline.
 
 ---

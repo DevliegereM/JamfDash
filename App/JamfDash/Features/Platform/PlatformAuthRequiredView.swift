@@ -80,3 +80,30 @@ struct PlatformAuthRequiredView: View {
         }
     }
 }
+
+/// Shown instead of Blueprints / Compliance Benchmarks, which currently can't be loaded
+/// with either connection type: jamf-cli only serves them through the Jamf Platform API,
+/// and the Platform API doesn't grant them at the moment.
+struct PlatformAPIUnavailableView: View {
+    let featureName: String
+    let systemImage: String
+    let usesPlatformAPI: Bool
+
+    static func tooltip(usesPlatformAPI: Bool) -> String {
+        usesPlatformAPI ? "Currently unavailable with the Platform API"
+                        : "Requires a Jamf Platform API connection"
+    }
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(Self.tooltip(usesPlatformAPI: usesPlatformAPI), systemImage: systemImage)
+        } description: {
+            if usesPlatformAPI {
+                Text("\(featureName) can't be loaded through a Jamf Platform API connection at the moment.")
+            } else {
+                Text("jamf-cli only offers \(featureName) through the Jamf Platform API, and that is currently unavailable too.")
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

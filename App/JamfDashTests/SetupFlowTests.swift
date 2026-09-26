@@ -306,6 +306,12 @@ final class GatewayCompatibilityTests: XCTestCase {
         XCTAssertFalse(SecurityRepository.isMissingInventoryEndpoint("plain failure"))
     }
 
+    func testPlatformOnlyCommandOnInstanceProfileMessage() {
+        let stderr = #"{"error": "unsupported", "exitCode": 8, "exitCodeName": "unsupported", "message": "jamf-cli pro blueprints list is served by the Jamf Platform API, which the active credentials do not reach\n\nThe resolved credentials authenticate against a Jamf Pro instance (auth-method oauth2, from profile \"Jamf-CLI - SSO\").\n\nSet one up with `jamf-cli platform setup`, then re-run with -p \u003cthat profile\u003e."}"#
+        XCTAssertEqual(CLIError.nonZeroExit(code: 8, stderr: stderr).localizedDescription,
+                       "This needs a Jamf Platform API connection. Add one in Settings → Connection.")
+    }
+
     func testGatewayRefusedCommandMessage() {
         let stderr = #"{"error": "unsupported", "exitCode": 8, "exitCodeName": "unsupported", "hint": "auth-method platform against the gateway, from profile \"Jamf Platform\"", "message": "jamf-cli pro computer-inventory lock is not part of the Jamf Platform gateway's published API"}"#
         XCTAssertEqual(CLIError.nonZeroExit(code: 8, stderr: stderr).localizedDescription,

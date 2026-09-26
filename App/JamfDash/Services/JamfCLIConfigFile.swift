@@ -50,14 +50,23 @@ struct JamfCLIConfigFile: Sendable {
     // MARK: - Profile url
 
     func profileURL(_ name: String) throws -> String? {
+        try field("url", ofProfile: name)
+    }
+
+    /// `oauth2`, `token` or `platform`.
+    func authMethod(ofProfile name: String) throws -> String? {
+        try field("auth-method", ofProfile: name)
+    }
+
+    private func field(_ key: String, ofProfile name: String) throws -> String? {
         let lines = try readLines()
-        guard let i = try urlLineIndex(for: name, in: lines) else { return nil }
+        guard let i = try fieldLineIndex(key, for: name, in: lines) else { return nil }
         return Self.scalar(String(lines[i].split(separator: ":", maxSplits: 1)[1]))
     }
 
     func setURL(_ newURL: String, forProfile name: String) throws {
         var lines = try readLines()
-        guard let i = try urlLineIndex(for: name, in: lines) else { throw EditError.urlLineNotFound(name) }
+        guard let i = try fieldLineIndex("url", for: name, in: lines) else { throw EditError.urlLineNotFound(name) }
         let indent = lines[i].prefix { $0 == " " }
         lines[i] = "\(indent)url: \(newURL)"
         try write(lines)
@@ -65,8 +74,8 @@ struct JamfCLIConfigFile: Sendable {
 
     // MARK: - Parsing
 
-    /// Index of the `url:` line inside the profile's block under `profiles:`.
-    private func urlLineIndex(for name: String, in lines: [String]) throws -> Int? {
+    /// Index of the `<key>:` line inside the profile's block under `profiles:`.
+    private func fieldLineIndex(_ key: String, for name: String, in lines: [String]) throws -> Int? {
         guard let profilesLine = lines.firstIndex(where: { $0.hasPrefix("profiles:") }) else {
             throw EditError.profileNotFound(name)
         }
@@ -81,13 +90,13 @@ struct JamfCLIConfigFile: Sendable {
             if indent == 0 { break }                       // left the profiles map
             if entryIndent == nil { entryIndent = indent }
             if indent == entryIndent, Self.key(of: line) == name {
-                // Scan this profile's block for `url:`.
+                // Scan this profile's block for `<key>:`.
                 var j = i + 1
                 while j < lines.count {
                     let child = lines[j]
                     let trimmed = child.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty, !trimmed.hasPrefix("#"), Self.indent(of: child) <= indent { break }
-                    if trimmed.hasPrefix("url:") { return j }
+                    if trimmed.hasPrefix(key + ":") { return j }
                     j += 1
                 }
                 return nil

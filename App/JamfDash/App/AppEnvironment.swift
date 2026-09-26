@@ -179,6 +179,7 @@ final class AppEnvironment {
 
         self.currentProduct = profileService.currentProduct
         IntentCLIProvider.current = cliManager
+        refreshActiveProfileAuth()
     }
 
     // MARK: - Demo init
@@ -405,6 +406,22 @@ final class AppEnvironment {
 
     func loadProfiles() async {
         availableProfiles = await keychain.jamfCLIProfiles()
+        refreshActiveProfileAuth()
+    }
+
+    // MARK: - Active profile auth
+
+    /// True when the active jamf-cli profile authenticates through the Jamf Platform API
+    /// gateway (`auth-method: platform`). Features the gateway doesn't offer check this.
+    private(set) var activeProfileUsesPlatformAPI = false
+
+    func refreshActiveProfileAuth() {
+        guard !isDemoMode else { activeProfileUsesPlatformAPI = false; return }
+        let config = JamfCLIConfigFile(url: JamfCLIConfigFile.standardURL)
+        let selected = profileService.selectedProfile.name
+        let name = selected.isEmpty ? ((try? config.defaultProfile()) ?? "") : selected
+        let method = name.isEmpty ? nil : (try? config.authMethod(ofProfile: name)) ?? nil
+        activeProfileUsesPlatformAPI = method == "platform"
     }
 
     // MARK: - Instance switching
@@ -421,6 +438,7 @@ final class AppEnvironment {
 
         profileService.selectedProfile = JamfProfile(name: profileName)
         currentProduct = profileService.currentProduct
+        refreshActiveProfileAuth()
         isSwitchingProfile = true
         switchError = nil
 
@@ -434,6 +452,7 @@ final class AppEnvironment {
                 Self.logger.error("Instance switch failed for \(profileName, privacy: .private): \(error)")
                 profileService.selectedProfile = previousProfile
                 currentProduct = previousProduct
+                refreshActiveProfileAuth()
                 switchError = Self.connectionErrorMessage(for: error, profile: profileName)
             }
             isSwitchingProfile = false

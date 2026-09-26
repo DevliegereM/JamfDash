@@ -5,7 +5,18 @@ struct ComplianceBenchmarksView: View {
     @Bindable var vm: PlatformViewModel
     @State private var refreshTask: Task<Void, Never>? = nil
 
+    @Environment(AppEnvironment.self) private var env
+
     var body: some View {
+        if SidebarItem.platformFeaturesAvailable {
+            content
+        } else {
+            PlatformAPIUnavailableView(featureName: "Compliance Benchmarks", systemImage: "checkmark.shield",
+                                       usesPlatformAPI: env.activeProfileUsesPlatformAPI)
+        }
+    }
+
+    private var content: some View {
         Group {
             switch vm.complianceBenchmarksState {
             case .idle:

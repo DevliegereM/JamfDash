@@ -79,9 +79,15 @@ struct JamfCLIErrorPayload: Decodable, Equatable {
             text = "The API client doesn't have permission for this."
             if hint == nil, !detail.isEmpty { text += "\n\n" + detail }
         case "unsupported":
-            // jamf-cli refuses Jamf Pro commands the Platform gateway doesn't publish (exit 8).
-            text = "This isn't available through the Jamf Platform API. Use a Jamf Pro connection (an API client or local admin account for your Jamf Pro instance) for this."
-            return text
+            // jamf-cli refuses a command before sending it (exit 8) when the profile's API
+            // doesn't offer it — in either direction.
+            if detail.contains("gateway's published API") {
+                return "This isn't available through the Jamf Platform API. Use a Jamf Pro connection (an API client or local admin account for your Jamf Pro instance) for this."
+            }
+            if detail.localizedCaseInsensitiveContains("platform setup") || (hint ?? "").localizedCaseInsensitiveContains("platform setup") {
+                return "This needs a Jamf Platform API connection. Add one in Settings → Connection."
+            }
+            return detail.components(separatedBy: "\n\n").first ?? detail
         case "authentication":
             text = "Authentication failed" + (detail.isEmpty ? "." : ": " + detail)
         default:
