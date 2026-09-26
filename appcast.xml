@@ -9,6 +9,54 @@
     <language>en</language>
 
     <item>
+            <title>0.7</title>
+            <pubDate>Sat, 26 Sep 2026 20:23:19 +0200</pubDate>
+            <sparkle:version>20260926.1</sparkle:version>
+            <sparkle:shortVersionString>0.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## New Features
+
+- **Update Readiness (macOS 27)** — macOS 27 removes the legacy MDM software update commands and the software update deferral restrictions; updates are now managed declaratively only. Update Readiness checks every Mac against that change (OS version, DDM enabled, Managed Software Update plans, reported update status, and installed profiles that still carry deferral or Software Update payloads) and gives each Mac a readiness level with the reason and what to change. Available as a new mode in **DDM Monitor** and as a section in **Device Lookup**.
+- **DDM Monitor — Status Items** — a new mode that shows every DDM device in one table, with sortable and filterable columns for the status items reported by the device (enrollment type, awaiting configuration, Lockdown Mode, and more). The per-device panel adds a summary card and tags keys introduced in OS 27.
+- **Declaration coverage** — the DDM **Fleet Overview** now shows how many devices are DDM-enabled compared to your inventory, and the overall succeeded / failed / pending rate.
+- **OS 27 deprecation audit** — the **Audit Dashboard** flags configuration profiles that use payloads removed or deprecated in macOS 27 (Software Update payload, update deferral restrictions, `com.apple.applicationaccess.new`, `com.apple.AssetCache.managed`, DNS settings / DNS proxy / relay) and names the declaration that replaces each. The detail sheet lists every affected profile.
+- **Jamf Security Cloud** — connect Jamf Security Cloud from **Settings → Security Cloud** to get a **Security Cloud** section: all devices with user, risk level, OS, connector and deployment state, and last seen time, with search, OS filter and a detail inspector.
+- **Shortcuts & Siri** — three read-only actions for Shortcuts, Spotlight and Siri: **Get Fleet Compliance**, **Get Devices Needing Updates** and **Get DDM Declaration Failures**.
+
+## AI Assistant (Dashie)
+
+- Every management action except blank push now asks for confirmation before anything is sent, including running a policy, renewing the MDM profile and flushing failed commands. The confirmation is a sheet on the window instead of a blocking dialog.
+- On macOS 27, Dashie measures how full its context window is and summarises the conversation before it runs out, instead of waiting for an error.
+- Optional **Private Cloud Compute** model for a larger context window (**Settings → AI**). Off by default; Dashie falls back to the on-device model when it is unavailable.
+
+## Security
+
+- Every `jamf-cli` binary must now be signed with JAMF Software's Developer ID (Team ID `483DWKW443`), in addition to the existing SHA-256 checksum check. The signature is verified when a version is downloaded, when you switch or roll back versions, and before it runs. A binary that fails the check is never executed.
+- `jamf-cli` now runs in a separate helper process (**JamfDashCLIWorker**, an XPC service inside the app). The helper only accepts requests from Jamf Dash and only runs signed `jamf-cli` binaries from Jamf Dash's own folder. To run it in-process for troubleshooting: `defaults write be.devliegere.JamfDash UseInProcessCLI -bool YES`.
+- Serial numbers are now escaped when used in inventory searches.
+
+## Improvements & Fixes
+
+- **Lock (with PIN)** now sends the PIN you enter. Previously the lock command was sent without it.
+- A `jamf-cli` call that times out is now reported as a timeout. Previously it could return partial data as if the call had succeeded.
+- **DDM Monitor** shows *Endpoint Not Supported* when your Jamf Pro version no longer serves a DDM endpoint, instead of an empty list.
+- Jamf Security Cloud requests stop retrying after 5 rate-limited attempts, and an expired session is refreshed automatically.
+- Destructive actions in **Device Lookup** use a standard confirmation dialog.
+- New **Verbose Unified Logging** toggle in **Settings** to capture all log levels for the `com.jamfdash` subsystem without installing a configuration profile.
+- Smaller updates: Jamf Dash now downloads delta updates of only what changed since your installed version, instead of the full app.
+
+## macOS 27 Compatibility
+
+Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contextSizeExceeded` on macOS 27; the deprecated `exceededContextWindowSize` is still handled on macOS 26. macOS 14 Sonoma remains the minimum.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7/JamfDash_v0.7.zip" length="8138355" type="application/octet-stream" sparkle:edSignature="s7h/bFhxtsBKS7OLxD8PylYy8Hd002LdFKxVUg2hOTlUh+Ws+iOVbjeKGFIxfihU7KJF60P/3JmiGc5HhjMKDQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7/JamfDash20260926.1-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4388246" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="iH7YQepBsAB2DOt3UxSNnfCubIzBk029a0bYHDLmUkLuIpWk1Si4bSPD2fo00VibPQkdgsV4yOpVtrlqjpIzBg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7/JamfDash20260926.1-20260527.13.delta" sparkle:deltaFrom="20260527.13" length="4692938" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1RiMKRqYS3amICv02XCs93C7WpzFDo5gWkPXlLfrFd272aNbxZ9gfOvmFr4w7LUyyBAJG6cp20UL7Sr612X6AQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7/JamfDash20260926.1-20260517.15.delta" sparkle:deltaFrom="20260517.15" length="4721382" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="jvtSGrfZL0Gk+WXzQfJC+p6TyrmrYgLlSrVHaDdicwVI+qG9811IL5I1EVLX0nIZWuphn8G8CEbT99LV+1phCQ=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
       <title>Version 0.6</title>
       <sparkle:releaseNotesLink>https://github.com/DevliegereM/JamfDash/releases/tag/v0.6</sparkle:releaseNotesLink>
       <sparkle:version>20260614.21</sparkle:version>
