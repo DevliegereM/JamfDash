@@ -81,27 +81,31 @@ struct PlatformAuthRequiredView: View {
     }
 }
 
-/// Shown instead of Blueprints / Compliance Benchmarks, which currently can't be loaded
-/// with either connection type: jamf-cli only serves them through the Jamf Platform API,
-/// and the Platform API doesn't grant them at the moment.
+/// Shown instead of Blueprints / Compliance Benchmarks when the active profile can't load them.
 struct PlatformAPIUnavailableView: View {
     let featureName: String
     let systemImage: String
-    let usesPlatformAPI: Bool
+    /// Jamf Account permission the integration needs, e.g. "Deployment → Blueprints: Read".
+    let permission: String
+    let access: AppEnvironment.PlatformFeatureAccess
 
-    static func tooltip(usesPlatformAPI: Bool) -> String {
-        usesPlatformAPI ? "Currently unavailable with the Platform API"
-                        : "Requires a Jamf Platform API connection"
+    static func tooltip(for access: AppEnvironment.PlatformFeatureAccess) -> String {
+        switch access {
+        case .requiresPlatformAPI: return "Requires a Jamf Platform API connection"
+        case .noPermission:        return "Not available to this Platform API connection"
+        case .checking, .available: return ""
+        }
     }
 
     var body: some View {
         ContentUnavailableView {
-            Label(Self.tooltip(usesPlatformAPI: usesPlatformAPI), systemImage: systemImage)
+            Label(Self.tooltip(for: access), systemImage: systemImage)
         } description: {
-            if usesPlatformAPI {
-                Text("\(featureName) can't be loaded through a Jamf Platform API connection at the moment.")
-            } else {
-                Text("jamf-cli only offers \(featureName) through the Jamf Platform API, and that is currently unavailable too.")
+            switch access {
+            case .noPermission:
+                Text("This API integration can't read \(featureName). In Jamf Account, create an API integration at the **platform environment** level with **\(permission)**, and add it in Settings → Connection as a Platform API connection with its Environment ID.")
+            default:
+                Text("jamf-cli offers \(featureName) only through the Jamf Platform API. Switch to a Platform API connection with the profile picker at the bottom of the sidebar.")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

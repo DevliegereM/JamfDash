@@ -8,11 +8,12 @@ struct ComplianceBenchmarksView: View {
     @Environment(AppEnvironment.self) private var env
 
     var body: some View {
-        if SidebarItem.platformFeaturesAvailable {
+        switch env.access(for: .complianceBenchmarks) {
+        case .available, .checking:
             content
-        } else {
+        case let access:
             PlatformAPIUnavailableView(featureName: "Compliance Benchmarks", systemImage: "checkmark.shield",
-                                       usesPlatformAPI: env.activeProfileUsesPlatformAPI)
+                                       permission: "Compliance → Compliance Benchmarks: Read", access: access)
         }
     }
 

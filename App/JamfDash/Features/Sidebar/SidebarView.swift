@@ -162,15 +162,6 @@ enum SidebarItem: String, Identifiable {
         }
     }
 
-    /// Features jamf-cli only serves through the Jamf Platform API.
-    var isPlatformFeature: Bool {
-        self == .blueprints || self == .complianceBenchmarks
-    }
-
-    /// Blueprints and Compliance Benchmarks can't currently be loaded with any connection:
-    /// jamf-cli refuses them on a Jamf Pro instance profile (Platform-only), and the
-    /// Platform API gateway doesn't grant them. Flip to true once the gateway does.
-    static let platformFeaturesAvailable = false
 
     static func items(for product: JamfProduct) -> [SidebarItem] {
         switch product {
@@ -218,10 +209,11 @@ struct SidebarView: View {
             ($0 != .securityCloud || hasJSC)
         }
         List(items, selection: $selection) { item in
-            let unavailable = item.isPlatformFeature && !SidebarItem.platformFeaturesAvailable
+            let access = env.access(for: item)
+            let unavailable = access == .requiresPlatformAPI || access == .noPermission
             Label(item.title, systemImage: item.icon)
                 .opacity(unavailable ? 0.4 : 1)
-                .help(unavailable ? PlatformAPIUnavailableView.tooltip(usesPlatformAPI: env.activeProfileUsesPlatformAPI) : "")
+                .help(PlatformAPIUnavailableView.tooltip(for: access))
                 .selectionDisabled(unavailable)
                 .tag(item)
         }

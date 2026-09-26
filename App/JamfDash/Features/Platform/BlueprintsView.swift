@@ -8,11 +8,12 @@ struct BlueprintsView: View {
     @Environment(AppEnvironment.self) private var env
 
     var body: some View {
-        if SidebarItem.platformFeaturesAvailable {
+        switch env.access(for: .blueprints) {
+        case .available, .checking:
             content
-        } else {
+        case let access:
             PlatformAPIUnavailableView(featureName: "Blueprints", systemImage: "square.3.layers.3d",
-                                       usesPlatformAPI: env.activeProfileUsesPlatformAPI)
+                                       permission: "Deployment → Blueprints: Read", access: access)
         }
     }
 

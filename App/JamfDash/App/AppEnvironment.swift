@@ -416,12 +416,84 @@ final class AppEnvironment {
     private(set) var activeProfileUsesPlatformAPI = false
 
     func refreshActiveProfileAuth() {
-        guard !isDemoMode else { activeProfileUsesPlatformAPI = false; return }
+        guard !isDemoMode else {
+            activeProfileUsesPlatformAPI = false
+            blueprintsAccess = .available
+            benchmarksAccess = .available
+            return
+        }
         let config = JamfCLIConfigFile(url: JamfCLIConfigFile.standardURL)
         let selected = profileService.selectedProfile.name
         let name = selected.isEmpty ? ((try? config.defaultProfile()) ?? "") : selected
         let method = name.isEmpty ? nil : (try? config.authMethod(ofProfile: name)) ?? nil
         activeProfileUsesPlatformAPI = method == "platform"
+        probePlatformFeatures(profile: selected)
+    }
+
+    // MARK: - Platform-only features
+
+    /// Whether Blueprints / Compliance Benchmarks can be loaded with the active profile.
+    /// jamf-cli only serves them through the Platform API, and only integrations with the
+    /// right Jamf Account permissions (in practice: created at platform-environment level)
+    /// can read them — so each Platform profile is checked with one list call.
+    enum PlatformFeatureAccess: Equatable {
+        case checking
+        case available
+        case requiresPlatformAPI
+        case noPermission
+    }
+
+    private(set) var blueprintsAccess: PlatformFeatureAccess = .checking
+    private(set) var benchmarksAccess: PlatformFeatureAccess = .checking
+    private var probedProfile: String?
+    private var probeTask: Task<Void, Never>?
+
+    func access(for item: SidebarItem) -> PlatformFeatureAccess {
+        switch item {
+        case .blueprints:           return blueprintsAccess
+        case .complianceBenchmarks: return benchmarksAccess
+        default:                    return .available
+        }
+    }
+
+    private func probePlatformFeatures(profile: String) {
+        guard activeProfileUsesPlatformAPI else {
+            probeTask?.cancel()
+            probedProfile = nil
+            blueprintsAccess = .requiresPlatformAPI
+            benchmarksAccess = .requiresPlatformAPI
+            return
+        }
+        guard probedProfile != profile else { return }   // already checked (or checking)
+        probeTask?.cancel()
+        probedProfile = profile
+        blueprintsAccess = .checking
+        benchmarksAccess = .checking
+        let cli = cliManager
+        probeTask = Task { [weak self] in
+            async let bp = Self.probe(cli, .blueprints)
+            async let cb = Self.probe(cli, .complianceBenchmarks)
+            let (bpAccess, cbAccess) = await (bp, cb)
+            guard let self, !Task.isCancelled, self.probedProfile == profile else { return }
+            self.blueprintsAccess = bpAccess
+            self.benchmarksAccess = cbAccess
+        }
+    }
+
+    /// Only a permission refusal disables a feature; any other failure (network, timeout)
+    /// leaves it enabled so the view shows the real error when it loads.
+    private nonisolated static func probe(_ cli: CLIManager, _ command: CLICommand) async -> PlatformFeatureAccess {
+        do {
+            _ = try await cli.run(command)
+            return .available
+        } catch CLIError.nonZeroExit(_, let stderr) {
+            guard let payload = JamfCLIErrorPayload(output: stderr) else { return .available }
+            if payload.isPermissionDenied { return .noPermission }
+            if payload.exitCodeName == "unsupported" || payload.error == "unsupported" { return .requiresPlatformAPI }
+            return .available
+        } catch {
+            return .available
+        }
     }
 
     // MARK: - Instance switching
