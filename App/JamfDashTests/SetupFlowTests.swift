@@ -225,3 +225,36 @@ final class SetupFlowTests: XCTestCase {
         XCTAssertTrue(err.contains("did not write"), err)
     }
 }
+
+// MARK: - jamf-cli error payloads
+
+final class JamfCLIErrorPayloadTests: XCTestCase {
+    func testPermissionDeniedShowsHint() {
+        let stderr = #"""
+        {
+          "error": "permission_denied",
+          "exitCode": 5,
+          "exitCodeName": "permission_denied",
+          "hint": "grant the Jamf Platform API integration these permissions in Jamf Account: Deployment > Blueprints: Read (blueprints:read).",
+          "message": "list: API request failed with status 403 Forbidden, traceId 2025d7dbb066da562c97bbe44ba845b5 (method=GET, url=https://us.api.jamfcloud.com/blueprints/v1/blueprints?page=0&page-size=100): [BAD_PERMISSIONS] The given token was not authorized to access the requested resource."
+        }
+        """#
+        let text = CLIError.nonZeroExit(code: 5, stderr: stderr).localizedDescription
+        XCTAssertEqual(text, """
+        The API client doesn't have permission for this.
+
+        Grant the Jamf Platform API integration these permissions in Jamf Account: Deployment > Blueprints: Read (blueprints:read).
+        """)
+    }
+
+    func testAuthenticationErrorAfterPromptText() {
+        let stderr = #"Client ID: Client Secret: Verifying credentials... ✗ {"error": "authentication", "exitCode": 3, "exitCodeName": "authentication", "message": "getting auth token: invalid client credentials"}"#
+        XCTAssertEqual(CLIError.nonZeroExit(code: 3, stderr: stderr).localizedDescription,
+                       "Authentication failed: getting auth token: invalid client credentials")
+    }
+
+    func testPlainOutputFallsBack() {
+        XCTAssertEqual(CLIError.nonZeroExit(code: 1, stderr: "boom").localizedDescription,
+                       "jamf-cli exited with code 1: boom")
+    }
+}

@@ -23,6 +23,9 @@ extension CLIError: LocalizedError {
         case .launchFailed(let msg):
             return "Failed to launch jamf-cli: \(msg)"
         case .nonZeroExit(let code, let stderr):
+            if let readable = JamfCLIErrorPayload(output: stderr)?.readableMessage {
+                return readable
+            }
             return "jamf-cli exited with code \(code): \(stderr.isEmpty ? "no output" : stderr)"
         case .decodingFailed(let msg):
             return "Failed to parse CLI output: \(msg)"
@@ -43,5 +46,57 @@ extension CLIError: LocalizedError {
         case .untrustedBinary(let reason):
             return "jamf-cli failed its code signature check and was not run: \(reason). Reinstall it from Settings → CLI."
         }
+    }
+}
+
+/// The JSON error jamf-cli prints on failure, e.g.
+/// `{"error": "permission_denied", "exitCode": 5, "hint": "…", "message": "…"}`.
+/// Anything before the JSON (prompts, progress lines) is ignored.
+struct JamfCLIErrorPayload: Decodable, Equatable {
+    let error: String?
+    let exitCodeName: String?
+    let message: String?
+    let hint: String?
+
+    init?(output: String) {
+        guard let start = output.firstIndex(of: "{"), let end = output.lastIndex(of: "}"), start < end,
+              let payload = try? JSONDecoder().decode(Self.self, from: Data(output[start...end].utf8)),
+              payload.message != nil || payload.hint != nil
+        else { return nil }
+        self = payload
+    }
+
+    private var kind: String { exitCodeName ?? error ?? "" }
+
+    /// A sentence for the UI, with the hint on its own paragraph.
+    var readableMessage: String {
+        let detail = message.map(Self.clean) ?? ""
+        var text: String
+        switch kind {
+        case "permission_denied":
+            text = "The API client doesn't have permission for this."
+            if hint == nil, !detail.isEmpty { text += "\n\n" + detail }
+        case "authentication":
+            text = "Authentication failed" + (detail.isEmpty ? "." : ": " + detail)
+        default:
+            text = detail.isEmpty ? "jamf-cli failed (\(kind))." : detail
+        }
+        if let hint, !hint.isEmpty {
+            text += "\n\n" + Self.capitalizedFirst(hint)
+        }
+        return text
+    }
+
+    /// Drops the request plumbing jamf-cli appends to API errors (trace IDs, method/URL).
+    private static func clean(_ message: String) -> String {
+        var m = message
+        for pattern in [#",?\s*traceId [0-9a-f]+"#, #"\s*\(method=[A-Z]+, url=[^)]*\)"#] {
+            m = m.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
+        }
+        return m.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func capitalizedFirst(_ s: String) -> String {
+        s.prefix(1).uppercased() + s.dropFirst()
     }
 }
