@@ -9,6 +9,28 @@
     <language>en</language>
 
     <item>
+            <title>0.8.2</title>
+            <pubDate>Sun, 27 Sep 2026 16:46:57 +0200</pubDate>
+            <sparkle:version>20260927.5</sparkle:version>
+            <sparkle:shortVersionString>0.8.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## New Help
+
+- **Rebuilt Help window** (Help → Jamf Dash Help, ⌘?) — five tabs: **Get Started**, **Jamf Pro**, **Protect & School**, **Dashie** and **Troubleshooting**, each with topics grouped in sections. Topics are written as tasks ("Add a connection", "Fix “doesn't have permission” errors") with numbered steps, notes and related topics.
+- **Search everything** — the search field in the Help sidebar searches every tab at once.
+- **Help menu search** — type in the Help menu's search field and matching help topics appear next to menu items.
+- **Open from Help** — topics about a section have an **Open …** button that takes you straight there.
+- **Ask Dashie** — Dashie now answers questions about Jamf Dash itself ("How do I turn on automatic updates?", "Why are Blueprints greyed out?") from the same help, and tells you where to find things.
+- **Up to date** — the help covers everything added in 0.8 and 0.8.1 and fixes outdated descriptions.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash_v0.8.2.zip" length="8844818" type="application/octet-stream" sparkle:edSignature="U83CCGoAQLrs/aL50B7K5iyq887bvMIbltjQIBPHwzhe0Yy5Yz/BrjUpMOL0iujyODwyQJ9MHaSxfz0pau41AQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="1027434" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="zzOFE/FbJWhWD0b3ql0G8O62MzsGgDe0NB2PFb67M+yY2s4hQPSxfnYrDyagi0xUi8g21DZ+6oCAaQDqlOLVBw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="1125498" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="t3MW4oV7FPHlKjbNdR2nChcZig53NlAb3ecLLWRuHr6UGBCbOX+JEXG2lI3HhXM8ZWuMx+kvDugbLYtAs1WnAg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1787990" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ZK3gm+pHCSCclIBrQy5kvrUckzkFDq2goVLLhPYAv0+YLfRflPL0OzUXW+qAaxFjpLi1OIDuNcIWrISNJynpDg=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.8.1</title>
             <pubDate>Sun, 27 Sep 2026 13:28:14 +0200</pubDate>
             <sparkle:version>20260927.2</sparkle:version>
