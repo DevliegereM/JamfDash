@@ -1128,6 +1128,8 @@ private struct DeveloperTab: View {
     @State private var debugService = DebugLoggingService.shared
     @State private var showExportSuccess = false
     @State private var exportHours = 4
+    @State private var showTerminalCommands = false
+    @State private var showReadingLogs = false
 
     var body: some View {
         Form {
@@ -1178,6 +1180,7 @@ private struct DeveloperTab: View {
             } footer: {
                 Text("In Console.app filter by: subsystem == \"com.jamfdash\". Without this toggle only errors and faults are persisted; debug and info messages are discarded.")
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // MARK: Log Export
@@ -1237,13 +1240,16 @@ private struct DeveloperTab: View {
             } footer: {
                 Text("Exports recent unified log entries for JamfDash to a .log file. Enable verbose logging first to capture debug-level entries, reproduce the issue, then export.")
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // MARK: Pre-launch activation
             Section {
+                DisclosureGroup(isExpanded: $showTerminalCommands) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Enable before first launch (Terminal)")
-                        .fontWeight(.medium)
+                    Text("Use these to enable logging before Jamf Dash starts, or to watch logs live.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     terminalCommandRow(
                         label: "Install config plist:",
                         command: #"mkdir -p ~/Library/Preferences/Logging/Subsystems && printf '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>DEFAULT-OPTIONS</key><dict><key>level</key><string>debug</string></dict></dict></plist>' > ~/Library/Preferences/Logging/Subsystems/com.jamfdash.plist"#
@@ -1273,17 +1279,21 @@ private struct DeveloperTab: View {
                         label: "Remove config plist:",
                         command: "rm ~/Library/Preferences/Logging/Subsystems/com.jamfdash.plist"
                     )
+                    Text("The config file is read by macOS when Jamf Dash starts, so it also captures startup. Once installed (here or with the toggle above) it stays active for every launch until removed.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
+                } label: {
+                    Label("Terminal commands", systemImage: "terminal")
+                }
             } header: {
-                Text("Pre-launch Activation")
-            } footer: {
-                Text("The plist approach takes effect before your process's first line of code runs — the OS logging daemon reads it at process startup. Once installed via Terminal or the toggle above, it persists across all future launches automatically.")
-                    .foregroundStyle(.secondary)
+                Text("Advanced")
             }
 
             // MARK: How to read logs
             Section {
+                DisclosureGroup(isExpanded: $showReadingLogs) {
                 VStack(alignment: .leading, spacing: 10) {
                     instructionRow(
                         step: "1",
@@ -1309,11 +1319,13 @@ private struct DeveloperTab: View {
                         detail: "log stream --predicate 'subsystem == \"com.jamfdash\"' --level debug"
                     )
                 }
-                .padding(.vertical, 4)
-            } header: {
-                Text("How to Read Logs")
+                .padding(.vertical, 6)
+                } label: {
+                    Label("How to read logs in Console", systemImage: "list.bullet.rectangle")
+                }
             }
         }
+        .formStyle(.grouped)
     }
 
     @ViewBuilder
