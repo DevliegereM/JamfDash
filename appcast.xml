@@ -9,6 +9,51 @@
     <language>en</language>
 
     <item>
+            <title>0.8</title>
+            <pubDate>Sun, 27 Sep 2026 13:02:39 +0200</pubDate>
+            <sparkle:version>20260927.1</sparkle:version>
+            <sparkle:shortVersionString>0.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Dashie on macOS 27
+
+Dashie, the AI assistant, now runs entirely on Apple's on-device model and uses what macOS 27 adds to it.
+
+- **Screenshots** — attach, paste or drop an image (a Jamf Pro error, a Self Service message, a System Settings pane) and ask about it. The image is read on your Mac. Available on Macs whose model supports vision.
+- **Twice the room** — Dashie measures the model's context window (8,192 tokens on current Macs, up from 4,096) and gives tools proportionally more room for results.
+- **Long chats keep fitting** — before each turn, older tool results are shortened automatically; the two most recent stay complete. When a chat does need compacting, the summary now includes what the tools returned, and the conversation stays on screen.
+- **See what Dashie is doing** — the status shows the tool in use, such as "Checking compliance…" or "Searching the fleet index…".
+- **Fleet index** — after each sync Jamf Dash keeps a local keyword index of policy, configuration profile, script, package, smart group and Mac names, blueprint states, compliance results and recent daily digests. Ask "What do we have for FileVault?" or "What did the digest say about patches?". The index stays on your Mac (readable only by you), is never added to Spotlight, and is cleared when you switch to another Jamf instance.
+- **Better tool choices** — Dashie can now filter the Mac list (by name, macOS version or days since check-in), use two lookups in one answer, and calls action tools straight away so the confirmation dialog appears instead of a "shall I proceed?" question. Measured on a set of 22 admin questions, Dashie picks the right tool in 20 to 22 of them, up from 15.
+- **Apple Intelligence setup guide** — if Apple Intelligence is off, still downloading, set to an unsupported language, or not available on the Mac, Dashie shows step-by-step instructions with a button to the right System Settings pane, and opens by itself once the model is ready.
+- **Private Cloud Compute removed** — Apple only offers it to App Store apps, so it could never work in Jamf Dash and caused errors and a crash when switched on. Dashie is on-device only; your fleet data never leaves your Mac.
+
+## New Features
+
+- **Ask in plain language (Devices)** — type a question such as "Macs on macOS 14 not seen for two weeks" and press **Ask**. The on-device model turns it into filters shown as chips you can remove. Criteria the device list doesn't have (department, model, user) are named instead of guessed.
+- **Compliance results (Compliance Benchmarks)** — each benchmark now shows the fleet compliance score, which devices fail the most rules, and the rules with failures. Expand a rule to read its description and see the failing devices. Device names open **Device Lookup**. When most devices haven't reported results yet, Jamf Dash says so, because Jamf counts them as 0% and they pull the score down.
+- **Blueprint deployment status** — the Blueprints list and detail show each blueprint's state and how many devices succeeded, failed or are pending.
+- **App Installers** — deployments show the app icon, the target smart group and an **In Progress** count.
+
+## Improvements & Fixes
+
+- **Bulk disable policies** did not work: Jamf Dash passed an option jamf-cli doesn't have. Fixed, both in **Fleet & Config** and in Dashie. Dashie's confirmation now lists the matching policies, and a pattern that would match every policy (such as `*`) is refused.
+- **Daily digest** — built from readable summaries instead of raw data cut off mid-way, always three points, and a failed run no longer counts as today's digest, so it tries again on the next launch. Only the last 60 digests are kept.
+- Conversation summaries are no longer written to disk.
+- Compliance benchmarks show their name, sync state, "Update available" and the device groups they apply to.
+- Starting a new chat while Dashie is still answering no longer risks a crash.
+
+## Requirements
+
+macOS 14 Sonoma or later; Dashie and plain-language search need Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.31.1 or later. Compliance results and blueprint status need a Platform API connection at the platform environment level.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash_v0.8.zip" length="8738619" type="application/octet-stream" sparkle:edSignature="b7dLPeEjjsPLsr0NbE6lFGiUQWAfKSr5lK9atFjD0RFq2bBje0W7pAKZ+K0A4GlQuonyUS3eks1FB/M32pBWDQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1578358" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="TGqxDazoi4PfVmYnBgU8JE3RjXaw+PPUfHGcYT7Wt46s+V2jNPTOUaq6kCNTiJ+dYOKv6dkEPmLu6WHqL8opBw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="1589082" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="QSgmxpIP5qmnmCQ/xPaSQTxN/UlTscSQNKKNR05ldG7bvF3wVJgNYXFB7Wu5UCrP9d8jrhv+x2bXLluoYnF8Bw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="1595630" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="7NvGOGJy2EhFqZPfJlGaDNhPYoHeMZPCVZpG3YfjD8lq9bI8BNrH8PFVgQ0Yam+jXlOHwBN3yrG8Vs3lrHRiDw=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.7.4</title>
             <pubDate>Sat, 26 Sep 2026 23:07:24 +0200</pubDate>
             <sparkle:version>20260926.6</sparkle:version>
