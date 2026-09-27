@@ -16,6 +16,14 @@ struct OverviewItem: Codable, Sendable, Hashable, Identifiable {
         case val, data
     }
 
+    init(id: String? = nil, section: String, resource: String, value: String, status: String? = nil) {
+        self.id = id ?? "\(section)-\(resource)"
+        self.section = section
+        self.resource = resource
+        self.value = value
+        self.status = status
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
 

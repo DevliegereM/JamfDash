@@ -16,6 +16,9 @@ struct SettingsView: View {
             CLITab(vm: vm)
                 .tabItem { Label("CLI", systemImage: "terminal") }
 
+            UpdatesTab()
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
+
             BrandingTab(vm: vm)
                 .tabItem { Label("Branding", systemImage: "photo") }
 
@@ -34,6 +37,68 @@ struct SettingsView: View {
         .padding(20)
         .frame(minWidth: 620, minHeight: 520)
         .task { await vm.loadExisting() }
+    }
+}
+
+// MARK: - Updates
+
+/// Jamf Dash's own updates (Sparkle). jamf-cli updates are under the CLI tab.
+private struct UpdatesTab: View {
+    @State private var checksAutomatically = AppUpdater.shared.automaticallyChecks
+    @State private var installsAutomatically = AppUpdater.shared.automaticallyDownloads
+    @State private var lastCheck = AppUpdater.shared.lastCheck
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Check for updates automatically", isOn: $checksAutomatically)
+                    .onChange(of: checksAutomatically) { _, on in
+                        AppUpdater.shared.automaticallyChecks = on
+                        if !on {
+                            installsAutomatically = false
+                            AppUpdater.shared.automaticallyDownloads = false
+                        }
+                    }
+                Toggle("Download and install updates automatically", isOn: $installsAutomatically)
+                    .onChange(of: installsAutomatically) { _, on in
+                        AppUpdater.shared.automaticallyDownloads = on
+                    }
+                    .disabled(!checksAutomatically)
+            } header: {
+                Text("Jamf Dash Updates")
+            } footer: {
+                Text(checksAutomatically
+                     ? "Jamf Dash checks for a new version once a day and asks before installing it. With automatic install on, updates are downloaded in the background and installed when you quit Jamf Dash."
+                     : "Jamf Dash only checks when you choose Check for Updates.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                HStack {
+                    Button("Check for Updates Now") {
+                        AppUpdater.shared.checkForUpdates()
+                        lastCheck = AppUpdater.shared.lastCheck
+                    }
+                    Spacer()
+                    Text(lastCheck.map { "Last checked \($0.formatted(.relative(presentation: .named)))" } ?? "Not checked yet")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                LabeledContent("Installed version", value: Self.installedVersion)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            checksAutomatically = AppUpdater.shared.automaticallyChecks
+            installsAutomatically = AppUpdater.shared.automaticallyDownloads
+            lastCheck = AppUpdater.shared.lastCheck
+        }
+    }
+
+    private static var installedVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
     }
 }
 

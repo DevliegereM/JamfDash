@@ -22,6 +22,24 @@ final class AppUpdater: NSObject {
     func checkForUpdates() {
         controller.checkForUpdates(nil)
     }
+
+    private var updater: SPUUpdater { controller.updater }
+
+    /// Checks the appcast once a day in the background and offers new versions.
+    /// On by default (SUEnableAutomaticChecks); the user's choice is stored by Sparkle.
+    var automaticallyChecks: Bool {
+        get { updater.automaticallyChecksForUpdates }
+        set { updater.automaticallyChecksForUpdates = newValue }
+    }
+
+    /// Also downloads updates in the background and installs them when the app quits.
+    var automaticallyDownloads: Bool {
+        get { updater.automaticallyDownloadsUpdates }
+        set { updater.automaticallyDownloadsUpdates = newValue }
+    }
+
+    var lastCheck: Date? { updater.lastUpdateCheckDate }
+    var canCheck: Bool { updater.canCheckForUpdates }
 }
 
 // MARK: - Sparkle delegate (logging only)

@@ -13,10 +13,28 @@ struct ProNotification: Decodable, Identifiable, Sendable {
     let message: String
     let severity: String?
     let expirationDate: String?
+    /// What the alert is about, when Jamf Pro names it in `params` (e.g. a patch title).
+    let subject: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, type, message, severity
+        case id, type, message, severity, params
         case expirationDate, expiration_date, expiresAt, expires_at, expirationUtcDateTime
+    }
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    private static func subject(in params: KeyedDecodingContainer<AnyKey>) -> String? {
+        for key in ["name", "title", "softwareTitleName", "displayName", "objectName"] {
+            if let k = AnyKey(stringValue: key), let v = try? params.decode(String.self, forKey: k), !v.isEmpty {
+                return v
+            }
+        }
+        return nil
     }
 
     init(from decoder: Decoder) throws {
@@ -32,6 +50,7 @@ struct ProNotification: Decodable, Identifiable, Sendable {
                       ?? (try? c.decode(String.self, forKey: .expiresAt))
                       ?? (try? c.decode(String.self, forKey: .expires_at))
                       ?? (try? c.decode(String.self, forKey: .expirationUtcDateTime))
+        subject = (try? c.nestedContainer(keyedBy: AnyKey.self, forKey: .params)).flatMap(Self.subject)
     }
 
     var severityColor: Color {

@@ -16,6 +16,10 @@ struct OverviewView: View {
                     headerCards
                     ForEach(vm.sections, id: \.title) { section in
                         SectionBlock(title: section.title, items: section.items)
+                        if section.title == "Health & Alerts",
+                           let notifications = env.notificationsState.value, !notifications.isEmpty {
+                            AlertDetailsView(notifications: notifications)
+                        }
                     }
                 }
             }
@@ -68,6 +72,81 @@ struct OverviewView: View {
                 StatCard(title: "Active Alerts", value: alerts, icon: "bell", color: alerts == "None" ? .green : .orange)
             }
         }
+    }
+}
+
+// MARK: - Alert details
+
+/// Jamf Pro's notifications grouped by kind, with what each is about and how to fix it.
+private struct AlertDetailsView: View {
+    let notifications: [ProNotification]
+
+    private var groups: [(title: String, type: String, items: [ProNotification])] {
+        let byType = Dictionary(grouping: notifications, by: \.type)
+        return byType.map { type, items in
+            let title = items.first.map { $0.message.isEmpty ? AlertHints.readable(type) : $0.message }
+                ?? AlertHints.readable(type)
+            return (title, type, items)
+        }
+        .sorted { $0.items.count > $1.items.count }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(groups, id: \.type) { group in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            .accessibilityHidden(true)
+                        Text(group.title).font(.subheadline.weight(.semibold))
+                        if group.items.count > 1 {
+                            Text("×\(group.items.count)").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    let subjects = group.items.compactMap(\.subject)
+                    if !subjects.isEmpty {
+                        Text("Affected: " + subjects.sorted().joined(separator: ", "))
+                            .font(.caption).foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let hint = AlertHints.fix(for: group.type, message: group.title) {
+                        Label(hint, systemImage: "wrench.and.screwdriver")
+                            .font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+}
+
+enum AlertHints {
+    /// "PATCH_EXTENSION_ATTRIBUTE" → "Patch extension attribute"
+    static func readable(_ type: String) -> String {
+        let words = type.replacingOccurrences(of: "_", with: " ").lowercased()
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
+
+    static func fix(for type: String, message: String) -> String? {
+        let text = (type + " " + message).lowercased()
+        if text.contains("patch"), text.contains("extension") {
+            return "In Jamf Pro, open Settings → Computer management → Patch Management, select each affected software title, and accept its extension attribute under Extension Attributes. Until then the title can't report versions."
+        }
+        if text.contains("certificate") || text.contains("apns") || text.contains("push") {
+            return "Renew it in Jamf Pro under Settings → Global → Push certificates (or the certificate named in the alert) before it expires."
+        }
+        if text.contains("vpp") || text.contains("volume purchasing") {
+            return "Renew the Volume Purchasing token in Jamf Pro under Settings → Global → Volume purchasing."
+        }
+        if text.contains("dep") || text.contains("automated device enrollment") {
+            return "Renew the Automated Device Enrollment token in Jamf Pro under Settings → Global → Automated Device Enrollment."
+        }
+        return nil
     }
 }
 

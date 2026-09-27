@@ -45,8 +45,47 @@ final class OverviewViewModel {
         ]
         return sectionOrder.compactMap { section in
             guard let group = grouped[section], !group.isEmpty else { return nil }
-            return (title: section, items: group)
+            let items = section == "Health & Alerts" ? Self.groupingAlerts(group) : group
+            return (title: section, items: items)
         }
+    }
+
+    /// jamf-cli lists every active alert as its own row: the first under "Alert Types", the
+    /// rest with an empty name. Identical alerts are collapsed into one row with a count
+    /// ("Patch extension attribute issue ×5").
+    nonisolated static func groupingAlerts(_ items: [OverviewItem]) -> [OverviewItem] {
+        var out: [OverviewItem] = []
+        var counts: [(value: String, count: Int)] = []
+        var inAlerts = false
+        var section = ""
+
+        func flush() {
+            for (i, entry) in counts.enumerated() {
+                out.append(OverviewItem(
+                    id: "\(section)-alert-\(entry.value)",
+                    section: section,
+                    resource: i == 0 ? "Alert Types" : "",
+                    value: entry.count > 1 ? "\(entry.value) ×\(entry.count)" : entry.value))
+            }
+            counts = []
+        }
+
+        for item in items {
+            if item.resource == "Alert Types" || (inAlerts && item.resource.isEmpty) {
+                inAlerts = true
+                section = item.section
+                if let i = counts.firstIndex(where: { $0.value == item.value }) {
+                    counts[i].count += 1
+                } else {
+                    counts.append((item.value, 1))
+                }
+                continue
+            }
+            if inAlerts { flush(); inAlerts = false }
+            out.append(item)
+        }
+        if inAlerts { flush() }
+        return out
     }
 
     func value(for resource: String) -> String? {

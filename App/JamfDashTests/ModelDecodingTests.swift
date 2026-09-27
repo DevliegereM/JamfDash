@@ -461,3 +461,34 @@ final class FleetKnowledgeIndexTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 }
+
+final class OverviewAlertTests: XCTestCase {
+    private func item(_ resource: String, _ value: String) -> OverviewItem {
+        OverviewItem(section: "Health & Alerts", resource: resource, value: value)
+    }
+
+    func testIdenticalAlertsAreCounted() {
+        let items = [item("Health Status", "ok"), item("Active Alerts", "6 active"),
+                     item("Alert Types", "Patch extension attribute issue"),
+                     item("", "Patch extension attribute issue"),
+                     item("", "Push certificate expiring"),
+                     item("", "Patch extension attribute issue")]
+        let grouped = OverviewViewModel.groupingAlerts(items)
+        XCTAssertEqual(grouped.map(\.resource), ["Health Status", "Active Alerts", "Alert Types", ""])
+        XCTAssertEqual(grouped[2].value, "Patch extension attribute issue ×3")
+        XCTAssertEqual(grouped[3].value, "Push certificate expiring")
+        XCTAssertEqual(Set(grouped.map(\.id)).count, grouped.count, "ids must be unique for ForEach")
+    }
+
+    func testNotificationSubjectFromParams() throws {
+        let json = Data("""
+            [{"id": 1, "type": "PATCH_EXTENSION_ATTRIBUTE", "message": "", "params": {"id": "12", "name": "Google Chrome"}},
+             {"id": 2, "type": "PATCH_EXTENSION_ATTRIBUTE"}]
+            """.utf8)
+        let n = try JSONDecoder().decode([ProNotification].self, from: json)
+        XCTAssertEqual(n.map(\.subject), ["Google Chrome", nil])
+        XCTAssertEqual(AlertHints.readable("PATCH_EXTENSION_ATTRIBUTE"), "Patch extension attribute")
+        XCTAssertNotNil(AlertHints.fix(for: "PATCH_EXTENSION_ATTRIBUTE", message: ""))
+        XCTAssertNil(AlertHints.fix(for: "SOMETHING_ELSE", message: "Other"))
+    }
+}
