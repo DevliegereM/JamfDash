@@ -36,7 +36,7 @@ struct MainView: View {
                 PatchView(vm: env.fleetVM)
 
             case .enrollment:
-                EnrollmentView(vm: env.fleetVM)
+                EnrollmentSectionView(vm: env.enrollmentVM, fleetVM: env.fleetVM)
             case .settingsInspector:
                 SettingsInspectorView(vm: env.settingsInspectorVM)
             case .ddmMonitor:
@@ -223,8 +223,13 @@ struct MainView: View {
             Task { await env.overviewVM.load(force: true) }
         case .security:
             Task { await env.securityVM.load(force: true) }
-        case .fleet, .orgBrowser, .extensionAttributes, .patchManagement, .enrollment:
+        case .fleet, .orgBrowser, .extensionAttributes, .patchManagement:
             Task { await env.fleetVM.loadAll(force: true) }
+        case .enrollment:
+            Task {
+                if env.enrollmentVM.tab == .setup { await env.fleetVM.loadAll(force: true) }
+                else { await env.enrollmentVM.refresh() }
+            }
         case .devices:
             Task { await env.devicesVM.load(force: true) }
         case .mobileDevices:

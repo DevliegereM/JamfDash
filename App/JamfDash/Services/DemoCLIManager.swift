@@ -33,6 +33,7 @@ struct DemoCLIManager: CLIRunning, Sendable {
     // MARK: - Route
 
     private func demoJSON(for command: CLICommand) -> String {
+        if let enrollment = DemoEnrollmentData.json(for: command) { return enrollment }
         switch command {
         // Jamf Pro
         case .overview:              return proOverviewJSON
@@ -452,11 +453,14 @@ private func demoPolicyDetailJSON(id: Int) -> String {
         19: (6,"Development"), 20: (6,"Development")
     ]
     let (catId, catName) = cats[id] ?? (-1, "No category assigned")
+    // Enrollment Complete policies for the Enrollment section's flow (Dock only for Engineering).
+    let enrollmentTrigger = [7, 8, 11, 14, 17].contains(id)
+    let allComputers = [7, 8, 11, 17].contains(id)
     return """
     {
-      "general": {"id": \(id), "name": "Policy \(id)", "category": {"id": \(catId), "name": "\(catName)"}},
+      "general": {"id": \(id), "name": "Policy \(id)", "enabled": true, "trigger_enrollment_complete": \(enrollmentTrigger), "category": {"id": \(catId), "name": "\(catName)"}},
       "scope": {
-        "all_computers": false,
+        "all_computers": \(allComputers),
         "computers": [],
         "computer_groups": [{"id": 1, "name": "All Managed Macs"}, {"id": 13, "name": "Engineering Department"}],
         "departments": [],
@@ -485,14 +489,22 @@ private func demoConfigProfileDetailJSON(id: Int) -> String {
         .replacingOccurrences(of: "\\", with: "\\\\")
         .replacingOccurrences(of: "\"", with: "\\\"")
         .replacingOccurrences(of: "\n", with: "\\n")
+    // Scopes for the Enrollment section's flow: most profiles go to All Computers, a few to groups.
+    let allComputers = [1, 2, 3, 5, 7, 9, 10, 12].contains(id)
+    let groups: String
+    switch id {
+    case 6:  groups = #"[{"id": 21, "name": "Engineering VPN Users"}]"#
+    case 11: groups = #"[{"id": 22, "name": "Beta Testers"}]"#
+    default: groups = #"[{"id": 1, "name": "All Managed Macs"}, {"id": 5, "name": "Security Baseline Required"}]"#
+    }
     return """
     {
-      "general": {"id": \(id), "name": "\(demoProfileName(id: id))", "category": {"id": \(catId), "name": "\(catName)"}, "payloads": "\(payloads)"},
+      "general": {"id": \(id), "name": "\(demoProfileName(id: id))", "uuid": "demo-profile-\(id)", "category": {"id": \(catId), "name": "\(catName)"}, "payloads": "\(payloads)"},
       "scope": {
-        "all_computers": false,
+        "all_computers": \(allComputers),
         "computers": [],
-        "computer_groups": [{"id": 1, "name": "All Managed Macs"}, {"id": 5, "name": "Security Baseline Required"}],
-        "departments": [{"id": 2, "name": "Engineering"}, {"id": 3, "name": "IT"}],
+        "computer_groups": \(groups),
+        "departments": \([6, 11].contains(id) ? "[]" : #"[{"id": 2, "name": "Engineering"}, {"id": 3, "name": "IT"}]"#),
         "buildings": [],
         "limitations": {
           "users": [], "user_groups": [], "network_segments": [], "ibeacons": []

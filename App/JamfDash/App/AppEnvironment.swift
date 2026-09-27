@@ -99,6 +99,7 @@ final class AppEnvironment {
     let platformVM: PlatformViewModel
     let aiAssistantVM: AIAssistantViewModel
     let settingsInspectorVM: SettingsInspectorViewModel
+    let enrollmentVM: EnrollmentFlowViewModel
 
     /// Set by a view to switch the sidebar to another section; MainView applies and clears it.
     var requestedSection: SidebarItem?
@@ -107,6 +108,12 @@ final class AppEnvironment {
     func showInDeviceLookup(_ query: String) {
         deviceSearchVM.lookUp(query)
         requestedSection = .deviceSearch
+    }
+
+    /// Opens Enrollment → Recent Enrollments with this Mac's timeline.
+    func showEnrollmentTimeline(serial: String) {
+        enrollmentVM.showTimeline(serial: serial)
+        requestedSection = .enrollment
     }
     let digestService: DigestService
     let driftVM: DriftViewModel
@@ -200,6 +207,7 @@ final class AppEnvironment {
         self.aiAssistantVM          = AIAssistantViewModel(cli: cliManager)
         self.schoolVM               = SchoolViewModel(cli: cliManager)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: cliManager)
+        self.enrollmentVM           = EnrollmentFlowViewModel(cli: cliManager)
         self.digestService          = DigestService(cli: cliManager)
         self.driftVM                = DriftViewModel(cli: cliManager)
         self.correlationVM          = CorrelationViewModel()
@@ -256,6 +264,7 @@ final class AppEnvironment {
         self.platformVM             = PlatformViewModel(cli: demoCLI)
         self.aiAssistantVM          = AIAssistantViewModel(cli: demoCLI)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: demoCLI)
+        self.enrollmentVM           = EnrollmentFlowViewModel(cli: demoCLI)
         self.digestService          = DigestService(cli: demoCLI)
         self.driftVM                = DriftViewModel(cli: demoCLI)
         self.correlationVM          = CorrelationViewModel()
@@ -570,6 +579,7 @@ final class AppEnvironment {
                 Self.logger.info("Instance switch verified — loading data for \(profileName, privacy: .private)")
                 // Another Jamf instance: don't let Dashie search the previous one's data.
                 FleetKnowledgeStore.shared.clear()
+                enrollmentVM.reset()
                 loadMainData()
                 profileSwitchCount += 1
             } catch {

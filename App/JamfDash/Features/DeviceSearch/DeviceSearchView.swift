@@ -1209,6 +1209,7 @@ private struct BoolDetailRow: View {
 
 private struct DeviceHistoryPanel: View {
     let detail: ComputerDetail
+    @Environment(AppEnvironment.self) private var env
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -1306,9 +1307,15 @@ private struct DeviceHistoryPanel: View {
 
     private var mdmCommandHistorySection: some View {
         GroupBox("MDM Command History") {
-            Label("MDM command history is not available via jamf-cli.", systemImage: "info.circle")
-                .foregroundStyle(.secondary)
-                .font(.callout)
+            HStack(alignment: .firstTextBaseline) {
+                Text("See every MDM command, profile and policy since this Mac enrolled, with failed and stuck commands at the top.")
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button("Enrollment Timeline") { env.showEnrollmentTimeline(serial: detail.effectiveSerial) }
+                    .disabled(detail.effectiveSerial == "—")
+            }
         }
     }
 

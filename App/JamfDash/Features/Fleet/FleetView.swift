@@ -1553,17 +1553,7 @@ struct EnrollmentView: View {
             default: EmptyView()
             }
         }
-        .navigationTitle("Enrollment & Prestages")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { Task {
-                    await vm.loadDepTokens(force: true)
-                    await vm.loadComputerPrestages(force: true)
-                    await vm.loadMobileDevicePrestages(force: true)
-                }} label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                .help("Refresh DEP tokens and prestage configurations")
-            }
-        }
+        // Title and Refresh come from EnrollmentSectionView, which shows this as its third tab.
     }
 }
 

@@ -108,15 +108,16 @@ struct FleetRepository: Sendable {
 
     func fetchPolicyScope(id: Int) async throws -> JamfScope {
         let data = try await cli.run(.policyDetail(id: id))
-        return extractScope(from: data)
+        return Self.extractScope(from: data)
     }
 
     func fetchConfigProfileScope(id: Int) async throws -> JamfScope {
         let data = try await cli.run(.configProfileDetail(id: id))
-        return extractScope(from: data)
+        return Self.extractScope(from: data)
     }
 
-    private func extractScope(from data: Data) -> JamfScope {
+    /// Scope of a Classic policy or configuration profile detail. Also used by the Enrollment section.
+    static func extractScope(from data: Data) -> JamfScope {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let s = json["scope"] as? [String: Any] else { return JamfScope() }
 
@@ -150,7 +151,7 @@ struct FleetRepository: Sendable {
     /// Extracts an array of scope items from a Classic API field.
     /// Handles three formats: "" (empty), {"singular": {...}} (one), {"singular": [{...}]} (many),
     /// and plain [{...}] (flat array used in demo mode).
-    private func classicItems(_ value: Any?, singular: String) -> [JamfScopeItem] {
+    private static func classicItems(_ value: Any?, singular: String) -> [JamfScopeItem] {
         if let array = value as? [[String: Any]] {
             return array.compactMap { classicScopeItem($0) }
         }
@@ -160,7 +161,7 @@ struct FleetRepository: Sendable {
         return []
     }
 
-    private func classicScopeItem(_ dict: [String: Any]) -> JamfScopeItem? {
+    private static func classicScopeItem(_ dict: [String: Any]) -> JamfScopeItem? {
         let name = (dict["name"] as? String) ?? ""
         guard !name.isEmpty else { return nil }
         let id: Int

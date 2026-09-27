@@ -1,0 +1,527 @@
+import XCTest
+@testable import JamfDash
+
+final class EnrollmentParsingTests: XCTestCase {
+
+    func testMDMCommandsFromResultsWrapper() {
+        let data = Data("""
+            {"totalCount": 3, "results": [
+              {"uuid": "u1", "commandType": "INSTALL_PROFILE", "commandState": "ACKNOWLEDGED",
+               "dateSent": "2026-09-25T09:12:40.123Z", "dateCompleted": "2026-09-25T09:12:44Z",
+               "profileIdentifier": "com.acme.wifi"},
+              {"uuid": "u2", "commandType": "INSTALL_APPLICATION", "commandState": "PENDING", "dateSent": "2026-09-25T09:19:30Z"},
+              {"uuid": "u3", "commandType": "INSTALL_PROFILE", "commandState": "ERROR", "dateSent": "2026-09-25T09:16:15Z"}
+            ]}
+            """.utf8)
+        let records = EnrollmentParsing.mdmCommands(data)
+        XCTAssertEqual(records.map(\.status), [.completed, .pending, .failed])
+        XCTAssertEqual(records[0].profileIdentifier, "com.acme.wifi")
+        XCTAssertNotNil(records[0].dateSent, "fractional-second ISO dates must parse")
+        XCTAssertNotNil(records[0].dateCompleted)
+    }
+
+    func testMDMCommandsFlatArrayWithOtherSpellings() {
+        let data = Data("""
+            [{"command": "DeviceConfigured", "status": "Completed", "dateSent": "2026-09-25 09:15:22"}]
+            """.utf8)
+        let records = EnrollmentParsing.mdmCommands(data)
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records[0].status, .completed)
+        XCTAssertEqual(EnrollmentParsing.phase(forCommand: records[0].commandType), .setupAssistant)
+    }
+
+    func testHistoryCommandsInBothClassicShapes() {
+        // Arrays directly under completed/pending/failed.
+        let flat = Data("""
+            {"computer_history": {"commands": {
+              "completed": [{"name": "InstallProfile", "completed_epoch": 1758791560000}],
+              "pending": [{"name": "InstallApplication", "status": "Pending", "issued_epoch": 1758791970000}],
+              "failed": [{"name": "InstallProfile", "status": "Certificate error", "issued_utc": "2026-09-25T09:16:15.000+0000",
+                          "failed_epoch": 1758791780000}]
+            }}}
+            """.utf8)
+        // XML-converted shape: {"command": {...}} for a single item.
+        let wrapped = Data("""
+            {"computer_history": {"commands": {
+              "completed": {"command": [{"name": "InstallProfile", "completed_epoch": "1758791560000"}]},
+              "pending": {"command": {"name": "InstallApplication", "issued_epoch": 1758791970000}},
+              "failed": ""
+            }}}
+            """.utf8)
+        let a = EnrollmentParsing.historyCommands(flat)
+        XCTAssertEqual(a.map(\.status), [.completed, .pending, .failed])
+        XCTAssertEqual(a[2].message, "Certificate error")
+        XCTAssertEqual(a[0].finished, Date(timeIntervalSince1970: 1_758_791_560))
+
+        let b = EnrollmentParsing.historyCommands(wrapped)
+        XCTAssertEqual(b.map(\.status), [.completed, .pending])
+        XCTAssertEqual(b[0].finished, Date(timeIntervalSince1970: 1_758_791_560), "epoch as a string")
+    }
+
+    func testPolicyLogsInBothShapes() {
+        let flat = Data("""
+            {"computer_history": {"policy_logs": [
+              {"policy_id": 7, "policy_name": "Configure Login Window", "status": "Completed", "date_completed_epoch": 1758791880000},
+              {"policy_id": 9, "policy_name": "Install Printer Drivers", "status": "Failed", "date_completed_epoch": 1758791900000}
+            ]}}
+            """.utf8)
+        let wrapped = Data("""
+            {"computer_history": {"policy_logs": {"policy_log": {"policy_id": "7", "policy_name": "Configure Login Window",
+              "status": "Completed", "date_completed_utc": "2026-09-25T09:18:00.000+0000"}}}}
+            """.utf8)
+        let a = EnrollmentParsing.policyLogs(flat)
+        XCTAssertEqual(a.map(\.policyID), [7, 9])
+        XCTAssertEqual(a.map(\.failed), [false, true])
+        let b = EnrollmentParsing.policyLogs(wrapped)
+        XCTAssertEqual(b.first?.policyID, 7)
+        XCTAssertNotNil(b.first?.date)
+    }
+
+    func testPrestageDetail() throws {
+        let data = Data("""
+            {"id": "1", "displayName": "MacBook Pro - Standard", "isMandatory": true, "isMdmRemovable": false,
+             "skipSetupItems": {"Siri": true, "Location": false, "iCloudStorage": true},
+             "prestageInstalledProfileIds": ["10", 11], "customPackageIds": ["1"],
+             "enrollmentCustomizationId": "0", "deviceEnrollmentProgramInstanceId": "A1",
+             "accountSettings": {"userAccountType": "STANDARD"}}
+            """.utf8)
+        let p = try XCTUnwrap(EnrollmentParsing.prestageDetail(data))
+        XCTAssertEqual(p.profileIDs, [10, 11])
+        XCTAssertEqual(p.packageIDs, [1])
+        XCTAssertEqual(p.skippedPanes, ["Siri", "iCloudStorage"])
+        XCTAssertEqual(p.shownPanes, ["Location"])
+        XCTAssertNil(p.customizationID, "0 means no customization")
+        XCTAssertTrue(p.facts.contains(.init(label: "MDM profile removable", value: "No")))
+        XCTAssertTrue(p.facts.contains(.init(label: "Local account", value: "Standard")))
+    }
+
+    func testEnrollmentMethodObjectAndString() {
+        XCTAssertEqual(EnrollmentParsing.enrollmentMethod(["id": "3", "objectName": "Lab"]).name, "Lab")
+        XCTAssertEqual(EnrollmentParsing.enrollmentMethod(["id": "3", "objectName": "Lab"]).id, "3")
+        XCTAssertEqual(EnrollmentParsing.enrollmentMethod("PreStage").name, "PreStage")
+    }
+
+    func testReadableCommandAndPanes() {
+        XCTAssertEqual(EnrollmentParsing.readableCommand("INSTALL_PROFILE"), "Install Profile")
+        XCTAssertEqual(EnrollmentParsing.readableCommand("InstallEnterpriseApplication"), "Install Enterprise Application")
+        XCTAssertEqual(EnrollmentAnalyzer.readablePane("TermsOfAddress"), "Terms Of Address")
+        XCTAssertEqual(EnrollmentAnalyzer.readablePane("iCloudStorage"), "iCloud Storage")
+        XCTAssertEqual(EnrollmentAnalyzer.readablePane("TOS"), "TOS")
+    }
+
+    func testLogFlushingRetention() {
+        let data = Data("""
+            {"retentionPolicies": [
+              {"displayName": "Computer Management History", "retentionPeriod": 3, "retentionPeriodUnit": "MONTH"},
+              {"displayName": "Policy Logs", "retentionPeriod": 2, "retentionPeriodUnit": "WEEK"},
+              {"displayName": "Mobile Device Usage Logs", "retentionPeriod": 1, "retentionPeriodUnit": "DAY"}
+            ]}
+            """.utf8)
+        let r = EnrollmentParsing.historyRetention(data)
+        XCTAssertEqual(r?.name, "Policy Logs")
+        XCTAssertEqual(r?.days, 14)
+        XCTAssertEqual(r?.label, "2 weeks")
+    }
+}
+
+/// Shapes seen on a real Jamf Pro instance (values made up).
+final class EnrollmentRealShapeTests: XCTestCase {
+
+    func testMDMListAsReturnedByJamfPro() {
+        let data = Data("""
+            [{"uuid": "1", "commandState": "ACKNOWLEDGED", "commandType": "INSTALL_PROFILE", "profileId": 419,
+              "client": {"managementId": "8f406756-bd08-4a0c-bad2-7eb1082b54f5", "clientType": "COMPUTER"},
+              "dateSent": "2026-09-09T08:55:59.202Z", "dateCompleted": "2026-09-09T08:55:59.653Z", "commandError": {}},
+             {"uuid": "2", "commandState": "PENDING", "commandType": "DEVICE_INFORMATION",
+              "dateSent": "2026-09-17T08:39:12.332Z", "dateCompleted": "1970-01-01T00:00:00Z", "commandError": {}}]
+            """.utf8)
+        let r = EnrollmentParsing.mdmCommands(data)
+        XCTAssertEqual(r[0].profileID, 419)
+        XCTAssertNil(r[0].errorText, "an empty commandError object is no error")
+        XCTAssertNil(r[1].dateCompleted, "1970 means not completed")
+        XCTAssertEqual(r[1].status, .pending)
+        XCTAssertEqual(EnrollmentParsing.phase(forCommand: "DEVICE_INFORMATION"), .inventory)
+        XCTAssertEqual(EnrollmentParsing.phase(forCommand: "MANAGED_APPLICATION_LIST"), .inventory)
+        XCTAssertEqual(EnrollmentParsing.phase(forCommand: "INSTALL_APPLICATION"), .apps)
+        XCTAssertEqual(EnrollmentParsing.errorText(["code": 12021, "localizedDescription": "Certificate error"]),
+                       "Certificate error · 12021")
+    }
+
+    func testHistoryWithoutWrapperAndProfileNames() {
+        let data = Data("""
+            {"commands": {
+              "completed": {"command": [
+                {"name": "Install Configuration Profile ALL - Wi-Fi", "completed": "2026/09/09 at 8:56 AM",
+                 "completed_epoch": 1789030560000, "completed_utc": "2026-09-09T08:56:00.000+0000", "username": ""}]},
+              "pending": {"command": {"name": "DeviceInformation", "issued_epoch": 1789634352332, "status": "Pending"}},
+              "failed": ""}}
+            """.utf8)
+        let r = EnrollmentParsing.historyCommands(data)
+        XCTAssertEqual(r.first?.name, "InstallProfile")
+        XCTAssertEqual(r.first?.subject, "ALL - Wi-Fi")
+        XCTAssertEqual(r.count, 2)
+    }
+
+    func testHistoryNamesTheMatchingAPICommand() {
+        let sent = Date(timeIntervalSince1970: 1_789_030_000)
+        var input = EnrollmentAnalyzer.TimelineInput()
+        input.mdmCommands = [MDMCommandRecord(uuid: "1", commandType: "INSTALL_PROFILE", status: .completed,
+                                              dateSent: sent, dateCompleted: sent.addingTimeInterval(300),
+                                              profileIdentifier: nil, profileID: 419, errorText: nil)]
+        // History has only the completion time, 5 minutes after the command was sent.
+        input.historyCommands = [HistoryCommandRecord(name: "InstallProfile", subject: "ALL - Wi-Fi", status: .completed,
+                                                      issued: sent.addingTimeInterval(300), finished: sent.addingTimeInterval(300),
+                                                      message: nil)]
+        let events = EnrollmentAnalyzer.buildEvents(input, now: sent.addingTimeInterval(3600))
+        XCTAssertEqual(events.count, 1, "matched on completion time")
+        XCTAssertEqual(events.first?.title, "ALL - Wi-Fi")
+    }
+
+    func testUserInitiatedEnrollmentMethod() {
+        let m = EnrollmentParsing.enrollmentMethod(["id": "359", "objectName": NSNull(), "objectType": "User-initiated - no invitation"])
+        XCTAssertEqual(m.name, "User-initiated - no invitation")
+        XCTAssertFalse(EnrollmentParsing.isPrestageMethod(type: m.type, viaADE: false),
+                       "the invitation ID must not be taken for a PreStage ID")
+        XCTAssertTrue(EnrollmentParsing.isPrestageMethod(type: "Computer PreStage", viaADE: nil))
+        XCTAssertEqual(EnrollmentParsing.lastContact(["lastContact": "2026-09-17T10:46:41.489Z"]),
+                       try? Date("2026-09-17T10:46:41.489Z", strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+    }
+}
+
+final class EnrollmentCLISafetyTests: XCTestCase {
+
+    func testManagementIDMustBeAUUIDAndIsFiltered() {
+        XCTAssertTrue(EnrollmentParsing.isManagementID("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb"))
+        XCTAssertFalse(EnrollmentParsing.isManagementID("x;status==Pending"))
+        XCTAssertFalse(EnrollmentParsing.isManagementID(""))
+        let args = CLICommand.mdmCommandsForDevice(managementId: "aaaa;command==X,b").baseArguments
+        XCTAssertEqual(args[4], "clientManagementId==aaaacadb", "only hex digits and dashes reach the filter")
+        XCTAssertFalse(args[4].dropFirst("clientManagementId==".count).contains { $0 == ";" || $0 == "=" || $0 == "," })
+    }
+
+    func testSerialAndPrestageIDAreSanitized() {
+        let history = CLICommand.computerHistory(serial: "C02 --url x", subset: .commands).baseArguments
+        XCTAssertEqual(history, ["pro", "classic-computer-history", "get", "--serial", "C02urlx",
+                                 "--subset", "Commands", "-o", "json"])
+        XCTAssertEqual(CLICommand.computerPrestageDetail(id: "1 --yes").baseArguments,
+                       ["pro", "computer-prestages", "get", "1", "-o", "json"])
+        let inventory = CLICommand.enrollmentInventory(serial: #"A"B"#).baseArguments
+        XCTAssertTrue(inventory.contains(#"hardware.serialNumber=="A\"B""#))
+    }
+
+    func testEnrollmentCommandsAreReadOnly() {
+        let commands: [CLICommand] = [
+            .recentEnrollments, .enrollmentInventory(serial: "A"), .mdmCommandsForDevice(managementId: "a"),
+            .computerHistory(serial: "A", subset: .policyLogs), .computerPrestageDetail(id: "1"), .logFlushingSettings,
+        ]
+        for c in commands {
+            XCTAssertFalse(c.isDestructive)
+            XCTAssertFalse(c.baseArguments.contains("--yes"))
+            XCTAssertTrue(c.baseArguments.contains("list") || c.baseArguments.contains("get"), "\(c.baseArguments)")
+        }
+    }
+}
+
+final class EnrollmentAnalyzerTests: XCTestCase {
+    private let enrolled = Date(timeIntervalSince1970: 1_758_791_523)   // 25 Sep 2026 09:12:03 UTC
+    private var now: Date { enrolled.addingTimeInterval(2 * 86_400) }
+
+    private func input() -> EnrollmentAnalyzer.TimelineInput {
+        var i = EnrollmentAnalyzer.TimelineInput()
+        i.enrolledAt = enrolled
+        i.method = "MacBook Pro - Standard"
+        i.lastContact = now.addingTimeInterval(-600)
+        i.mdmCommands = [
+            MDMCommandRecord(uuid: "1", commandType: "INSTALL_PROFILE", status: .completed,
+                             dateSent: enrolled.addingTimeInterval(37), dateCompleted: enrolled.addingTimeInterval(40),
+                             profileIdentifier: "ca", errorText: nil),
+            MDMCommandRecord(uuid: "2", commandType: "INSTALL_PROFILE", status: .failed,
+                             dateSent: enrolled.addingTimeInterval(252), dateCompleted: nil,
+                             profileIdentifier: "wifi", errorText: "Certificate error"),
+            MDMCommandRecord(uuid: "3", commandType: "INSTALL_APPLICATION", status: .pending,
+                             dateSent: enrolled.addingTimeInterval(447), dateCompleted: nil,
+                             profileIdentifier: nil, errorText: nil),
+        ]
+        i.historyCommands = [
+            // Same as the first API command, 2 seconds apart: must not appear twice.
+            HistoryCommandRecord(name: "InstallProfile", status: .completed, issued: enrolled.addingTimeInterval(39),
+                                 finished: enrolled.addingTimeInterval(40), message: nil),
+            HistoryCommandRecord(name: "DeviceConfigured", status: .completed, issued: enrolled.addingTimeInterval(199),
+                                 finished: enrolled.addingTimeInterval(200), message: nil),
+        ]
+        i.policyLogs = [PolicyLogRecord(policyID: 7, name: "Configure Login Window", status: "Completed",
+                                        date: enrolled.addingTimeInterval(359))]
+        i.installedProfiles = [
+            .init(name: "Internal CA", identifier: "ca", installedAt: enrolled.addingTimeInterval(40)),
+            .init(name: "FileVault", identifier: "fv", installedAt: enrolled.addingTimeInterval(300)),
+        ]
+        i.enrollmentPolicyIDs = [7]
+        return i
+    }
+
+    func testTimelineMergesSourcesInOrder() {
+        let events = EnrollmentAnalyzer.buildEvents(input(), now: now)
+        XCTAssertEqual(events.first?.title, "Enrolled in MDM")
+        XCTAssertEqual(events.map(\.date), events.map(\.date).sorted())
+        XCTAssertEqual(events.filter { EnrollmentParsing.commandKey($0.kind) == "installprofile" }.count, 2,
+                       "the history duplicate of the first InstallProfile is dropped")
+        XCTAssertEqual(events.first { $0.profileIdentifier == "ca" && $0.source == .mdmCommands }?.title, "Internal CA",
+                       "profile commands are named after the installed profile")
+        let setup = events.first { $0.id == "setup-finished" }
+        XCTAssertEqual(setup?.isApproximate, true)
+        XCTAssertEqual(events.first { $0.source == .policyLogs }?.kind, "Enrollment policy")
+        XCTAssertTrue(events.contains { $0.title == "FileVault" && $0.source == .inventory },
+                      "installed profiles without a command still appear")
+    }
+
+    func testStuckNeedsFourHoursAndALaterCheckIn() {
+        let events = EnrollmentAnalyzer.buildEvents(input(), now: now)
+        XCTAssertEqual(events.first { $0.kind == "Install Application" }?.status, .stuck)
+
+        // Pending for under 4 hours: still pending.
+        let recent = EnrollmentAnalyzer.buildEvents(input(), now: enrolled.addingTimeInterval(447 + 3 * 3600))
+        XCTAssertEqual(recent.first { $0.kind == "Install Application" }?.status, .pending)
+
+        // Mac hasn't checked in since the command was sent: pending, not stuck.
+        var offline = input()
+        offline.lastContact = enrolled.addingTimeInterval(400)
+        let events2 = EnrollmentAnalyzer.buildEvents(offline, now: now)
+        XCTAssertEqual(events2.first { $0.kind == "Install Application" }?.status, .pending)
+
+        // Exactly the threshold counts as stuck.
+        let edge = EnrollmentAnalyzer.markStuck(
+            [EnrollmentEvent(id: "x", date: now.addingTimeInterval(-EnrollmentAnalyzer.stuckThreshold), completedDate: nil,
+                             phase: .apps, kind: "Install Application", title: "App", detail: nil, status: .pending,
+                             isApproximate: false, source: .mdmCommands, profileIdentifier: nil)],
+            lastContact: now, now: now)
+        XCTAssertEqual(edge.first?.status, .stuck)
+    }
+
+    func testAttentionListsFailuresFirst() {
+        let events = EnrollmentAnalyzer.buildEvents(input(), now: now)
+        XCTAssertEqual(EnrollmentAnalyzer.attention(events).map(\.status), [.failed, .stuck])
+    }
+
+    func testWindowKeepsFailuresAndPendingItems() {
+        var i = input()
+        i.mdmCommands.append(MDMCommandRecord(uuid: "late", commandType: "INSTALL_PROFILE", status: .completed,
+                                              dateSent: enrolled.addingTimeInterval(3 * 86_400), dateCompleted: nil,
+                                              profileIdentifier: nil, errorText: nil))
+        let events = EnrollmentAnalyzer.buildEvents(i, now: now)
+        let day = EnrollmentAnalyzer.eventsInWindow(events, enrolledAt: enrolled, window: 86_400)
+        XCTAssertFalse(day.contains { $0.id == "mdm-late" })
+        XCTAssertTrue(day.contains { $0.status == .stuck })
+        XCTAssertTrue(EnrollmentAnalyzer.eventsInWindow(events, enrolledAt: enrolled, window: nil).contains { $0.id == "mdm-late" })
+    }
+
+    func testRelativeTimes() {
+        XCTAssertEqual(EnrollmentAnalyzer.relative(enrolled.addingTimeInterval(37), to: enrolled), "+0:37")
+        XCTAssertEqual(EnrollmentAnalyzer.relative(enrolled.addingTimeInterval(3 * 3600 + 720), to: enrolled), "+3h 12m")
+        XCTAssertEqual(EnrollmentAnalyzer.relative(enrolled.addingTimeInterval(2 * 86_400 + 4 * 3600), to: enrolled), "+2d 4h")
+    }
+
+    // MARK: Scope
+
+    private func scope(all: Bool = false, groups: [String] = [], excluded: [String] = [],
+                       departments: [String] = []) -> JamfScope {
+        JamfScope(allComputers: all,
+                  computerGroups: groups.enumerated().map { JamfScopeItem(id: $0.offset, name: $0.element) },
+                  departments: departments.enumerated().map { JamfScopeItem(id: $0.offset, name: $0.element) },
+                  exclusions: JamfScopeExclusions(computerGroups: excluded.enumerated().map { JamfScopeItem(id: $0.offset, name: $0.element) }))
+    }
+
+    func testScopeMatchForOneMac() {
+        let mac = EnrollmentAnalyzer.DeviceContext(computerID: 1, name: "Alice", groups: ["All Managed Macs"],
+                                                   department: "Engineering", building: nil)
+        XCTAssertEqual(EnrollmentAnalyzer.match(scope(all: true), device: mac), .applies("All Computers"))
+        XCTAssertEqual(EnrollmentAnalyzer.match(scope(groups: ["all managed macs"]), device: mac), .applies("Member of “all managed macs”"))
+        XCTAssertEqual(EnrollmentAnalyzer.match(scope(all: true, excluded: ["All Managed Macs"]), device: mac),
+                       .excluded("Excluded by “All Managed Macs”"))
+        XCTAssertEqual(EnrollmentAnalyzer.match(scope(departments: ["Engineering"]), device: mac), .applies("Department “Engineering”"))
+        XCTAssertEqual(EnrollmentAnalyzer.match(scope(groups: ["Beta"]), device: mac), .notScoped("Not in “Beta”"))
+    }
+
+    func testFlowCertainty() {
+        XCTAssertEqual(EnrollmentAnalyzer.flowCondition(scope(all: true))?.0, .certain)
+        XCTAssertEqual(EnrollmentAnalyzer.flowCondition(scope(all: true, excluded: ["Kiosks"]))?.0, .conditional)
+        XCTAssertEqual(EnrollmentAnalyzer.flowCondition(scope(groups: ["Engineering"]))?.1, "If in “Engineering”")
+        XCTAssertNil(EnrollmentAnalyzer.flowCondition(JamfScope(computers: [JamfScopeItem(id: 1, name: "One")])),
+                     "items for named Macs only are left out of the flow")
+    }
+
+    // MARK: Expected vs actual
+
+    private func timeline(events: [EnrollmentEvent], installed: [EnrollmentTimeline.InstalledProfile],
+                          prestageProfiles: [Int] = []) -> EnrollmentTimeline {
+        EnrollmentTimeline(
+            device: .init(computerID: "1", name: "Alice", serial: "AAA111", managementId: nil, enrolledAt: enrolled,
+                          firstSeenAt: nil, lastContact: now, method: nil, methodID: nil, supervised: true,
+                          userApprovedMDM: true, groups: ["All Managed Macs"], department: nil, building: nil),
+            events: events, sources: [:], installedProfiles: installed, ddm: nil,
+            prestage: PrestageDetail(id: "1", name: "P", profileIDs: prestageProfiles, packageIDs: [], skipItems: [:],
+                                     customizationID: nil, adeInstanceID: nil, facts: []),
+            historyRetention: nil, loadedAt: now)
+    }
+
+    func testProfileRowsCompareExpectedWithInstalled() {
+        let events = EnrollmentAnalyzer.buildEvents(input(), now: now)
+        let installed: [EnrollmentTimeline.InstalledProfile] = [
+            .init(name: "Internal CA", identifier: "ca", installedAt: enrolled),
+            .init(name: "Legacy Proxy", identifier: "proxy", installedAt: enrolled),
+            .init(name: "MDM Profile", identifier: "mdm", installedAt: enrolled),
+        ]
+        let scan = ScopeScanResult(profiles: [
+            ScopedProfile(id: 10, name: "Internal CA", identifier: "ca", scope: scope(groups: ["Nobody"])),
+            ScopedProfile(id: 5, name: "Wi-Fi", identifier: "wifi", scope: scope(all: true)),
+            ScopedProfile(id: 4, name: "Energy Saver", identifier: "energy", scope: scope(groups: ["All Managed Macs"])),
+            ScopedProfile(id: 6, name: "VPN", identifier: "vpn", scope: scope(groups: ["Engineering VPN"])),
+            ScopedProfile(id: 20, name: "Legacy Proxy", identifier: "proxy", scope: scope(groups: ["Old Macs"])),
+        ], policies: [], failures: 0, scannedAt: now)
+
+        let rows = EnrollmentAnalyzer.profileRows(timeline: timeline(events: events, installed: installed, prestageProfiles: [10]),
+                                                  events: events, scan: scan)
+        func status(_ name: String) -> ProfileRowStatus? { rows.first { $0.name == name }?.status }
+        XCTAssertEqual(status("Internal CA"), .installed, "PreStage profiles are expected regardless of scope")
+        XCTAssertEqual(rows.first { $0.name == "Internal CA" }?.source, "PreStage")
+        XCTAssertEqual(status("Wi-Fi"), .failed)
+        XCTAssertEqual(status("Energy Saver"), .missing)
+        XCTAssertEqual(status("VPN"), .notScoped)
+        XCTAssertEqual(status("Legacy Proxy"), .unexpected)
+        XCTAssertEqual(status("MDM Profile"), .installed)
+        XCTAssertEqual(rows.first?.status, .failed, "problems sort first")
+    }
+
+    func testProfileRowsWithoutScanShowInstalledAndFailed() {
+        let events = EnrollmentAnalyzer.buildEvents(input(), now: now)
+        let rows = EnrollmentAnalyzer.profileRows(
+            timeline: timeline(events: events, installed: [.init(name: "Internal CA", identifier: "ca", installedAt: enrolled)]),
+            events: events, scan: nil)
+        XCTAssertEqual(rows.map(\.status), [.failed, .installed])
+        XCTAssertEqual(rows.first?.name, "wifi")
+    }
+
+    func testPolicyRowsFlagEnrollmentPoliciesWithoutALog() {
+        let events = EnrollmentAnalyzer.buildEvents(input(), now: now)
+        let scan = ScopeScanResult(profiles: [], policies: [
+            ScopedPolicy(id: 7, name: "Configure Login Window", enabled: true, enrollmentTrigger: true, scope: scope(all: true)),
+            ScopedPolicy(id: 11, name: "Install Rosetta 2", enabled: true, enrollmentTrigger: true, scope: scope(all: true)),
+            ScopedPolicy(id: 12, name: "Disabled", enabled: false, enrollmentTrigger: true, scope: scope(all: true)),
+            ScopedPolicy(id: 13, name: "Other group", enabled: true, enrollmentTrigger: true, scope: scope(groups: ["X"])),
+        ], failures: 0, scannedAt: now)
+        let rows = EnrollmentAnalyzer.policyRows(timeline: timeline(events: events, installed: []), events: events, scan: scan)
+        XCTAssertEqual(rows.map(\.name), ["Install Rosetta 2", "Configure Login Window"])
+        XCTAssertEqual(rows.map(\.status), [.notRunYet, .completed])
+    }
+
+    func testFlowForPrestage() {
+        let prestage = PrestageDetail(id: "1", name: "Std", profileIDs: [10], packageIDs: [1],
+                                      skipItems: ["Siri": true, "Location": false], customizationID: "2",
+                                      adeInstanceID: "T", facts: [.init(label: "MDM profile removable", value: "No")])
+        let scan = ScopeScanResult(profiles: [
+            ScopedProfile(id: 10, name: "CA", identifier: nil, scope: scope(all: true)),
+            ScopedProfile(id: 2, name: "FileVault", identifier: nil, scope: scope(all: true)),
+            ScopedProfile(id: 6, name: "VPN", identifier: nil, scope: scope(groups: ["Eng"])),
+            ScopedProfile(id: 7, name: "Kiosk", identifier: nil, scope: JamfScope(computers: [JamfScopeItem(id: 1, name: "K")])),
+        ], policies: [
+            ScopedPolicy(id: 1, name: "02 Rosetta", enabled: true, enrollmentTrigger: true, scope: scope(all: true)),
+            ScopedPolicy(id: 2, name: "01 Name", enabled: true, enrollmentTrigger: true, scope: scope(all: true)),
+            ScopedPolicy(id: 3, name: "Check-in", enabled: true, enrollmentTrigger: false, scope: scope(all: true)),
+        ], failures: 0, scannedAt: now)
+        let flow = EnrollmentAnalyzer.buildFlow(.init(prestage: prestage, adeTokenName: "Acme",
+                                                      profileNames: [10: "CA"], packageNames: [1: "Tools.pkg"],
+                                                      checkInMinutes: 15, scan: scan))
+        func phase(_ p: EnrollmentPhase) -> FlowPhase? { flow.phases.first { $0.phase == p } }
+        XCTAssertEqual(phase(.adeAssignment)?.summary, "Token “Acme”")
+        XCTAssertEqual(phase(.prestageItems)?.items.map(\.name), ["CA", "Tools.pkg"])
+        XCTAssertEqual(phase(.profiles)?.items.map(\.name), ["FileVault", "VPN"], "PreStage profiles aren't listed twice")
+        XCTAssertEqual(phase(.policies)?.items.map(\.name), ["01 Name", "02 Rosetta"], "enrollment policies in name order")
+        XCTAssertEqual(flow.specificOnlyCount, 1)
+        XCTAssertEqual(phase(.inventory)?.summary, "Check-in every 15 min")
+        XCTAssertTrue(phase(.setupAssistant)?.lines.contains { $0.contains("Enrollment Customization 2") } == true)
+    }
+}
+
+/// The demo data must decode through the same code as real data.
+final class EnrollmentDemoTests: XCTestCase {
+
+    func testDemoTimelineHasAFailureAndAStuckCommand() async throws {
+        let repo = EnrollmentRepository(cli: DemoCLIManager())
+        let recent = try await repo.recentEnrollments(withinDays: 7)
+        XCTAssertEqual(recent.first?.serial, "C02XA001DEMO", "newest enrollment first")
+        XCTAssertFalse(recent.contains { $0.serial == "C02XA008DEMO" }, "a 45-day-old enrollment is outside 7 days")
+
+        let timeline = try await repo.timeline(serial: "C02XA001DEMO")
+        XCTAssertEqual(timeline.device.name, "Alice's MacBook Pro")
+        XCTAssertEqual(timeline.prestage?.name, "MacBook Pro - Standard")
+        XCTAssertTrue(timeline.sources.values.allSatisfy(\.isOK), "\(timeline.sources)")
+        let attention = EnrollmentAnalyzer.attention(timeline.events)
+        XCTAssertEqual(attention.map(\.status), [.failed, .stuck])
+        XCTAssertEqual(attention.first?.title, "Wi-Fi (Corporate)")
+        XCTAssertTrue(timeline.events.contains { $0.id == "setup-finished" })
+        XCTAssertEqual(timeline.historyRetention?.label, "3 months")
+    }
+
+    func testDemoScanAndFlow() async throws {
+        let repo = EnrollmentRepository(cli: DemoCLIManager())
+        let scan = try await repo.scanScopes { _, _ in }
+        XCTAssertEqual(scan.failures, 0)
+        XCTAssertTrue(scan.policies.contains { $0.enrollmentTrigger })
+        let detail = try await repo.prestageDetail(id: "1")
+        let prestage = try XCTUnwrap(detail)
+        let flow = EnrollmentAnalyzer.buildFlow(.init(prestage: prestage, scan: scan))
+        XCTAssertFalse(flow.phases.first { $0.phase == .profiles }?.items.isEmpty ?? true)
+
+        let timeline = try await repo.timeline(serial: "C02XA001DEMO")
+        let rows = EnrollmentAnalyzer.profileRows(timeline: timeline, events: timeline.events, scan: scan)
+        XCTAssertEqual(rows.first { $0.name == "Wi-Fi (Corporate)" }?.status, .failed)
+        XCTAssertEqual(rows.first { $0.name == "VPN Settings" }?.status, .notScoped)
+        XCTAssertEqual(rows.first { $0.name == "Certificates - Internal CA" }?.source, "PreStage")
+    }
+}
+
+/// Runs the timeline against a real Jamf Pro instance through jamf-cli (read-only commands).
+/// Skipped unless `TEST_RUNNER_JAMFDASH_LIVE_SERIAL` (and optionally `…_LIVE_PROFILE`) are set.
+final class EnrollmentLiveProbeTests: XCTestCase {
+    private struct ShellCLI: CLIRunning {
+        let profile: String?
+        func run(_ command: CLICommand) async throws -> Data {
+            let binary = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("JamfDash/bin/jamf-cli")
+            let args = (profile.map { ["--profile", $0] } ?? []) + command.baseArguments
+            var env = ProcessInfo.processInfo.environment
+            env["JAMF_CLI_NO_UPDATE_CHECK"] = "1"
+            return try await CLIExecutor().execute(binary: binary, arguments: args, environment: env,
+                                                   stdinData: nil, timeout: command.timeout)
+        }
+        func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data { try await run(command) }
+    }
+
+    func testLiveTimeline() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let serial = env["JAMFDASH_LIVE_SERIAL"], !serial.isEmpty else { throw XCTSkip("no live serial") }
+        let repo = EnrollmentRepository(cli: ShellCLI(profile: env["JAMFDASH_LIVE_PROFILE"]))
+        let t = try await repo.timeline(serial: serial)
+        let events = t.events
+        print("LIVE sources: \(t.sources.map { "\($0.key.rawValue)=\($0.value)" }.sorted())")
+        print("LIVE method=\(t.device.method ?? "-") prestage=\(t.prestage?.name ?? "-") lastContact=\(t.device.lastContact != nil) dept=\(t.device.department != nil) groups=\(t.device.groups.count)")
+        print("LIVE events=\(events.count) byPhase=\(Dictionary(grouping: events, by: \.phase.title).mapValues(\.count).sorted { $0.key < $1.key })")
+        print("LIVE status=\(Dictionary(grouping: events, by: \.status.rawValue).mapValues(\.count))")
+        print("LIVE profile commands named=\(events.filter { $0.phase == .profiles && $0.title != $0.kind }.count)/\(events.filter { $0.phase == .profiles }.count)")
+        print("LIVE retention=\(t.historyRetention?.label ?? "-") installed=\(t.installedProfiles.count) ddm=\(t.ddm?.itemCount ?? 0)")
+        print("LIVE summary:\n" + EnrollmentAnalyzer.summary(t).split(separator: "\n").dropFirst().joined(separator: "\n"))
+        XCTAssertFalse(events.isEmpty)
+
+        guard env["JAMFDASH_LIVE_SCAN"] == "1" else { return }
+        let start = Date()
+        let scan = try await repo.scanScopes { _, _ in }
+        print("LIVE scan \(Int(Date().timeIntervalSince(start)))s: \(scan.profiles.count) profiles, \(scan.policies.count) policies, \(scan.failures) failed, enrollment policies \(scan.policies.filter { $0.enrollmentTrigger && $0.enabled }.count)")
+        let rows = EnrollmentAnalyzer.profileRows(timeline: t, events: t.events, scan: scan)
+        print("LIVE profile rows: \(Dictionary(grouping: rows, by: \.status.label).mapValues(\.count))")
+        let policies = EnrollmentAnalyzer.policyRows(timeline: t, events: t.events, scan: scan)
+        print("LIVE policy rows: \(Dictionary(grouping: policies, by: \.status.label).mapValues(\.count))")
+        if let p = t.prestage {
+            let flow = EnrollmentAnalyzer.buildFlow(.init(prestage: p, scan: scan))
+            print("LIVE flow: " + flow.phases.map { "\($0.phase.title)=\($0.summary) [\($0.items.count)]" }.joined(separator: " | "))
+        }
+    }
+}

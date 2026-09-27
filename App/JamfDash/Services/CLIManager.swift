@@ -211,6 +211,28 @@ enum CLICommand: Sendable {
     /// Computers with OS version, DDM flag and installed configuration profiles.
     case computersUpdateReadiness
 
+    // MARK: Enrollment flow & timeline (appended)
+    /// Inventory with enrollment dates, method and serials for the Recent Enrollments list.
+    case recentEnrollments
+    /// One Mac's inventory with the sections the timeline needs.
+    case enrollmentInventory(serial: String)
+    /// MDM commands for one Mac (`clientManagementId` must be a UUID).
+    case mdmCommandsForDevice(managementId: String)
+    /// One section of a Mac's Classic computer history.
+    case computerHistory(serial: String, subset: ComputerHistorySubset)
+    case computerPrestageDetail(id: String)
+    case logFlushingSettings
+
+    enum ComputerHistorySubset: String, Sendable {
+        case commands = "Commands"
+        case policyLogs = "PolicyLogs"
+    }
+
+    /// Letters and digits only; serial numbers never contain anything else.
+    static func sanitizedSerial(_ serial: String) -> String {
+        serial.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+    }
+
     private static func protectList(_ sub: String) -> [String] {
         ["protect", sub, "list", "-o", "json"]
     }
@@ -428,6 +450,24 @@ enum CLICommand: Sendable {
             return ["pro", "managed-software-updates-plans", "list", "--filter", "device.deviceId==\(digits);device.objectType==COMPUTER", "-o", "json"]
         case .softwareUpdateStatuses:            return ["pro", "managed-software-updates", "update-statuses", "-o", "json"]
         case .computersUpdateReadiness:          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "CONFIGURATION_PROFILES", "-o", "json"]
+
+        // Enrollment flow & timeline (appended)
+        case .recentEnrollments:
+            return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "-o", "json"]
+        case .enrollmentInventory(let s):
+            return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s),
+                    "--section", "GENERAL", "--section", "HARDWARE", "--section", "USER_AND_LOCATION",
+                    "--section", "GROUP_MEMBERSHIPS", "--section", "CONFIGURATION_PROFILES", "-o", "json"]
+        case .mdmCommandsForDevice(let id):
+            let uuid = id.filter { $0.isHexDigit || $0 == "-" }
+            return ["pro", "mdm", "list", "--filter", "clientManagementId==\(uuid)", "--sort", "dateSent:asc", "-o", "json"]
+        case .computerHistory(let s, let subset):
+            return ["pro", "classic-computer-history", "get", "--serial", CLICommand.sanitizedSerial(s),
+                    "--subset", subset.rawValue, "-o", "json"]
+        case .computerPrestageDetail(let id):
+            return ["pro", "computer-prestages", "get", id.filter { $0.isASCII && $0.isNumber }, "-o", "json"]
+        case .logFlushingSettings:
+            return ["pro", "log-flushing", "list", "-o", "json"]
         }
     }
 
@@ -443,6 +483,8 @@ enum CLICommand: Sendable {
              .benchmarkFailingDevices:
             return 120
         case .computersUpdateReadiness, .softwareUpdatePlans, .softwareUpdateStatuses:
+            return 120
+        case .recentEnrollments, .mdmCommandsForDevice, .computerHistory:
             return 120
         default: return 60
         }

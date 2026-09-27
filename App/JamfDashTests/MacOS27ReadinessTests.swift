@@ -329,17 +329,17 @@ final class DashieToolTests: XCTestCase {
 
     func testBulkDisableRejectsMatchAllPatterns() {
         for p in ["", "  ", "*", "**", "?*", "* "] {
-            XCTAssertTrue(BulkDisablePoliciesTool.matchesEverything(p), "\(p) should be refused")
+            XCTAssertTrue(BulkSetPoliciesTool.matchesEverything(p), "\(p) should be refused")
         }
         for p in ["Test*", "*Legacy*", "?"] {
-            XCTAssertFalse(BulkDisablePoliciesTool.matchesEverything(p), "\(p) should be allowed")
+            XCTAssertFalse(BulkSetPoliciesTool.matchesEverything(p), "\(p) should be allowed")
         }
     }
 
     func testBulkDisableMatchesGlob() {
         let names = ["Test Install", "Test Remove", "Prod Install", "Contest"]
-        XCTAssertEqual(BulkDisablePoliciesTool.matchingNames("Test*", in: names), ["Test Install", "Test Remove"])
-        XCTAssertEqual(BulkDisablePoliciesTool.matchingNames("*Install", in: names), ["Test Install", "Prod Install"])
+        XCTAssertEqual(BulkSetPoliciesTool.matchingNames("Test*", in: names), ["Test Install", "Test Remove"])
+        XCTAssertEqual(BulkSetPoliciesTool.matchingNames("*Install", in: names), ["Test Install", "Prod Install"])
     }
 
     func testBulkDisableUsesNamePatternFlag() {
@@ -466,7 +466,10 @@ final class DashieToolRoutingEvals: XCTestCase {
         Case(question: "Send a blank push to BBB222", expected: ["blankPush"]),
         Case(question: "Renew the MDM profile on AAA111", expected: ["renewMDMProfile"]),
         Case(question: "Flush the failed MDM commands on BBB222", expected: ["flushFailedCommands"]),
-        Case(question: "Disable all policies named Test*", expected: ["bulkDisablePolicies"]),
+        Case(question: "Disable all policies named Test*", expected: ["bulkSetPolicies"]),
+        Case(question: "Enable all policies in the Maintenance category", expected: ["bulkSetPolicies"]),
+        Case(question: "What happened when AAA111 enrolled?", expected: ["explainEnrollment"]),
+        Case(question: "Why didn't the Wi-Fi profile install on the new Mac BBB222?", expected: ["explainEnrollment"]),
         Case(question: "Give me a health overview of the Jamf Pro instance", expected: ["getOverview"]),
         Case(question: "What do we have for FileVault?", expected: ["searchFleetKnowledge"]),
         Case(question: "What did the daily digest say about patches?", expected: ["searchFleetKnowledge"]),

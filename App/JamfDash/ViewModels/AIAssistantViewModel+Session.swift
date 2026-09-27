@@ -87,6 +87,7 @@ extension AIAssistantViewModel {
             GetPoliciesTool(cli: cli),
             GetSmartGroupsTool(cli: cli),
             GetInventorySummaryTool(cli: cli),
+            ExplainEnrollmentTool(cli: cli),
             SearchFleetKnowledgeTool(),
             SearchHelpTool(),
             // Actions
@@ -96,8 +97,7 @@ extension AIAssistantViewModel {
             FlushFailedCommandsTool(cli: cli),
             RestartDeviceTool(cli: cli),
             ExecutePolicyTool(cli: cli),
-            BulkEnablePoliciesTool(cli: cli),
-            BulkDisablePoliciesTool(cli: cli),
+            BulkSetPoliciesTool(cli: cli),
         ]
     }
 
@@ -425,6 +425,8 @@ extension AIAssistantViewModel {
         • Security posture: getSecurityReport
         • Compliance: getCompliance
         • Policies: getPolicies — Smart groups: getSmartGroups
+        • What happened when a Mac enrolled, or why a profile, policy or app didn't arrive on a \
+        new Mac: explainEnrollment (needs the serial)
         • Find anything by name or keyword (policies, profiles, scripts, packages, groups, Macs, \
         blueprints, compliance rules, past digests), e.g. "what do we have for FileVault?": \
         searchFleetKnowledge
@@ -432,7 +434,7 @@ extension AIAssistantViewModel {
         searchHelp — answer from its result and name where to find it (e.g. Settings → Updates)
         • Actions, only when the user asks for them: blankPush, renewMDMProfile, \
         redeployFramework, flushFailedCommands, restartDevice, executePolicy, \
-        bulkEnablePolicies, bulkDisablePolicies
+        bulkSetPolicies (enable a category, or disable by name pattern)
 
         Rules: call tools only when needed, at most two per answer — for example \
         listComputers with nameContains to find a serial, then getComputerDetail. \

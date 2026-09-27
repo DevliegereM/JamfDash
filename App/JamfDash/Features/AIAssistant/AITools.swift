@@ -867,47 +867,42 @@ struct ExecutePolicyTool: Tool {
 }
 
 @available(macOS 26, *)
-struct BulkEnablePoliciesTool: Tool {
-    let name = "bulkEnablePolicies"
-    let description = "Enable all policies in a Jamf Pro category. For example, enable all policies in the 'Maintenance' category."
+struct BulkSetPoliciesTool: Tool {
+    let name = "bulkSetPolicies"
+    let description = "Enable or disable many Jamf Pro policies at once. Enabling takes a policy category (e.g. 'Maintenance'); disabling takes a policy name pattern with wildcards (e.g. 'Test*')."
     let cli: any CLIRunning
 
     @Generable struct Arguments {
-        @Guide(description: "The Jamf Pro policy category name (e.g. Maintenance, Security)")
-        let category: String
+        @Guide(description: "true to enable policies, false to disable them")
+        let enable: Bool
+        @Guide(description: "When enabling: the policy category name, e.g. Maintenance. When disabling: a policy name pattern with wildcards, e.g. Test* or Legacy*")
+        let target: String
     }
 
     func call(arguments: Arguments) async throws -> String {
+        let target = arguments.target.trimmingCharacters(in: .whitespaces)
+        return arguments.enable ? await enable(category: target) : await disable(pattern: target)
+    }
+
+    private func enable(category: String) async -> String {
+        guard !category.isEmpty else { return "Refused: name the policy category to enable." }
         let confirmed = await confirmAction(
             title: "Bulk Enable Policies",
-            message: "This will enable ALL policies in category '\(arguments.category)'. This affects the entire fleet. Continue?",
+            message: "This will enable ALL policies in category '\(category)'. This affects the entire fleet. Continue?",
             confirmTitle: "Enable All"
         )
         guard confirmed else { return "Bulk enable cancelled by user." }
         do {
-            let data = try await cli.run(.bulkEnablePolicies(category: arguments.category))
+            let data = try await cli.run(.bulkEnablePolicies(category: category))
             return String(data: data, encoding: .utf8) ?? "Policies enabled."
         } catch {
-            return "Failed to enable policies in category '\(arguments.category)': \(error.localizedDescription)"
+            return "Failed to enable policies in category '\(category)': \(error.localizedDescription)"
         }
     }
-}
 
-@available(macOS 26, *)
-struct BulkDisablePoliciesTool: Tool {
-    let name = "bulkDisablePolicies"
-    let description = "Disable all policies whose name matches a pattern. For example, disable all policies named 'Test*'."
-    let cli: any CLIRunning
-
-    @Generable struct Arguments {
-        @Guide(description: "Name pattern to match (supports wildcards, e.g. 'Test*' or 'Legacy*')")
-        let namePattern: String
-    }
-
-    func call(arguments: Arguments) async throws -> String {
-        let pattern = arguments.namePattern.trimmingCharacters(in: .whitespaces)
+    private func disable(pattern: String) async -> String {
         if Self.matchesEverything(pattern) {
-            return "Refused: the pattern '\(arguments.namePattern)' would match every policy. Ask the user for a more specific name pattern."
+            return "Refused: the pattern '\(pattern)' would match every policy. Ask the user for a more specific name pattern."
         }
         let matching = await Self.matchingPolicyNames(pattern, cli: cli)
         if let matching, matching.isEmpty {
@@ -950,6 +945,30 @@ struct BulkDisablePoliciesTool: Tool {
 
     static func matchingNames(_ pattern: String, in names: [String]) -> [String] {
         names.filter { name in fnmatch(pattern, name, 0) == 0 }
+    }
+}
+
+@available(macOS 26, *)
+struct ExplainEnrollmentTool: Tool {
+    let name = "explainEnrollment"
+    let description = "Explain what happened when a Mac enrolled: enrollment method and PreStage, MDM commands, profiles and policies delivered, and failed or stuck commands. Use for questions like 'what happened when AAA111 enrolled?' or 'why didn't Wi-Fi install on a new Mac?'. Needs the serial number."
+    let cli: any CLIRunning
+
+    @Generable struct Arguments {
+        @Guide(description: "Serial number of the Mac")
+        let serialNumber: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        let serial = CLICommand.sanitizedSerial(arguments.serialNumber)
+        guard !serial.isEmpty else { return "Give the Mac's serial number." }
+        do {
+            let timeline = try await EnrollmentRepository(cli: cli).timeline(serial: serial)
+            return cap(EnrollmentAnalyzer.summary(timeline)
+                + "\nFull timeline: Enrollment → Recent Enrollments in Jamf Dash.", 1_200)
+        } catch {
+            return "Couldn't read the enrollment of \(serial): \(error.localizedDescription)"
+        }
     }
 }
 
