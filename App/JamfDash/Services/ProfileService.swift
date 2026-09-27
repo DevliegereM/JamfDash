@@ -91,36 +91,4 @@ final class ProfileService: @unchecked Sendable {
         defaults.removeObject(forKey: scopeKey(name))
     }
 
-    /// Returns available profiles by running `jamf-cli config list`.
-    /// Falls back to empty array if the command fails or binary is missing.
-    /// Prefer `KeychainService.jamfCLIProfiles()` for the authoritative list —
-    /// this method is kept only as a secondary fallback.
-    func availableProfiles(binaryURL: URL) -> [String] {
-        guard FileManager.default.fileExists(atPath: binaryURL.path) else { return [] }
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = binaryURL
-        process.arguments = ["config", "list"]
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do { try process.run() } catch { return [] }
-        let timeoutDeadline = DispatchTime.now() + .seconds(10)
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: timeoutDeadline) {
-            if process.isRunning { process.terminate() }
-        }
-        process.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard process.terminationStatus == 0,
-              let text = String(data: data, encoding: .utf8) else { return [] }
-        // Output is one profile name per line (possibly with trailing status columns)
-        return text
-            .components(separatedBy: .newlines)
-            .compactMap { line -> String? in
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return nil }
-                // Take only the first whitespace-separated token (the profile name)
-                return trimmed.components(separatedBy: .whitespaces).first
-            }
-            .filter { !$0.isEmpty }
-    }
 }

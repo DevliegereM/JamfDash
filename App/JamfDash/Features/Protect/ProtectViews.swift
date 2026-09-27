@@ -949,8 +949,6 @@ struct ProtectAPIClientsView: View {
     }
 }
 
-// MARK: - Config-as-Code Export Sheet
-
 
 // MARK: - Named entry list (shared pattern for simple resource lists)
 

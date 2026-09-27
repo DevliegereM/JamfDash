@@ -342,7 +342,7 @@ final class EnrollmentCLISafetyTests: XCTestCase {
         XCTAssertEqual(history, ["pro", "classic-computer-history", "get", "--serial=C02 --url x",
                                  "--subset", "Commands", "-o", "json"], "the serial stays inside one --serial= argument")
         XCTAssertEqual(CLICommand.computerPrestageDetail(id: "1 --yes").baseArguments,
-                       ["pro", "computer-prestages", "get", "1", "-o", "json"])
+                       ["pro", "computer-prestages", "get", "-o", "json", "--", "1"])
         let inventory = CLICommand.enrollmentInventory(serial: #"A"B"#).baseArguments
         XCTAssertTrue(inventory.contains(#"hardware.serialNumber=="A\"B""#))
     }

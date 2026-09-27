@@ -11,6 +11,10 @@ struct AuditView: View {
             Divider()
             filterBar
             Divider()
+            if !vm.failedChecks.isEmpty, vm.findingsState.value != nil {
+                failedChecksBanner
+                Divider()
+            }
 
             AsyncContentView(
                 state: vm.findingsState,
@@ -22,9 +26,11 @@ struct AuditView: View {
                                 ? "No Findings" : "No Matching Findings",
                             systemImage: "checkmark.seal.fill",
                             description: Text(
-                                vm.findingsState.value?.isEmpty == true
-                                    ? "All audit checks passed — your environment looks healthy."
-                                    : "Try adjusting your filters."
+                                vm.findingsState.value?.isEmpty != true
+                                    ? "Try adjusting your filters."
+                                    : vm.failedChecks.isEmpty
+                                        ? "All audit checks passed — your environment looks healthy."
+                                        : "The checks that ran found nothing. Some checks couldn't run; see above."
                             )
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -60,6 +66,29 @@ struct AuditView: View {
     private func clearSelection() {
         selectedID = nil
         detailFinding = nil
+    }
+
+    // MARK: - Failed checks
+
+    private var failedChecksBanner: some View {
+        let names = vm.failedChecks.keys.sorted().map(\.capitalized).joined(separator: ", ")
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Some checks couldn't run: \(names)").font(.callout.weight(.medium))
+                if let first = vm.failedChecks.sorted(by: { $0.key < $1.key }).first {
+                    Text(first.value).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                        .textSelection(.enabled)
+                }
+            }
+            Spacer()
+            Button("Try Again") { Task { await vm.load(force: true) } }
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - Summary Bar

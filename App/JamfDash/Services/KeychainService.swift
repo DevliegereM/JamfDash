@@ -20,57 +20,7 @@ extension KeychainError: LocalizedError {
 
 /// App-level credential storage and reader of jamf-cli's own keychain entries.
 actor KeychainService {
-    private let service = "com.jamfdash.credentials"
-    private let account = "jamfpro"
     private let logger = Logger(subsystem: "com.jamfdash", category: "KeychainService")
-
-    // MARK: - App credentials (legacy)
-
-    func save(_ credentials: JamfCredentials) throws {
-        let payload = try JSONEncoder().encode(KeychainPayload(credentials))
-        let query: [String: Any] = baseQuery()
-        // Include kSecAttrAccessible on the update path so that any item originally
-        // created with a weaker accessibility class gets upgraded to WhenUnlocked.
-        let attrs: [String: Any] = [
-            kSecValueData as String: payload,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
-        ]
-        let updateStatus = SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
-        if updateStatus == errSecSuccess { return }
-        if updateStatus == errSecItemNotFound {
-            var addQuery = query
-            addQuery[kSecValueData as String] = payload
-            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
-            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-            guard addStatus == errSecSuccess else { throw KeychainError.osStatus(addStatus) }
-            return
-        }
-        throw KeychainError.osStatus(updateStatus)
-    }
-
-    func load() throws -> JamfCredentials {
-        var query = baseQuery()
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound { throw KeychainError.notFound }
-            throw KeychainError.osStatus(status)
-        }
-        guard let data = result as? Data else { throw KeychainError.malformed }
-        let payload = try JSONDecoder().decode(KeychainPayload.self, from: data)
-        return try payload.toCredentials()
-    }
-
-    func hasCredentials() -> Bool { (try? load()) != nil }
-
-    func delete() throws {
-        let status = SecItemDelete(baseQuery() as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.osStatus(status)
-        }
-    }
 
     // MARK: - Jamf Security Cloud credentials
 
@@ -157,32 +107,4 @@ actor KeychainService {
         return profiles.sorted()
     }
 
-    // MARK: - Private
-
-    private func baseQuery() -> [String: Any] {
-        [
-            kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-    }
-}
-
-// MARK: - Storage payload
-
-private struct KeychainPayload: Codable {
-    let serverURL: String
-    let clientID: String
-    let clientSecret: String
-
-    init(_ c: JamfCredentials) {
-        serverURL    = c.serverURL.absoluteString
-        clientID     = c.clientID
-        clientSecret = c.clientSecret
-    }
-
-    func toCredentials() throws -> JamfCredentials {
-        guard let url = URL(string: serverURL) else { throw KeychainError.malformed }
-        return JamfCredentials(serverURL: url, clientID: clientID, clientSecret: clientSecret)
-    }
 }

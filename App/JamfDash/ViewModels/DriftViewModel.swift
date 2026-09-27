@@ -12,7 +12,7 @@ final class DriftViewModel {
 
     private static let logger = Logger(subsystem: "com.jamfdash", category: "DriftViewModel")
     private let cli: any CLIRunning
-    private let store: DriftStore
+    private var store: DriftStore
 
     private(set) var eventsState: LoadState<[DriftEvent]> = .idle
     private(set) var isSnapshotting: Bool = false
@@ -24,9 +24,17 @@ final class DriftViewModel {
 
     // MARK: Initialization
 
-    init(cli: any CLIRunning, store: DriftStore = .shared) {
+    init(cli: any CLIRunning, store: DriftStore) {
         self.cli = cli
         self.store = store
+    }
+
+    /// Switches to another instance's drift history.
+    func use(store: DriftStore) {
+        self.store = store
+        eventsState = .idle
+        snapshotCount = 0
+        lastSnapshotDate = nil
     }
 
     // MARK: Public Methods

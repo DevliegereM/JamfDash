@@ -10,6 +10,13 @@ struct CorrelationView: View {
         VStack(spacing: 0) {
             searchFilterBar
             Divider()
+            if let pro = env.loadedProfiles[.pro], let protect = env.loadedProfiles[.protect] {
+                Text("Pairing Jamf Pro “\(pro)” with Jamf Protect “\(protect)” by serial number.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                Divider()
+            }
 
             if vm.devices.isEmpty {
                 ContentUnavailableView(

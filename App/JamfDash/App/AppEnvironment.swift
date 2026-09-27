@@ -126,6 +126,9 @@ final class AppEnvironment {
     // MARK: - Health score tracking
 
     private var previousHealthScore: Int? = nil
+    /// The profile each product's data in memory was loaded from, so views that combine
+    /// products (Device Correlation) can say which instances they're pairing.
+    private(set) var loadedProfiles: [JamfProduct: String] = [:]
 
     /// Profiles discovered from the system keychain.
     private(set) var availableProfiles: [String] = []
@@ -208,8 +211,9 @@ final class AppEnvironment {
         self.schoolVM               = SchoolViewModel(cli: cliManager)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: cliManager)
         self.enrollmentVM           = EnrollmentFlowViewModel(cli: cliManager)
-        self.digestService          = DigestService(cli: cliManager)
-        self.driftVM                = DriftViewModel(cli: cliManager)
+        let instanceDir = InstanceStorage.directory(forProfile: profileService.selectedProfile.name)
+        self.digestService          = DigestService(cli: cliManager, storageURL: instanceDir.appendingPathComponent("digests.json"))
+        self.driftVM                = DriftViewModel(cli: cliManager, store: .forProfile(profileService.selectedProfile.name))
         self.correlationVM          = CorrelationViewModel()
         self.auditVM                = AuditViewModel(cli: cliManager, deprecationScanner: deprecationScanner)
 
@@ -265,8 +269,10 @@ final class AppEnvironment {
         self.aiAssistantVM          = AIAssistantViewModel(cli: demoCLI)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: demoCLI)
         self.enrollmentVM           = EnrollmentFlowViewModel(cli: demoCLI)
-        self.digestService          = DigestService(cli: demoCLI)
-        self.driftVM                = DriftViewModel(cli: demoCLI)
+        self.digestService          = DigestService(cli: demoCLI,
+                                                    storageURL: InstanceStorage.demoDirectory.appendingPathComponent("digests.json"),
+                                                    notifies: false)
+        self.driftVM                = DriftViewModel(cli: demoCLI, store: .demo())
         self.correlationVM          = CorrelationViewModel()
         self.auditVM                = AuditViewModel(cli: demoCLI, deprecationScanner: deprecationScanner)
 
@@ -308,6 +314,7 @@ final class AppEnvironment {
             currentProduct = profileService.currentProduct
         }
         let product = currentProduct
+        loadedProfiles[product] = currentProfileName
         Self.logger.info("Starting main data sync — product: \(product.rawValue, privacy: .public), profile: \(self.currentProfileName, privacy: .private)")
 
         switch product {
@@ -423,6 +430,7 @@ final class AppEnvironment {
     func switchDemoProduct(_ product: JamfProduct) {
         guard isDemoMode else { return }
         currentProduct = product
+        NSApp.dockTile.badgeLabel = nil
         loadMainData()
     }
 
@@ -580,6 +588,10 @@ final class AppEnvironment {
                 // Another Jamf instance: don't let Dashie search the previous one's data.
                 FleetKnowledgeStore.shared.clear()
                 enrollmentVM.reset()
+                // Scores from another instance aren't comparable.
+                previousHealthScore = nil
+                NSApp.dockTile.badgeLabel = nil
+                useInstanceStorage(for: profileName)
                 loadMainData()
                 profileSwitchCount += 1
             } catch {
@@ -594,6 +606,14 @@ final class AppEnvironment {
     }
 
     func clearSwitchError() { switchError = nil }
+
+    /// Points drift history, digests and correlation at the given profile's own data.
+    private func useInstanceStorage(for profileName: String) {
+        let dir = InstanceStorage.directory(forProfile: profileName)
+        digestService.use(storageURL: dir.appendingPathComponent("digests.json"))
+        driftVM.use(store: .forProfile(profileName))
+        correlationVM.reset()
+    }
 
     private static func connectionErrorMessage(for error: Error, profile: String) -> String {
         if case CLIError.nonZeroExit(_, let stderr) = error {
@@ -620,6 +640,12 @@ final class AppEnvironment {
 
     func updateDockBadge() {
         let score = fleetHealthScore
+        // No score without security data, and none outside Jamf Pro: clear the badge and
+        // keep the previous score, so a failed load can't trigger a "dropped" alert.
+        guard currentProduct == .pro, score.isAvailable else {
+            NSApp.dockTile.badgeLabel = nil
+            return
+        }
         let rawThreshold = UserDefaults.standard.integer(forKey: "healthScoreThreshold")
         let threshold = rawThreshold == 0 ? 70 : rawThreshold
         NSApp.dockTile.badgeLabel = score.score < threshold ? "\(score.score)" : nil

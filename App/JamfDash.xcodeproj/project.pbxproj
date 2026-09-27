@@ -20,7 +20,6 @@
 		21F25C265070C14A1DBF120F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C4313180D199CB61645D6AAB /* PrivacyInfo.xcprivacy */; };
 		238ECF6DFEE68CCA91B7D1F3 /* DebugLoggingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A384F7AAE000CF87E1EA4A62 /* DebugLoggingService.swift */; };
 		279203C5E78BF01A17F7E531 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D1FB11144A6B476A07A65D8 /* ProfileService.swift */; };
-		2B54617025756191F91E8EC7 /* JamfCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76104D1E55DDA989F1DDA35B /* JamfCredentials.swift */; };
 		30012CD150C42421D154D6E4 /* ErrorMessageFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97422B5AE084BF291355310 /* ErrorMessageFormatter.swift */; };
 		32771C548805701F3B8FCA9A /* EnrollmentAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A73217107E348CBD87E004B /* EnrollmentAnalyzer.swift */; };
 		3289A1254C61CE2EDD4BC615 /* SecurityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6B3F1138012BC76185BD3F8 /* SecurityView.swift */; };
@@ -75,6 +74,7 @@
 		7BC0BF80C61F4B552FEBF1BC /* MobileDevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CC1CD48B4A26B1C959B618C /* MobileDevicesView.swift */; };
 		7DEA6E663E804FFF56EFD0E4 /* PlatformViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8B5693777519A927D2E2F2 /* PlatformViewModel.swift */; };
 		8128539FBE7E2B5724623A59 /* FleetRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9AE5E2170DD1BF1E7B8E67 /* FleetRepository.swift */; };
+		821A33FF7AB5749D5B410A17 /* InstanceStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A82DEC1F0C3A42D8777498 /* InstanceStorage.swift */; };
 		830E383B5481FF815698E955 /* DeviceSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11104400C1207BCA192BA6A /* DeviceSearchView.swift */; };
 		880391F8059A3DE542B9DC0F /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 447D8E2BFE4215CBD3BF5FFC /* HelpView.swift */; };
 		8A34C52484E8AE50473F1346 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA72476386D56067F74E8649 /* DevicesView.swift */; };
@@ -102,6 +102,7 @@
 		B61544C2012C7E4712FDB3C4 /* JamfProduct.swift in Sources */ = {isa = PBXBuildFile; fileRef = A57655D2D81B3538CDA41FAA /* JamfProduct.swift */; };
 		B66F9DC4EDECAEE439DDB434 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F296E3F2BC4F04419299C8C /* AppState.swift */; };
 		B97FA917612AAF40CA35D426 /* CLISecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFB78E8D8D6A83AED291B489 /* CLISecurityTests.swift */; };
+		BDCA7D4C2773E2A960522BCE /* CLIHelpContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B45BF3C341A8A7AFC6F8F17 /* CLIHelpContractTests.swift */; };
 		BDD81120563B8650AFCC4CA9 /* FleetModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67645110CD028E2CE7C68EAE /* FleetModels.swift */; };
 		C2E7C2392F62DA2E5B5456BB /* JamfDashIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F84D27D8889FB7720A57B3F /* JamfDashIntents.swift */; };
 		C36B358EF5D0939752339453 /* CLIVersionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4B36F8A0BB673492220609A /* CLIVersionStore.swift */; };
@@ -184,6 +185,7 @@
 		122D1C3DA7468A4DBB598BD0 /* FleetViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetViewModel.swift; sourceTree = "<group>"; };
 		18F8045BF750F0DBD913FE61 /* PlatformDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlatformDetailModels.swift; sourceTree = "<group>"; };
 		19F65D6860AAC50376DB0026 /* MacOS27ReadinessTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MacOS27ReadinessTests.swift; sourceTree = "<group>"; };
+		1B45BF3C341A8A7AFC6F8F17 /* CLIHelpContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CLIHelpContractTests.swift; sourceTree = "<group>"; };
 		228A2C5DF5787E1FF50A2411 /* PDFExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFExporter.swift; sourceTree = "<group>"; };
 		2474D3B4BF10F5482B966512 /* AIAssistantViewModel+Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIAssistantViewModel+Session.swift"; sourceTree = "<group>"; };
 		276906C92A73944DF3BA9869 /* SecurityRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityRepository.swift; sourceTree = "<group>"; };
@@ -215,6 +217,7 @@
 		5D6DB8BA0D1CC0EF525ADA88 /* JamfSecurityRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfSecurityRepository.swift; sourceTree = "<group>"; };
 		5EF9965B3A25800E2ACF29FB /* EnrollmentRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EnrollmentRepository.swift; sourceTree = "<group>"; };
 		5F84D27D8889FB7720A57B3F /* JamfDashIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JamfDashIntents.swift; sourceTree = "<group>"; };
+		63A82DEC1F0C3A42D8777498 /* InstanceStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstanceStorage.swift; sourceTree = "<group>"; };
 		64CF97D92D1246498EA6D506 /* PlatformSetup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlatformSetup.swift; sourceTree = "<group>"; };
 		653221465C4D79BEC6D18D31 /* CLIExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIExecutor.swift; sourceTree = "<group>"; };
 		67645110CD028E2CE7C68EAE /* FleetModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetModels.swift; sourceTree = "<group>"; };
@@ -227,7 +230,6 @@
 		70B891128FC5CF093DFE5598 /* OverviewItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewItem.swift; sourceTree = "<group>"; };
 		72F3BAFA064517F58CAB80FF /* SettingsInspectorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsInspectorViewModel.swift; sourceTree = "<group>"; };
 		759585A030F63F374BD6FEA9 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
-		76104D1E55DDA989F1DDA35B /* JamfCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfCredentials.swift; sourceTree = "<group>"; };
 		7A754F0CF54F07B6340158DE /* JamfDashApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfDashApp.swift; sourceTree = "<group>"; };
 		7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCLIManager.swift; sourceTree = "<group>"; };
 		7E7AC40E74CF98EE6D591239 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -400,6 +402,7 @@
 				8FC3CDE86DBB84D39F9FF3BD /* FleetKnowledgeIndex.swift */,
 				2A73217107E348CBD87E004B /* EnrollmentAnalyzer.swift */,
 				403EBA02D47723998664E89A /* DemoEnrollmentData.swift */,
+				63A82DEC1F0C3A42D8777498 /* InstanceStorage.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -414,7 +417,6 @@
 				DDE709B0EFFC47F75239C075 /* DriftModels.swift */,
 				67645110CD028E2CE7C68EAE /* FleetModels.swift */,
 				332CD79CF790749A979186DA /* HealthScore.swift */,
-				76104D1E55DDA989F1DDA35B /* JamfCredentials.swift */,
 				A57655D2D81B3538CDA41FAA /* JamfProduct.swift */,
 				FFDFF28776F32F3744EE9C89 /* JamfProfile.swift */,
 				2B6B72843CEE1E93F140BFBC /* JSCModels.swift */,
@@ -588,6 +590,7 @@
 				809999E71240665EDC8BF4C1 /* SettingsLayoutTests.swift */,
 				8BEF82B756863B2E4A0892B3 /* EnrollmentTimelineTests.swift */,
 				56E31554062C9F2190E49390 /* CLIContractTests.swift */,
+				1B45BF3C341A8A7AFC6F8F17 /* CLIHelpContractTests.swift */,
 			);
 			path = JamfDashTests;
 			sourceTree = "<group>";
@@ -950,7 +953,6 @@
 				E29775A793679A72DD7109D3 /* HealthScore.swift in Sources */,
 				880391F8059A3DE542B9DC0F /* HelpView.swift in Sources */,
 				C57450C55500380D984F75C4 /* JSCModels.swift in Sources */,
-				2B54617025756191F91E8EC7 /* JamfCredentials.swift in Sources */,
 				32C251FCF533FCDF7994C308 /* JamfDashApp.swift in Sources */,
 				B61544C2012C7E4712FDB3C4 /* JamfProduct.swift in Sources */,
 				522CE6ED9EBE9CE2EBB35DEF /* JamfProfile.swift in Sources */,
@@ -1015,6 +1017,7 @@
 				4B637F49B33C621C8C07288B /* EnrollmentFlowViewModel.swift in Sources */,
 				6853370AEF7B98E33C4C5914 /* EnrollmentSectionView.swift in Sources */,
 				E88D4B26110720552565F30A /* EnrollmentFlowView.swift in Sources */,
+				821A33FF7AB5749D5B410A17 /* InstanceStorage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1029,6 +1032,7 @@
 				C927BA81DA00EB5B5EED0874 /* SettingsLayoutTests.swift in Sources */,
 				D388D56115616C644135972D /* EnrollmentTimelineTests.swift in Sources */,
 				E39EE3FAC55A6B2A7B89EFF7 /* CLIContractTests.swift in Sources */,
+				BDCA7D4C2773E2A960522BCE /* CLIHelpContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

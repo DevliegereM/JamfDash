@@ -236,8 +236,8 @@ enum CLICommand: Sendable {
         case .scripts:              return ["pro", "scripts", "list", "-o", "json"]
         case .packages:             return ["pro", "classic-packages", "list", "-o", "json"]
         case .configProfiles:                     return ["pro", "classic-macos-config-profiles", "list", "-o", "json"]
-        case .policyDetail(let id):               return ["pro", "classic-policies", "get", "\(id)", "-o", "json"]
-        case .configProfileDetail(let id):        return ["pro", "classic-macos-config-profiles", "get", "\(id)", "-o", "json"]
+        case .policyDetail(let id):               return ["pro", "classic-policies", "get", "-o", "json", "--", "\(id)"]
+        case .configProfileDetail(let id):        return ["pro", "classic-macos-config-profiles", "get", "-o", "json", "--", "\(id)"]
         case .computers:                          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "-o", "json"]
         case .computerDetail(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "STORAGE", "--section", "DISK_ENCRYPTION", "--section", "SECURITY", "--section", "USER_AND_LOCATION", "--section", "PURCHASING", "--section", "GROUP_MEMBERSHIPS", "--section", "LOCAL_USER_ACCOUNTS", "--section", "SOFTWARE_UPDATES", "--section", "CONFIGURATION_PROFILES", "--section", "EXTENSION_ATTRIBUTES", "-o", "json"]
         case .computerDetailById(let id):         return ["pro", "computers-inventory", "get", "-o", "json", "--", id]
@@ -396,7 +396,7 @@ enum CLICommand: Sendable {
         case .patchPolicyDetail(let id):         return ["pro", "classic-patch-policies", "get", "-o", "json", "--", id]
         case .restrictedSoftwareDetail(let id):  return ["pro", "classic-restricted-software", "get", "-o", "json", "--", id]
         case .scriptDetail(let id):      return ["pro", "scripts", "get", "-o", "json", "--", id]
-        case .packageDetail(let id):     return ["pro", "classic-packages", "get", "\(id)", "-o", "json"]
+        case .packageDetail(let id):     return ["pro", "classic-packages", "get", "-o", "json", "--", "\(id)"]
 
         // macOS 27 readiness (appended)
         case .softwareUpdatePlans:               return ["pro", "managed-software-updates-plans", "list", "-o", "json"]
@@ -420,7 +420,7 @@ enum CLICommand: Sendable {
             return ["pro", "classic-computer-history", "get", CLICommand.serialFlag(s),
                     "--subset", subset.rawValue, "-o", "json"]
         case .computerPrestageDetail(let id):
-            return ["pro", "computer-prestages", "get", id.filter { $0.isASCII && $0.isNumber }, "-o", "json"]
+            return ["pro", "computer-prestages", "get", "-o", "json", "--", id.filter { $0.isASCII && $0.isNumber }]
         case .logFlushingSettings:
             return ["pro", "log-flushing", "list", "-o", "json"]
         }
@@ -1075,10 +1075,6 @@ actor CLIManager: CLIRunning {
     }
 
     // MARK: - Profile helpers
-
-    func availableProfiles() -> [String] {
-        profileService.availableProfiles(binaryURL: binaryURL)
-    }
 
     func removeProfile(_ name: String) async throws {
         guard isBinaryInstalled else { throw CLIError.binaryMissing }

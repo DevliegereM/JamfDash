@@ -13,8 +13,8 @@ Jamf Dash connects to your Jamf environment via [`jamf-cli`](https://github.com/
 
 | Product | Sections |
 |---|---|
-| Jamf Pro | Overview · Security Posture · Fleet & Config · Devices · Mobile Devices · Device Lookup · Reports · Bulk Actions · Org Browser · Extension Attributes · Patch Management · Enrollment · Webhooks · DDM Monitor · Configuration Drift · Audit Dashboard · Settings Inspector · Blueprints · Compliance Benchmarks · AI Assistant |
-| Jamf Protect | Overview · Events · Computers · Plans · Alerts · Insights · Audit Logs · Removable Storage · Unified Logging · Action Configs · Telemetry · Prevent Lists · Roles · Users · Groups · API Clients |
+| Jamf Pro | Overview · Security Posture · Fleet & Config · Devices · Mobile Devices · Device Lookup · Reports · Org Browser · Extension Attributes · Patch Management · Enrollment · DDM Monitor · Configuration Drift · Audit Dashboard · Settings Inspector · Blueprints · Compliance Benchmarks · AI Assistant |
+| Jamf Protect | Overview · Alerts · Computers · Plans · Analytics · Analytic Sets · Audit Logs · Removable Storage · Unified Logging · Action Configs · Telemetry · Prevent Lists · Roles · Users · Groups · API Clients |
 | Jamf School | Overview · Devices · Device Groups · Users · User Groups · Classes · Apps |
 | Cross-product | Device Correlation *(requires both Pro and Protect)* |
 
@@ -146,13 +146,15 @@ Three-tab Mac inventory view:
 Serial numbers and device names are text-selectable for easy copying.
 
 **Mobile Devices**
-iOS and iPadOS device inventory with the same filtering and search capabilities as the Mac Devices view.
+iOS and iPadOS device inventory with the same filtering and search capabilities as the Mac Devices view. Device actions: Update Inventory, Restart, Shut Down, Enable Lost Mode (with a message, phone number and footnote), Disable Lost Mode, Erase, Unmanage and Lock.
 
 **Device Lookup**
 Look up any Mac by serial number and view full hardware, OS, security, location, storage, network, and configuration profile detail. Smart Groups, Static Groups, Local Users, Configuration Profiles, and Extension Attributes are shown in collapsible sections. A Device History panel at the bottom shows enrollment timeline (first enrolled, last re-enrolled, last check-in), enrollment method, and placeholder sections for MDM command history and user assignment history. Run management actions directly from the detail panel:
 - Safe: Blank Push, Renew MDM, DDM Sync, Flush Failed Commands, Flush All Commands
 - Moderate: Redeploy Framework, Enable/Disable Remote Desktop, Restart, Shutdown
-- Destructive (confirmation required): Remove MDM, Set Recovery Lock, Lock (with PIN), Erase
+- Destructive (confirmation required): Remove MDM, Clear Recovery Lock, Lock (with PIN), Erase
+
+Which actions are available depends on the connection's permission level (Settings → Connection).
 
 A **Software Update Readiness** section shows whether the Mac is ready for macOS 27 update management (see *Update Readiness* below).
 
@@ -174,14 +176,6 @@ Eight built-in CSV report types, each displayed in a full-width interactive tabl
 
 A **PDF Export** option generates a formatted PDF containing your Overview and Security Posture data, optionally branded with your company logo (upload via **Settings → Branding**).
 
-**Bulk Actions**
-Run a management command against a target without leaving the app. Supported operations:
-- Inventory Update (Recon)
-- Policy Trigger
-- MDM Push
-- Remote Lock (with PIN)
-- Remote Erase
-
 **Org Browser**
 Browse foundational Jamf Pro org objects across three tabs: Buildings, Departments, and Network Segments.
 
@@ -196,9 +190,6 @@ Three-tab enrollment dashboard:
 - *DEP Tokens* — Apple Business Manager / Apple School Manager tokens with associated organisation name and expiry date (renew before expiry to avoid enrollment interruptions)
 - *Computer Prestages* — all configured Mac prestages with MDM removable flag
 - *Mobile Device Prestages* — all configured iOS/iPadOS prestages
-
-**Webhooks**
-Table of all configured Jamf Pro webhooks — name, event type, enabled state, and endpoint URL.
 
 **DDM Monitor**
 Declarative Device Management status in four views:
@@ -248,7 +239,7 @@ Dashie is an on-device AI fleet assistant powered by Apple Intelligence (macOS 2
 - Fleet-wide questions: device counts, compliance percentages, OS distribution, patch status
 - Device lookup: hardware specs, installed apps, smart group memberships
 - Security posture: FileVault, SIP, Gatekeeper, and firewall compliance breakdowns
-- Management actions: blank push, MDM profile renew, redeploy framework, flush failed commands, restart, run a policy on a Mac, and bulk enable/disable policies. Every action except blank push asks for your confirmation before anything is sent.
+- Management actions: blank push, MDM profile renew, redeploy framework, flush failed commands, restart, and bulk enable/disable policies. These are **off by default**; turn them on in **Settings → Dashie**. Every action asks for your confirmation, showing what Jamf Dash looked up itself, before anything is sent.
 
 **Requirements:**
 - macOS 26 or later
@@ -296,8 +287,8 @@ Summary chips in the toolbar show the total matched, Pro-only, and Protect-only 
 **Overview**
 Deployment and threat summary statistics from the Protect overview endpoint.
 
-**Events**
-Recent threat and detection events stream.
+**Alerts**
+Protect alerts with severity, status, analytic, host and time. Filter by severity or status and search by analytic or host.
 
 **Computers**
 Table of enrolled computers showing host name, serial number, OS version, assigned plan, and last check-in time.
@@ -305,11 +296,11 @@ Table of enrolled computers showing host name, serial number, OS version, assign
 **Plans**
 All configured Protect plans with action config, telemetry, log level, and auto-update flag. Click any row for a full detail sheet.
 
-**Alerts**
-Active alerts with severity, host, and timestamp.
+**Analytics**
+All Protect analytics with their severity and categories.
 
-**Insights**
-Protect analytics insights with trend data.
+**Analytic Sets**
+Analytic sets and the analytics they contain.
 
 **Audit Logs**
 Administrative audit log for your Protect tenant.
@@ -340,9 +331,6 @@ All Protect groups with name and member count.
 
 **API Clients**
 All configured Protect API clients — name, role, and creation date.
-
-**Config-as-Code Export**
-Export any Protect resource to YAML from the sheet available in the Protect sections. Select a resource type from the sidebar, preview the generated YAML in the editor pane, then copy to clipboard or save to disk.
 
 ---
 
@@ -397,7 +385,7 @@ In Demo Mode a banner appears in the toolbar and a product switcher (Pro / Prote
 | Profile | Select which `jamf-cli` profile to use for API calls |
 | CLI | View installed `jamf-cli` version, check for updates, update the binary, enable Demo Mode |
 | Branding | Upload a company logo to include in exported PDF reports |
-| Backup | Select Jamf Pro resources and export them to JSON files in a timestamped folder for archiving or diffing |
+| Export Lists | Save Jamf Pro lists (policies, profiles, scripts, packages, groups, extension attributes, patch titles and policies, webhooks) as JSON files in a dated folder. These are lists with names and IDs, not a backup that can be restored |
 
 ---
 

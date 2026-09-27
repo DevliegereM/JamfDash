@@ -39,26 +39,30 @@ final class DigestService {
     // MARK: Properties
 
     private let cli: any CLIRunning
-    private let storageURL: URL
+    private var storageURL: URL
     private let notifies: Bool
     private(set) var entries: [DigestEntry] = []
     private(set) var isRunning = false
 
     // MARK: Initialization
 
-    /// `storageURL` is for tests; the app uses Application Support/JamfDash/digests.json.
-    init(cli: any CLIRunning, storageURL: URL? = nil, notifies: Bool = true) {
+    /// The app passes `InstanceStorage.directory(forProfile:)/digests.json`; demo mode
+    /// a temporary file.
+    init(cli: any CLIRunning, storageURL: URL, notifies: Bool = true) {
         self.cli = cli
         self.notifies = notifies
-        if let storageURL {
-            self.storageURL = storageURL
-        } else {
-            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            let dir = appSupport.appendingPathComponent("JamfDash", isDirectory: true)
-            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            self.storageURL = dir.appendingPathComponent("digests.json")
-        }
-        self.entries = (try? JSONDecoder().decode([DigestEntry].self, from: Data(contentsOf: self.storageURL))) ?? []
+        self.storageURL = storageURL
+        self.entries = Self.read(storageURL)
+    }
+
+    /// Switches to another instance's digests.
+    func use(storageURL: URL) {
+        self.storageURL = storageURL
+        entries = Self.read(storageURL)
+    }
+
+    private static func read(_ url: URL) -> [DigestEntry] {
+        (try? JSONDecoder().decode([DigestEntry].self, from: Data(contentsOf: url))) ?? []
     }
 
     // MARK: Public Methods
@@ -77,6 +81,7 @@ final class DigestService {
     func run() async {
         isRunning = true
         defer { isRunning = false }
+        let target = storageURL
 
         let overviewData  = try? await cli.run(.overview)
         let securityData  = try? await cli.run(.securityReport)
@@ -85,6 +90,8 @@ final class DigestService {
         let context = Self.buildContext(overview: overviewData, security: securityData, patch: patchData)
         guard !context.isEmpty else { return }
         guard let bullets = await generateBullets(context: context), !bullets.isEmpty else { return }
+        // The instance changed while this ran; the digest belongs to the previous one.
+        guard target == storageURL else { return }
 
         let entry = DigestEntry(id: UUID(), date: Date(), bullets: bullets,
                                 rawSummary: bullets.map { "• \($0)" }.joined(separator: "\n"))

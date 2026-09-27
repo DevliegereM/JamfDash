@@ -35,7 +35,9 @@ struct SecurityView: View {
                 } else if let error = vm.state.errorMessage {
                     ErrorStateView(message: error) { await vm.load(force: true) }
                 } else {
-                    HealthScoreBanner(score: env.fleetHealthScore)
+                    if env.fleetHealthScore.isAvailable {
+                        HealthScoreBanner(score: env.fleetHealthScore)
+                    }
                     if let summary = vm.summary {
                         complianceSection(summary: summary)
                     }

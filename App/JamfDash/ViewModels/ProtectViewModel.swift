@@ -465,16 +465,16 @@ final class ProtectViewModel {
 
     // MARK: - Load all
 
-    func load() async {
+    func load(force: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.loadOverview() }
-            group.addTask { await self.loadEvents() }
-            group.addTask { await self.loadComputers() }
-            group.addTask { await self.loadPlans() }
-            group.addTask { await self.loadAnalytics() }
-            group.addTask { await self.loadAnalyticSets() }
-            group.addTask { await self.loadExceptionSets() }
-            group.addTask { await self.loadAuditLogs() }
+            group.addTask { await self.loadOverview(force: force) }
+            group.addTask { await self.loadEvents(force: force) }
+            group.addTask { await self.loadComputers(force: force) }
+            group.addTask { await self.loadPlans(force: force) }
+            group.addTask { await self.loadAnalytics(force: force) }
+            group.addTask { await self.loadAnalyticSets(force: force) }
+            group.addTask { await self.loadExceptionSets(force: force) }
+            group.addTask { await self.loadAuditLogs(force: force) }
         }
     }
 

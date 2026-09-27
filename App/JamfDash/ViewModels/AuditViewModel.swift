@@ -157,33 +157,53 @@ final class AuditViewModel {
         guard force || !findingsState.isLoading else { return }
         Self.logger.debug("Loading audit findings across all categories")
         findingsState = .loading
-        do {
-            // Run all categories in parallel; collect results, ignore individual failures.
-            var allFindings: [AuditFinding] = []
-            await withTaskGroup(of: [AuditFinding].self) { group in
-                for category in Self.auditCategories {
-                    group.addTask {
-                        guard let data = try? await self.cli.run(.proAudit(category: category)) else {
-                            return []
-                        }
-                        let decoded = (try? Self.decode(from: data, categoryFallback: category)) ?? []
-                        return decoded
+        failedChecks = [:]
+        enum Outcome: Sendable {
+            case findings([AuditFinding])
+            case failed(category: String, message: String)
+        }
+        var allFindings: [AuditFinding] = []
+        var failures: [String: String] = [:]
+        await withTaskGroup(of: Outcome.self) { group in
+            for category in Self.auditCategories {
+                group.addTask {
+                    do {
+                        let data = try await self.cli.run(.proAudit(category: category))
+                        return .findings(try Self.decode(from: data, categoryFallback: category))
+                    } catch {
+                        return .failed(category: category, message: ErrorMessageFormatter.message(for: error))
                     }
                 }
-                // Local rules: configuration profiles using payloads deprecated/removed in OS 27.
-                let scanner = self.deprecationScanner
-                group.addTask {
-                    guard let profiles = try? await scanner.scan(force: force) else { return [] }
-                    return DeprecationAuditRules.findings(for: profiles)
-                }
-                for await findings in group {
-                    allFindings.append(contentsOf: findings)
+            }
+            // Local rules: configuration profiles using payloads deprecated/removed in OS 27.
+            let scanner = self.deprecationScanner
+            group.addTask {
+                do {
+                    return .findings(DeprecationAuditRules.findings(for: try await scanner.scan(force: force)))
+                } catch {
+                    return .failed(category: "profiles", message: ErrorMessageFormatter.message(for: error))
                 }
             }
-            Self.logger.debug("Loaded \(allFindings.count) audit findings total")
+            for await outcome in group {
+                switch outcome {
+                case .findings(let findings): allFindings.append(contentsOf: findings)
+                case .failed(let category, let message): failures[category] = message
+                }
+            }
+        }
+        failedChecks = failures
+        if failures.count == Self.auditCategories.count + 1 {
+            // Nothing ran, so there's nothing to call "passed".
+            Self.logger.error("Every audit check failed")
+            findingsState = .failed(failures.values.first ?? "The audit checks couldn't run.")
+        } else {
+            Self.logger.debug("Loaded \(allFindings.count) audit findings, \(failures.count) checks failed")
             findingsState = .loaded(allFindings)
         }
     }
+
+    /// Checks that couldn't run in the last load, by category, with the error shown to the user.
+    private(set) var failedChecks: [String: String] = [:]
 
     // MARK: - Filtering
 

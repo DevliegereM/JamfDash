@@ -22,6 +22,9 @@ struct FleetHealthScore: Sendable {
     /// True when patch compliance data was unavailable; score is calculated over the remaining weight.
     let isPartial: Bool
     let breakdown: [ScoreComponent]
+    /// False when there's no security data to score. The score is then meaningless and
+    /// must not be shown, badged or compared.
+    let isAvailable: Bool
 
     // MARK: - Init
 
@@ -36,6 +39,7 @@ struct FleetHealthScore: Sendable {
         patchCompliancePct: Double?
     ) {
         var components: [ScoreComponent] = []
+        isAvailable = (summary?.totalDevices ?? 0) > 0
 
         if let s = summary, s.totalDevices > 0 {
             let total  = Double(s.totalDevices)

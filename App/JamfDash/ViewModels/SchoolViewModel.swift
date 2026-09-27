@@ -162,17 +162,17 @@ final class SchoolViewModel {
 
     // MARK: - Load all
 
-    func load() async {
+    func load(force: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.loadOverview() }
-            group.addTask { await self.loadDevices() }
-            group.addTask { await self.loadDeviceGroups() }
-            group.addTask { await self.loadUsers() }
-            group.addTask { await self.loadUserGroups() }
-            group.addTask { await self.loadClasses() }
-            group.addTask { await self.loadApps() }
-            group.addTask { await self.loadProfiles() }
-            group.addTask { await self.loadDepDevices() }
+            group.addTask { await self.loadOverview(force: force) }
+            group.addTask { await self.loadDevices(force: force) }
+            group.addTask { await self.loadDeviceGroups(force: force) }
+            group.addTask { await self.loadUsers(force: force) }
+            group.addTask { await self.loadUserGroups(force: force) }
+            group.addTask { await self.loadClasses(force: force) }
+            group.addTask { await self.loadApps(force: force) }
+            group.addTask { await self.loadProfiles(force: force) }
+            group.addTask { await self.loadDepDevices(force: force) }
         }
     }
 

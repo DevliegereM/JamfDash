@@ -13,6 +13,9 @@ final class CorrelationViewModel {
     var searchText: String = ""
     var filter: CorrelationFilter = .all
 
+    /// Clears the result, e.g. after switching instance.
+    func reset() { devices = [] }
+
     // MARK: - Correlation
 
     /// Merges Pro computers and Protect computers by serial number.

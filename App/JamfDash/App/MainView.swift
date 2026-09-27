@@ -240,16 +240,22 @@ struct MainView: View {
             Task { await env.platformVM.loadBlueprints(force: true) }
         case .complianceBenchmarks:
             Task { await env.platformVM.loadComplianceBenchmarks(force: true) }
+        case .protectRemovableStorage: Task { await env.protectVM.loadRemovableStorage(force: true) }
+        case .protectUnifiedLogging:   Task { await env.protectVM.loadUnifiedLogging(force: true) }
+        case .protectActionConfigs:    Task { await env.protectVM.loadActionConfigs(force: true) }
+        case .protectTelemetry:        Task { await env.protectVM.loadTelemetry(force: true) }
+        case .protectPreventLists:     Task { await env.protectVM.loadPreventLists(force: true) }
+        case .protectRoles:            Task { await env.protectVM.loadRoles(force: true) }
+        case .protectUsers:            Task { await env.protectVM.loadUsers(force: true) }
+        case .protectGroups:           Task { await env.protectVM.loadGroups(force: true) }
+        case .protectAPIClients:       Task { await env.protectVM.loadAPIClients(force: true) }
         case .protectOverview, .protectEvents, .protectComputers, .protectPlans,
-             .protectAlerts, .protectInsights, .protectAuditLogs, .protectRemovableStorage,
-             .protectUnifiedLogging, .protectActionConfigs, .protectTelemetry,
-             .protectPreventLists, .protectRoles, .protectUsers, .protectGroups,
-             .protectAPIClients:
-            Task { await env.protectVM.load() }
+             .protectAlerts, .protectInsights, .protectAuditLogs:
+            Task { await env.protectVM.load(force: true) }
         case .schoolOverview, .schoolDevices, .schoolDeviceGroups, .schoolUsers,
              .schoolUserGroups, .schoolClasses, .schoolApps,
              .schoolProfiles, .schoolDepDevices:
-            Task { await env.schoolVM.load() }
+            Task { await env.schoolVM.load(force: true) }
         case .settingsInspector:
             Task { await env.settingsInspectorVM.load(force: true) }
         case .driftTracker:

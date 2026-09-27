@@ -4,11 +4,23 @@ import OSLog
 
 // MARK: - DriftStore
 
+/// SQLite copies the bound value immediately; the Swift string buffers passed to
+/// `sqlite3_bind_text` don't outlive the call.
+private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 final class DriftStore: @unchecked Sendable {
 
     // MARK: Properties
 
-    static let shared = DriftStore()
+    /// Drift history for one connection profile.
+    static func forProfile(_ name: String) -> DriftStore {
+        DriftStore(directory: InstanceStorage.directory(forProfile: name))
+    }
+
+    /// Drift history for demo mode, in a temporary folder.
+    static func demo() -> DriftStore {
+        DriftStore(directory: InstanceStorage.demoDirectory)
+    }
 
     private static let logger = Logger(subsystem: "com.jamfdash", category: "DriftStore")
 
@@ -17,12 +29,8 @@ final class DriftStore: @unchecked Sendable {
 
     // MARK: Initialization
 
-    private init() {
-        let appSupport = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("JamfDash", isDirectory: true)
-
-        dbURL = appSupport.appendingPathComponent("drift.db")
+    init(directory: URL) {
+        dbURL = directory.appendingPathComponent("drift.db")
         dbQueue = DispatchSerialQueue(label: "com.jamfdash.DriftStore")
 
         dbQueue.sync {
@@ -126,7 +134,7 @@ final class DriftStore: @unchecked Sendable {
             }
             defer { sqlite3_finalize(stmt) }
 
-            sqlite3_bind_text(stmt, 1, (type.rawValue as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, (type.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
 
             while sqlite3_step(stmt) == SQLITE_ROW {
                 let itemId = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
@@ -147,7 +155,7 @@ final class DriftStore: @unchecked Sendable {
             }
             defer { sqlite3_finalize(stmt) }
 
-            sqlite3_bind_text(stmt, 1, (takenAt as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 1, (takenAt as NSString).utf8String, -1, SQLITE_TRANSIENT)
             sqlite3_step(stmt)
             return sqlite3_last_insert_rowid(db)
         } ?? 0
@@ -168,11 +176,11 @@ final class DriftStore: @unchecked Sendable {
             for item in items {
                 sqlite3_reset(stmt)
                 sqlite3_bind_int64(stmt, 1, snapshotId)
-                sqlite3_bind_text(stmt, 2, (type.rawValue as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 3, (item.itemId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 4, (item.name as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 2, (type.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 3, (item.itemId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 4, (item.name as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if let cat = item.category {
-                    sqlite3_bind_text(stmt, 5, (cat as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(stmt, 5, (cat as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(stmt, 5)
                 }
@@ -198,18 +206,18 @@ final class DriftStore: @unchecked Sendable {
             for event in events {
                 sqlite3_reset(stmt)
                 let dateStr = iso.string(from: event.detectedAt)
-                sqlite3_bind_text(stmt, 1, (dateStr as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 2, (event.itemType.rawValue as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 3, (event.itemId as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 4, (event.itemName as NSString).utf8String, -1, nil)
-                sqlite3_bind_text(stmt, 5, (event.changeType.rawValue as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(stmt, 1, (dateStr as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 2, (event.itemType.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 3, (event.itemId as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 4, (event.itemName as NSString).utf8String, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, 5, (event.changeType.rawValue as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 if let old = event.oldValue {
-                    sqlite3_bind_text(stmt, 6, (old as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(stmt, 6, (old as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(stmt, 6)
                 }
                 if let new = event.newValue {
-                    sqlite3_bind_text(stmt, 7, (new as NSString).utf8String, -1, nil)
+                    sqlite3_bind_text(stmt, 7, (new as NSString).utf8String, -1, SQLITE_TRANSIENT)
                 } else {
                     sqlite3_bind_null(stmt, 7)
                 }
