@@ -137,6 +137,6 @@ struct JamfDashApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
-        .defaultSize(width: 680, height: 620)
+        .defaultSize(width: 980, height: 680)
     }
 }

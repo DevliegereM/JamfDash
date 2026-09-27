@@ -398,6 +398,17 @@ final class DashieLiveTests: XCTestCase {
     }
 
     @MainActor
+    func testHelpQuestionIsAnsweredFromHelp() async throws {
+        guard case .available = SystemLanguageModel.default.availability else { throw XCTSkip("model unavailable") }
+        let vm = AIAssistantViewModel(cli: CannedCLI())
+        vm.inputText = "How do I turn on automatic updates for Jamf Dash?"
+        await vm.send()
+        let reply = vm.messages.last(where: { $0.role == .assistant })?.content ?? ""
+        print("DASHIE help: \(reply.prefix(300))")
+        XCTAssertTrue(reply.localizedCaseInsensitiveContains("Updates"), reply)
+    }
+
+    @MainActor
     func testFollowUpQuestion() async throws {
         guard case .available = SystemLanguageModel.default.availability else { throw XCTSkip("model unavailable") }
         let vm = AIAssistantViewModel(cli: CannedCLI())
@@ -459,6 +470,9 @@ final class DashieToolRoutingEvals: XCTestCase {
         Case(question: "Give me a health overview of the Jamf Pro instance", expected: ["getOverview"]),
         Case(question: "What do we have for FileVault?", expected: ["searchFleetKnowledge"]),
         Case(question: "What did the daily digest say about patches?", expected: ["searchFleetKnowledge"]),
+        Case(question: "How do I add a Platform API connection in Jamf Dash?", expected: ["searchHelp"]),
+        Case(question: "Why are Blueprints greyed out in the sidebar?", expected: ["searchHelp"]),
+        Case(question: "Where can I turn on automatic app updates?", expected: ["searchHelp"]),
     ]
 
     /// Minimum share of cases where the model picks an expected tool.

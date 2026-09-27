@@ -88,6 +88,7 @@ extension AIAssistantViewModel {
             GetSmartGroupsTool(cli: cli),
             GetInventorySummaryTool(cli: cli),
             SearchFleetKnowledgeTool(),
+            SearchHelpTool(),
             // Actions
             BlankPushTool(cli: cli),
             RenewMDMProfileTool(cli: cli),
@@ -427,6 +428,8 @@ extension AIAssistantViewModel {
         • Find anything by name or keyword (policies, profiles, scripts, packages, groups, Macs, \
         blueprints, compliance rules, past digests), e.g. "what do we have for FileVault?": \
         searchFleetKnowledge
+        • How to use Jamf Dash, where something is, setup, permissions or errors in the app: \
+        searchHelp — answer from its result and name where to find it (e.g. Settings → Updates)
         • Actions, only when the user asks for them: blankPush, renewMDMProfile, \
         redeployFramework, flushFailedCommands, restartDevice, executePolicy, \
         bulkEnablePolicies, bulkDisablePolicies

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct RootView: View {
@@ -56,6 +57,10 @@ struct RootView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openHelpWindow)) { _ in
             openWindow(id: "jamf-help")
+        }
+        .onAppear {
+            // Help topics show up in the Help menu's search field.
+            NSApp.registerUserInterfaceItemSearchHandler(HelpMenuSearch.shared)
         }
     }
 }

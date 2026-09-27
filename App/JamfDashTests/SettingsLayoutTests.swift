@@ -89,6 +89,14 @@ final class SettingsLayoutTests: XCTestCase {
         print("LOCALE current=\(Locale.current.identifier) preferred=\(Locale.preferredLanguages) supportsCurrent=\(model.supportsLocale()) state=\(AppleIntelligenceStatus.current())")
     }
 
+    func testHelpWindowRenders() {
+        _ = snapshot(HelpView(), size: NSSize(width: 980, height: 680), name: "help-window")
+        let topic = HelpLibrary.topic(id: "platform-api")!
+        _ = snapshot(HelpTopicView(topic: topic) { _ in }, size: NSSize(width: 700, height: 680), name: "help-topic-steps")
+        let shortcuts = HelpLibrary.topic(id: "shortcuts")!
+        _ = snapshot(HelpTopicView(topic: shortcuts) { _ in }, size: NSSize(width: 700, height: 500), name: "help-topic-shortcuts")
+    }
+
     func testDDMStatusItemsViewRenders() {
         let vm = DDMMonitorViewModel(cli: DemoCLIManager())
         _ = snapshot(DDMDeviceStatusTableView(vm: vm), size: NSSize(width: 1000, height: 700), name: "ddm-status-items")

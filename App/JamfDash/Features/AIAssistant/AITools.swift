@@ -687,6 +687,25 @@ struct SearchFleetKnowledgeTool: Tool {
     }
 }
 
+@available(macOS 26, *)
+struct SearchHelpTool: Tool {
+    let name = "searchHelp"
+    let description = """
+        Search Jamf Dash's own help: how to use the app, where things are, setup, \
+        connections and permissions, Dashie, and troubleshooting. Use it for "how do I…", \
+        "where is…" and "why is … greyed out / not working" questions about Jamf Dash.
+        """
+
+    @Generable struct Arguments {
+        @Guide(description: "The user's question or its key words, e.g. \"add Platform API connection\"")
+        let query: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        HelpSearch.answer(String(arguments.query.prefix(200)), characterLimit: DashieBudget.characters(2_400))
+    }
+}
+
 // MARK: - Device action tools
 
 @available(macOS 26, *)

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MainView: View {
@@ -150,6 +151,15 @@ struct MainView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openDeviceSearch)) { _ in
             selection = .deviceSearch
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showSidebarItem)) { notification in
+            guard let raw = notification.userInfo?["item"] as? String,
+                  let item = SidebarItem(rawValue: raw),
+                  SidebarItem.items(for: env.currentProduct).contains(item) else { return }
+            selection = item
+            NSApp.activate()
+            NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("AppWindow") == true }?
+                .makeKeyAndOrderFront(nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSidebarItem)) { notification in
             guard let index = notification.userInfo?["index"] as? Int else { return }

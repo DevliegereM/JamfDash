@@ -38,6 +38,7 @@
 		4346FA5BF62044A17DB33EFF /* CLIWorkerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838CA2D99EE01E9CBF971E3B /* CLIWorkerService.swift */; };
 		44625331157216107A9C749F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB50A66360EC92E3FC979988 /* RootView.swift */; };
 		447A8469FDC4444D2F8FCAB4 /* DigestHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14F0DCA6FFBA2126BBC3C89 /* DigestHistoryView.swift */; };
+		44929050527C2FB0F7B67C21 /* HelpContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDF2CDA7A492344DA752CA6C /* HelpContent.swift */; };
 		44A142D305A2175641FC37C9 /* AuditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF419ED284640E94605513B5 /* AuditView.swift */; };
 		465567737DAF5DA19175F639 /* AITools.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB936842570B6FC032714727 /* AITools.swift */; };
 		466E717768232782A682380E /* CLIVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA08AC8A88F0EEE747937BE3 /* CLIVersion.swift */; };
@@ -265,6 +266,7 @@
 		CA9E62B119AB4FD99E5D9EAF /* CorrelationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CorrelationModels.swift; sourceTree = "<group>"; };
 		CB75E72BD104A22834CA508B /* ComplianceBenchmarksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplianceBenchmarksView.swift; sourceTree = "<group>"; };
 		CC33A94430162F5A001378C2 /* JamfDash.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = JamfDash.icon; sourceTree = "<group>"; };
+		CDF2CDA7A492344DA752CA6C /* HelpContent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HelpContent.swift; sourceTree = "<group>"; };
 		CF419ED284640E94605513B5 /* AuditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditView.swift; sourceTree = "<group>"; };
 		CF8F47E68F35A1E7D496C965 /* JamfSecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfSecurityView.swift; sourceTree = "<group>"; };
 		CFB78E8D8D6A83AED291B489 /* CLISecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CLISecurityTests.swift; sourceTree = "<group>"; };
@@ -532,6 +534,7 @@
 			isa = PBXGroup;
 			children = (
 				447D8E2BFE4215CBD3BF5FFC /* HelpView.swift */,
+				CDF2CDA7A492344DA752CA6C /* HelpContent.swift */,
 			);
 			path = Help;
 			sourceTree = "<group>";
@@ -968,6 +971,7 @@
 				405FC0803C204EB7B7BD4FFF /* PlatformSetup.swift in Sources */,
 				8FAED68BE52331CD4D2935A4 /* FleetKnowledgeIndex.swift in Sources */,
 				B33F1CE34B36B8F885A12352 /* AppleIntelligenceSetupView.swift in Sources */,
+				44929050527C2FB0F7B67C21 /* HelpContent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

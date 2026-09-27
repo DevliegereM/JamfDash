@@ -492,3 +492,56 @@ final class OverviewAlertTests: XCTestCase {
         XCTAssertNil(AlertHints.fix(for: "SOMETHING_ELSE", message: "Other"))
     }
 }
+
+final class HelpContentTests: XCTestCase {
+    func testTopicsAreConsistent() {
+        let ids = HelpLibrary.topics.map(\.id)
+        XCTAssertEqual(Set(ids).count, ids.count, "duplicate help topic ids")
+        for tab in HelpTab.allCases {
+            XCTAssertFalse(HelpLibrary.sections(in: tab).isEmpty, "\(tab) has no topics")
+        }
+        for topic in HelpLibrary.topics {
+            XCTAssertFalse(topic.summary.isEmpty, topic.id)
+            if let raw = topic.opens {
+                XCTAssertNotNil(SidebarItem(rawValue: raw), "\(topic.id) opens unknown sidebar item \(raw)")
+            }
+        }
+    }
+
+    func testSearchFindsTheRightTopic() {
+        let expectations: [(String, String)] = [
+            ("how do I add a platform api connection", "platform-api"),
+            ("blueprints greyed out", "greyed-out"),
+            ("turn on automatic updates", "app-updates"),
+            ("patch extension attribute issue", "patch-ea-alert"),
+            ("attach a screenshot to dashie", "dashie-images"),
+            ("keyboard shortcuts", "shortcuts"),
+            ("compliance score too low", "low-compliance"),
+            ("export logs", "logs"),
+            ("apple intelligence not available", "dashie-setup"),
+            ("snapshot configuration changes", "drift"),
+        ]
+        for (query, id) in expectations {
+            let top3 = HelpSearch.search(query).prefix(3).map(\.id)
+            XCTAssertTrue(top3.contains(id), "“\(query)” → \(top3), expected \(id)")
+        }
+        XCTAssertTrue(HelpSearch.search("zzzz qqqq").isEmpty)
+    }
+
+    func testAnswerForDashieNamesTheLocation() {
+        let answer = HelpSearch.answer("automatic updates")
+        XCTAssertTrue(answer.contains("Settings → Updates"), answer)
+        XCTAssertTrue(answer.contains("Help → Get Started"), answer)
+    }
+
+    func testHelpMenuSearchHandler() {
+        let exp = expectation(description: "results")
+        HelpMenuSearch.shared.searchForItems(withSearch: "platform api", resultLimit: 5) { items in
+            let ids = items.compactMap { $0 as? String }
+            XCTAssertTrue(ids.contains("platform-api"))
+            XCTAssertEqual(HelpMenuSearch.shared.localizedTitles(forItem: ids[0]).count, 1)
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 2)
+    }
+}
