@@ -294,6 +294,38 @@ final class SetupManagerTests: XCTestCase {
     }
 }
 
+/// Device Lookup's detail by serial asked for sections Jamf Pro rejects (HTTP 400).
+final class ComputerDetailSectionTests: XCTestCase {
+    private let validSections: Set<String> = [
+        "GENERAL", "DISK_ENCRYPTION", "PURCHASING", "APPLICATIONS", "STORAGE", "USER_AND_LOCATION",
+        "CONFIGURATION_PROFILES", "PRINTERS", "SERVICES", "HARDWARE", "LOCAL_USER_ACCOUNTS", "CERTIFICATES",
+        "ATTACHMENTS", "PLUGINS", "PACKAGE_RECEIPTS", "FONTS", "SECURITY", "OPERATING_SYSTEM", "LICENSED_SOFTWARE",
+        "IBEACONS", "SOFTWARE_UPDATES", "EXTENSION_ATTRIBUTES", "CONTENT_CACHING", "GROUP_MEMBERSHIPS",
+    ]
+
+    func testInventoryCommandsOnlyUseValidSections() {
+        let commands: [CLICommand] = [.computerDetail(serial: "A"), .computers, .securityInventory, .ddmComputers,
+                                      .computersUpdateReadiness, .recentEnrollments, .enrollmentInventory(serial: "A")]
+        for c in commands {
+            let args = c.baseArguments
+            for (i, a) in args.enumerated() where a == "--section" {
+                XCTAssertTrue(validSections.contains(args[i + 1]), "\(args[i + 1]) is not a Jamf Pro inventory section")
+            }
+        }
+    }
+
+    func testUserAndLocationDecodes() throws {
+        let data = Data("""
+            {"id": "1", "general": {"name": "Mac"}, "userAndLocation": {"username": "ann", "realname": "Ann Peeters",
+             "email": "ann@example.com", "departmentId": "4", "buildingId": 2, "room": "3.14"}}
+            """.utf8)
+        let d = try JSONDecoder().decode(ComputerDetail.self, from: data)
+        XCTAssertEqual(d.location?.realName, "Ann Peeters")
+        XCTAssertEqual(d.location?.departmentId, "4")
+        XCTAssertEqual(d.location?.buildingId, "2")
+    }
+}
+
 final class EnrollmentCLISafetyTests: XCTestCase {
 
     func testManagementIDMustBeAUUIDAndIsFiltered() {

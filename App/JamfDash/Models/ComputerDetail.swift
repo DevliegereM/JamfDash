@@ -36,7 +36,7 @@ struct ComputerDetail: Decodable, Sendable, Identifiable {
         case id, name, managed, platform, udid
         case serialNumber, serial
         case general, hardware, operatingSystem, security
-        case location, diskEncryption, network
+        case location, userAndLocation, diskEncryption, network
         case purchasing, storage
         case groupMemberships, localUserAccounts
         case softwareUpdates, extensionAttributes
@@ -65,7 +65,9 @@ struct ComputerDetail: Decodable, Sendable, Identifiable {
         hardware             = try? c.decode(HardwareInfo.self,          forKey: .hardware)
         operatingSystem      = try? c.decode(OSInfo.self,                forKey: .operatingSystem)
         security             = try? c.decode(SecurityInfo.self,          forKey: .security)
-        location             = try? c.decode(LocationInfo.self,          forKey: .location)
+        // Jamf Pro API: `userAndLocation` (section USER_AND_LOCATION); older output: `location`.
+        location             = (try? c.decode(LocationInfo.self,          forKey: .userAndLocation))
+                            ?? (try? c.decode(LocationInfo.self,          forKey: .location))
         diskEncryption       = try? c.decode(DiskEncryptionInfo.self,    forKey: .diskEncryption)
         network              = try? c.decode(NetworkInfo.self,           forKey: .network)
         purchasing           = try? c.decode(PurchasingInfo.self,        forKey: .purchasing)
@@ -224,6 +226,33 @@ struct ComputerDetail: Decodable, Sendable, Identifiable {
         let departmentName: String?
         let buildingName: String?
         let room: String?
+        /// The Jamf Pro API gives department and building as IDs, not names.
+        let departmentId: String?
+        let buildingId: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case username, realName, realname, email, position, phone
+            case departmentName, buildingName, room, departmentId, buildingId
+        }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            func string(_ key: CodingKeys) -> String? {
+                if let s = try? c.decode(String.self, forKey: key) { return s }
+                if let i = try? c.decode(Int.self, forKey: key) { return String(i) }
+                return nil
+            }
+            username = string(.username)
+            realName = string(.realName) ?? string(.realname)
+            email = string(.email)
+            position = string(.position)
+            phone = string(.phone)
+            departmentName = string(.departmentName)
+            buildingName = string(.buildingName)
+            room = string(.room)
+            departmentId = string(.departmentId)
+            buildingId = string(.buildingId)
+        }
     }
 
     struct DiskEncryptionInfo: Decodable, Sendable {
