@@ -12,7 +12,9 @@ final class AppUpdater: NSObject {
 
     private override init() {
         controller = SPUStandardUpdaterController(
-            startingUpdater: true,
+            // No update checks inside the unit-test host: with automatic checks on, it would
+            // hit the live appcast on every test run.
+            startingUpdater: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
             updaterDelegate: delegate,
             userDriverDelegate: nil
         )
