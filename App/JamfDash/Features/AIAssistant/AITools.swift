@@ -629,7 +629,7 @@ struct GetInstalledAppsTool: Tool {
 
     func call(arguments: Arguments) async throws -> String {
         do {
-            let data = try await cli.run(.computerDetail(serial: arguments.serialNumber))
+            let data = try await cli.run(.installedApps(serial: arguments.serialNumber))
             return Self.summarize(data)
         } catch {
             return "Failed to get installed apps for \(arguments.serialNumber): \(error.localizedDescription)"
@@ -833,35 +833,6 @@ struct RestartDeviceTool: Tool {
             return String(data: data, encoding: .utf8) ?? "Restart command sent."
         } catch {
             return "Failed to restart \(arguments.serialNumber): \(error.localizedDescription)"
-        }
-    }
-}
-
-@available(macOS 26, *)
-struct ExecutePolicyTool: Tool {
-    let name = "executePolicy"
-    let description = "Trigger a Jamf Pro policy to run on a specific Mac by policy name and serial number. Use when you need to push a policy immediately rather than waiting for the next check-in."
-    let cli: any CLIRunning
-
-    @Generable struct Arguments {
-        @Guide(description: "Name of the Jamf Pro policy to execute")
-        let policyName: String
-        @Guide(description: "Serial number of the target Mac")
-        let serialNumber: String
-    }
-
-    func call(arguments: Arguments) async throws -> String {
-        let confirmed = await confirmAction(
-            title: "Execute Policy",
-            message: "This will run policy '\(arguments.policyName)' on \(arguments.serialNumber). Continue?",
-            confirmTitle: "Execute"
-        )
-        guard confirmed else { return "Policy execution cancelled by user." }
-        do {
-            let data = try await cli.run(.policyExecute(name: arguments.policyName, serial: arguments.serialNumber))
-            return String(data: data, encoding: .utf8) ?? "Policy executed."
-        } catch {
-            return "Failed to execute policy '\(arguments.policyName)' on \(arguments.serialNumber): \(error.localizedDescription)"
         }
     }
 }

@@ -126,12 +126,16 @@ struct ProtectEvent: Decodable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, uuid
-        case analyticName, analytic, ruleName, name
-        case hostName, hostname, deviceName
+        case analyticName, analytic, ruleName, name, analytics
+        case hostName, hostname, deviceName, computer
         case timestamp, createdAt, created, date
         case severity
         case status, state
     }
+
+    /// Protect's GraphQL shape nests the computer and the analytics that fired.
+    private struct Named: Decodable { let name: String? }
+    private struct Host: Decodable { let hostName: String?; let hostname: String? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -142,9 +146,12 @@ struct ProtectEvent: Decodable, Sendable, Identifiable {
                     ?? (try? c.decode(String.self, forKey: .analytic))
                     ?? (try? c.decode(String.self, forKey: .ruleName))
                     ?? (try? c.decode(String.self, forKey: .name))
+                    ?? (try? c.decode([Named].self, forKey: .analytics))?.compactMap(\.name).first
+                    ?? (try? c.decode(Named.self, forKey: .analytic))?.name
         hostName     = (try? c.decode(String.self, forKey: .hostName))
                     ?? (try? c.decode(String.self, forKey: .hostname))
                     ?? (try? c.decode(String.self, forKey: .deviceName))
+                    ?? (try? c.decode(Host.self, forKey: .computer)).flatMap { $0.hostName ?? $0.hostname }
         timestamp    = (try? c.decode(String.self, forKey: .timestamp))
                     ?? (try? c.decode(String.self, forKey: .createdAt))
                     ?? (try? c.decode(String.self, forKey: .created))
@@ -152,6 +159,22 @@ struct ProtectEvent: Decodable, Sendable, Identifiable {
         severity     = try? c.decode(String.self, forKey: .severity)
         status       = (try? c.decode(String.self, forKey: .status))
                     ?? (try? c.decode(String.self, forKey: .state))
+    }
+
+    var date: Date? {
+        guard let raw = timestamp else { return nil }
+        return (try? Date(raw, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)))
+            ?? (try? Date(raw, strategy: .iso8601))
+    }
+
+    /// Severity rank for sorting: high first.
+    var severityRank: Int {
+        switch severity?.lowercased() {
+        case "high", "critical": return 0
+        case "medium": return 1
+        case "low": return 2
+        default: return 3
+        }
     }
 
     var formattedTimestamp: String? {

@@ -96,7 +96,6 @@ extension AIAssistantViewModel {
             RedeployFrameworkTool(cli: cli),
             FlushFailedCommandsTool(cli: cli),
             RestartDeviceTool(cli: cli),
-            ExecutePolicyTool(cli: cli),
             BulkSetPoliciesTool(cli: cli),
         ]
     }
@@ -433,7 +432,7 @@ extension AIAssistantViewModel {
         • How to use Jamf Dash, where something is, setup, permissions or errors in the app: \
         searchHelp — answer from its result and name where to find it (e.g. Settings → Updates)
         • Actions, only when the user asks for them: blankPush, renewMDMProfile, \
-        redeployFramework, flushFailedCommands, restartDevice, executePolicy, \
+        redeployFramework, flushFailedCommands, restartDevice, \
         bulkSetPolicies (enable a category, or disable by name pattern)
 
         Rules: call tools only when needed, at most two per answer — for example \

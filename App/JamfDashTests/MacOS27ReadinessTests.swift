@@ -344,7 +344,7 @@ final class DashieToolTests: XCTestCase {
 
     func testBulkDisableUsesNamePatternFlag() {
         XCTAssertEqual(CLICommand.bulkDisablePolicies(pattern: "Test*").baseArguments,
-                       ["pro", "bulk", "disable-policies", "--name-pattern", "Test*", "--yes"])
+                       ["pro", "bulk", "disable-policies", "--name-pattern=Test*", "--yes"])
     }
 }
 #endif

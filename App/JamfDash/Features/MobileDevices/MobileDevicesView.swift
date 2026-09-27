@@ -350,6 +350,12 @@ struct MobileDeviceDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var confirmAction: ConfirmableAction? = nil
     @State private var showConfirm = false
+    @State private var lostModeSerial: LostModeTarget? = nil
+
+    struct LostModeTarget: Identifiable {
+        let serial: String
+        var id: String { serial }
+    }
 
     struct ConfirmableAction: Identifiable {
         let id = UUID()
@@ -422,6 +428,13 @@ struct MobileDeviceDetailSheet: View {
                     .ignoresSafeArea()
             }
         }
+        .sheet(item: $lostModeSerial) { target in
+            LostModeSheet(deviceName: device.name) { message, phone, footnote in
+                let command = CLICommand.mobileDeviceEnableLostMode(serial: target.serial, message: message,
+                                                                    phone: phone, footnote: footnote)
+                Task { await vm.runAction(command, label: "Enable Lost Mode") }
+            }
+        }
         .alert(
             confirmAction?.isDestructive == true ? "Confirm Destructive Action" : "Confirm Action",
             isPresented: $showConfirm,
@@ -444,8 +457,6 @@ struct MobileDeviceDetailSheet: View {
         let moderateActions: [(String, CLICommand)] = [
             ("Restart", .mobileDeviceRestart(serial: serial)),
             ("Shutdown", .mobileDeviceShutdown(serial: serial)),
-            ("Clear Passcode", .mobileDeviceClearPasscode(serial: serial)),
-            ("Enable Lost Mode", .mobileDeviceEnableLostMode(serial: serial)),
             ("Disable Lost Mode", .mobileDeviceDisableLostMode(serial: serial))
         ]
         let destructiveActions: [(String, CLICommand)] = [
@@ -467,6 +478,11 @@ struct MobileDeviceDetailSheet: View {
                 ForEach(moderateActions, id: \.0) { label, cmd in
                     actionButton(label: label, cmd: cmd, tint: .orange, isDestructive: false)
                 }
+                Button("Enable Lost Mode…") { lostModeSerial = LostModeTarget(serial: serial) }
+                    .buttonStyle(.bordered)
+                    .tint(.orange)
+                    .controlSize(.small)
+                    .disabled(vm.isActionRunning)
             }
 
             Text("Destructive").font(.caption.weight(.semibold)).foregroundStyle(.red).padding(.top, 4)
@@ -507,6 +523,48 @@ struct MobileDeviceDetailSheet: View {
             Text(label).font(.caption.weight(.semibold)).foregroundStyle(.secondary).frame(width: 120, alignment: .leading)
             Text(value).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+// MARK: - Lost Mode
+
+/// Lost Mode needs a message for the lock screen; the phone number and footnote are optional.
+private struct LostModeSheet: View {
+    let deviceName: String
+    let onEnable: (_ message: String, _ phone: String, _ footnote: String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var message = ""
+    @State private var phone = ""
+    @State private var footnote = ""
+
+    private var canEnable: Bool { !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Enable Lost Mode").font(.title3.weight(.semibold))
+            Text("\(deviceName) will be locked and show this message until Lost Mode is turned off. Lost Mode only works on supervised devices.")
+                .font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Form {
+                TextField("Message", text: $message, prompt: Text("This iPad belongs to…"))
+                TextField("Phone number", text: $phone, prompt: Text("Optional"))
+                TextField("Footnote", text: $footnote, prompt: Text("Optional"))
+            }
+            .formStyle(.grouped)
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Enable Lost Mode") {
+                    onEnable(message, phone, footnote)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!canEnable)
+            }
+        }
+        .padding(20)
+        .frame(width: 440)
     }
 }
 

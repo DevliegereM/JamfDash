@@ -708,87 +708,6 @@ private struct ConfigProfileScopeSheet: View {
 
 // MARK: - Bulk Actions View
 
-struct BulkActionsView: View {
-    @Bindable var vm: FleetViewModel
-    @State private var selectedOp = 0
-    @State private var param1 = ""
-    @State private var param2 = ""
-    @State private var isRunning = false
-    @State private var resultMessage: String? = nil
-
-    private let ops = ["Enable Policies (by category)", "Disable Policies (by pattern)",
-                       "Add to Group (from file)", "Remove from Group (from file)", "Send Command to Group"]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Text("Bulk Operations").font(.title2).bold()
-                .padding(.horizontal, 24).padding(.top, 24)
-
-            Form {
-                Picker("Operation", selection: $selectedOp) {
-                    ForEach(ops.indices, id: \.self) { i in Text(ops[i]).tag(i) }
-                }
-                .pickerStyle(.menu)
-
-                switch selectedOp {
-                case 0:
-                    TextField("Category name", text: $param1)
-                case 1:
-                    TextField("Name pattern", text: $param1)
-                case 2, 3:
-                    TextField("Group name", text: $param1)
-                    TextField("File path (CSV with serials)", text: $param2)
-                case 4:
-                    TextField("Command (e.g. BlankPush)", text: $param1)
-                    TextField("Group name", text: $param2)
-                default: EmptyView()
-                }
-
-                if let msg = resultMessage {
-                    Label(msg, systemImage: msg.contains("failed") ? "xmark.circle" : "checkmark.circle")
-                        .foregroundStyle(msg.contains("failed") ? .red : .green)
-                }
-            }
-            .formStyle(.grouped)
-            .frame(maxHeight: 260)
-
-            Button {
-                Task { await runBulk() }
-            } label: {
-                Label(isRunning ? "Running…" : "Execute", systemImage: "bolt.horizontal")
-                    .frame(minWidth: 140)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(isRunning || param1.isEmpty)
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .navigationTitle("Bulk Actions")
-    }
-
-    private func runBulk() async {
-        isRunning = true
-        resultMessage = nil
-        defer { isRunning = false }
-        do {
-            let cmd: CLICommand
-            switch selectedOp {
-            case 0: cmd = .bulkEnablePolicies(category: param1)
-            case 1: cmd = .bulkDisablePolicies(pattern: param1)
-            case 2: cmd = .bulkAddToGroup(group: param1, file: param2)
-            case 3: cmd = .bulkRemoveFromGroup(group: param1, file: param2)
-            case 4: cmd = .bulkSendCommand(command: param1, group: param2)
-            default: return
-            }
-            _ = try await vm.runCLI(cmd)
-            resultMessage = "Operation completed successfully."
-        } catch {
-            resultMessage = "Operation failed: \(error.localizedDescription)"
-        }
-    }
-}
 
 // MARK: - Org Browser View
 
@@ -1577,33 +1496,8 @@ private func formatExpiryDate(_ raw: String) -> String? {
     return out.string(from: date)
 }
 
-// MARK: - Webhooks View
 
-struct WebhooksView: View {
-    @Bindable var vm: FleetViewModel
 
-    var body: some View {
-        AsyncContentView(state: vm.webhooksState,
-                         retry: { await vm.loadWebhooks(force: true) }) { hooks in
-            Table(hooks) {
-                TableColumn("Name") { Text($0.name) }
-                TableColumn("Event") { Text($0.event ?? "—").foregroundStyle(.secondary) }
-                TableColumn("Enabled") { Text($0.enabled == true ? "Yes" : "No").foregroundStyle(.secondary) }
-                TableColumn("URL") { Text($0.url ?? "—").foregroundStyle(.secondary).lineLimit(1) }
-            }
-        }
-        .navigationTitle("Webhooks")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { Task { await vm.loadWebhooks(force: true) } } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .help("Refresh webhooks")
-            }
-        }
-        .task { await vm.loadWebhooks() }
-    }
-}
 
 // MARK: - Script Detail Sheet
 

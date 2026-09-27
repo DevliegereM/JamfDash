@@ -22,6 +22,8 @@ enum CLICommand: Sendable {
     case computers
     case computerDetail(serial: String)
     case computerDetailById(id: String)
+    /// One Mac's installed applications (inventory APPLICATIONS section).
+    case installedApps(serial: String)
     case smartGroupDetail(id: String)
 
     // MARK: DDM Monitor
@@ -83,7 +85,8 @@ enum CLICommand: Sendable {
 
     // MARK: Device actions (destructive)
     case removeMDM(serial: String)
-    case setRecoveryLock(serial: String)
+    /// Clears the Recovery Lock password (jamf-cli clears it when no new password is given).
+    case clearRecoveryLock(serial: String)
     case lock(serial: String, pin: String)
     case erase(serial: String)
 
@@ -94,9 +97,8 @@ enum CLICommand: Sendable {
     case mobileDeviceRestart(serial: String)
     case mobileDeviceShutdown(serial: String)
     case mobileDeviceUnmanage(serial: String)
-    case mobileDeviceEnableLostMode(serial: String)
+    case mobileDeviceEnableLostMode(serial: String, message: String, phone: String, footnote: String)
     case mobileDeviceDisableLostMode(serial: String)
-    case mobileDeviceClearPasscode(serial: String)
     case mobileDeviceUpdateInventory(serial: String)
 
     // MARK: Reports
@@ -115,12 +117,6 @@ enum CLICommand: Sendable {
     // MARK: Bulk Operations
     case bulkEnablePolicies(category: String)
     case bulkDisablePolicies(pattern: String)
-    case bulkAddToGroup(group: String, file: String)
-    case bulkRemoveFromGroup(group: String, file: String)
-    case bulkSendCommand(command: String, group: String)
-
-    // MARK: Policy Execute
-    case policyExecute(name: String, serial: String)
 
     // MARK: Org Objects
     case buildings
@@ -133,9 +129,7 @@ enum CLICommand: Sendable {
     // MARK: Patch Management
     case patchTitles
     case patchPolicies                      // Classic API list (id+name only)
-    case patchPoliciesUAPI                  // UAPI v2 list (full data: enabled, targetVersion, softwareTitle)
     case patchSoftwareTitleConfigurations   // modern patch titles (UAPI v2)
-    case patchSoftwareSummary               // modern patch compliance summary (requires title ID)
     case appInstallerTitles                 // App Installer catalogue
     case appInstallerDeployments            // App Installer deployments
     case restrictedSoftware                 // restricted software list (id+name only)
@@ -155,42 +149,20 @@ enum CLICommand: Sendable {
 
     // MARK: Protect extended - data
     case protectRemovableStorage
-    case protectRemovableStorageDetail(name: String)
-    case protectRemovableStorageExport(name: String)
     case protectUnifiedLogging
     case protectUnifiedLoggingDetail(name: String)
-    case protectUnifiedLoggingExport(name: String)
     case protectActionConfigs
-    case protectActionConfigDetail(name: String)
-    case protectActionConfigExport(name: String)
     case protectTelemetryConfigs
-    case protectTelemetryDetail(name: String)
-    case protectTelemetryExport(name: String)
     case protectCustomPreventLists
-    case protectCustomPreventListDetail(name: String)
-    case protectCustomPreventListExport(name: String)
     case protectRoles
-    case protectRoleDetail(name: String)
-    case protectRoleExport(name: String)
     case protectUsers
-    case protectUserDetail(email: String)
-    case protectUserExport(email: String)
     case protectGroups
-    case protectGroupDetail(name: String)
-    case protectGroupExport(name: String)
     case protectAPIClients
-    case protectAPIClientDetail(name: String)
-    case protectAPIClientExport(name: String)
     case protectDataForwarding
     case protectDataRetention
     case protectConfigFreeze
-    case protectConfigFreezeEnable
-    case protectConfigFreezeDisable
     case protectDownloadsSummary
-    case protectPlanExport(name: String)
     case protectAnalyticDetail(name: String)
-    case protectAnalyticExport(name: String)
-    case protectAnalyticSetExport(name: String)
 
     // MARK: Patch Management detail
     case patchTitleDetail(id: String)
@@ -199,7 +171,6 @@ enum CLICommand: Sendable {
     // MARK: Script & Package detail
     case scriptDetail(id: String)
     case packageDetail(id: Int)
-    case protectExceptionSetExport(name: String)
 
     // MARK: macOS 27 readiness (appended)
     /// DDM-based managed software update plans (Jamf Pro API `/v1/managed-software-updates/plans`).
@@ -233,14 +204,24 @@ enum CLICommand: Sendable {
         serial.filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
     }
 
+    /// `--serial=<value>`. The `=` form keeps a value that starts with "-" from being read
+    /// as a flag. Control characters are dropped; spaces, dots and dashes stay because
+    /// virtual machine serials use them.
+    static func serialFlag(_ serial: String) -> String {
+        "--serial=" + cleanValue(serial)
+    }
+
+    /// Trims whitespace and removes control characters from a value passed to jamf-cli.
+    static func cleanValue(_ value: String) -> String {
+        String(String.UnicodeScalarView(value.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }))
+            .trimmingCharacters(in: .whitespaces)
+    }
+
     private static func protectList(_ sub: String) -> [String] {
         ["protect", sub, "list", "-o", "json"]
     }
     private static func protectGet(_ sub: String, _ name: String) -> [String] {
-        ["protect", sub, "get", name, "-o", "json"]
-    }
-    private static func protectExport(_ sub: String, _ name: String) -> [String] {
-        ["protect", sub, "export", name]
+        ["protect", sub, "get", "-o", "json", "--", name]
     }
 
     var baseArguments: [String] {
@@ -259,28 +240,29 @@ enum CLICommand: Sendable {
         case .configProfileDetail(let id):        return ["pro", "classic-macos-config-profiles", "get", "\(id)", "-o", "json"]
         case .computers:                          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "-o", "json"]
         case .computerDetail(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "STORAGE", "--section", "DISK_ENCRYPTION", "--section", "SECURITY", "--section", "USER_AND_LOCATION", "--section", "PURCHASING", "--section", "GROUP_MEMBERSHIPS", "--section", "LOCAL_USER_ACCOUNTS", "--section", "SOFTWARE_UPDATES", "--section", "CONFIGURATION_PROFILES", "--section", "EXTENSION_ATTRIBUTES", "-o", "json"]
-        case .computerDetailById(let id):         return ["pro", "computers-inventory", "get", id, "-o", "json"]
-        case .smartGroupDetail(let id):           return ["pro", "smart-computer-groups", "get", id, "-o", "json"]
+        case .computerDetailById(let id):         return ["pro", "computers-inventory", "get", "-o", "json", "--", id]
+        case .installedApps(let s):               return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "APPLICATIONS", "-o", "json"]
+        case .smartGroupDetail(let id):           return ["pro", "smart-computer-groups", "get", "-o", "json", "--", id]
 
         // DDM Monitor
-        case .ddmStatusItems(let managementId): return ["pro", "ddm-status", "status-items", managementId, "-o", "json"]
+        case .ddmStatusItems(let managementId): return ["pro", "ddm-status", "status-items", "-o", "json", "--", managementId]
         case .ddmComputers: return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "-o", "json"]
 
         // Blueprints
         case .blueprints:                          return ["pro", "bp", "list", "-o", "json"]
-        case .blueprintDetail(let n):              return ["pro", "bp", "get", n, "-o", "json"]
+        case .blueprintDetail(let n):              return ["pro", "bp", "get", "-o", "json", "--", n]
         case .blueprintStatus:                     return ["pro", "report", "blueprint-status", "-o", "json"]
 
         // Compliance Benchmarks
         case .complianceBenchmarks:                return ["pro", "cb", "list", "-o", "json"]
-        case .complianceBenchmarkDetail(let n):    return ["pro", "cb", "get", n, "-o", "json"]
+        case .complianceBenchmarkDetail(let n):    return ["pro", "cb", "get", "-o", "json", "--", n]
         // IDs and titles go after `--` so a value starting with "-" can't be read as a flag.
         case .benchmarkCompliancePercentage(let id):
             return ["pro", "benchmark-reports", "compliance-percentage", "-o", "json", "--", id]
         case .benchmarkRuleStats(let id):
             return ["pro", "benchmark-reports", "rules", "--sort", "failed:desc", "-o", "json", "--", id]
         case .benchmarkRuleDevices(let id, let ruleID):
-            return ["pro", "benchmark-reports", "devices", "--rule-id", ruleID, "--rule-result", "FAILED",
+            return ["pro", "benchmark-reports", "devices", "--rule-id=" + Self.cleanValue(ruleID), "--rule-result", "FAILED",
                     "--sort", "deviceName", "-o", "json", "--", id]
         case .benchmarkFailingDevices(let title):
             return ["pro", "report", "compliance-devices", "-o", "json", "--", title]
@@ -289,59 +271,62 @@ enum CLICommand: Sendable {
         case .protectEvents:        return ["protect", "alerts", "list", "-o", "json"]
         case .protectOverview:      return ["protect", "overview", "-o", "json"]
         case .protectComputers:             return ["protect", "comp", "list", "-o", "json"]
-        case .protectComputerDetail(let n): return ["protect", "comp", "get", n, "-o", "json"]
+        case .protectComputerDetail(let n): return Self.protectGet("comp", n)
         case .protectPlans:         return ["protect", "plans", "list", "-o", "json"]
         case .protectAlerts:        return ["protect", "analytics", "list", "-o", "json"]
         case .protectInsights:      return ["protect", "analytic-sets", "list", "-o", "json"]
         case .protectAuditLogs:     return ["protect", "audit-logs", "list", "-o", "json"]
         case .protectExceptionSets: return Self.protectList("exception-sets")
         case .protectAnalyticSets:              return ["protect", "analytic-sets", "list", "-o", "json"]
-        case .protectExceptionSetDetail(let n): return ["protect", "exception-sets", "get", n, "-o", "json"]
+        case .protectExceptionSetDetail(let n): return Self.protectGet("exception-sets", n)
 
         // Jamf School — data
         case .schoolOverview:       return ["school", "overview", "-o", "json"]
         case .schoolDevices:        return ["school", "dev", "list", "-o", "json"]
         case .schoolDeviceGroups:   return ["school", "dg", "list", "-o", "json"]
         case .schoolUsers:          return ["school", "users", "list", "-o", "json"]
-        case .schoolUserGroups:     return ["school", "user-groups", "list", "-o", "json"]
+        case .schoolUserGroups:     return ["school", "groups", "list", "-o", "json"]
         case .schoolClasses:        return ["school", "cls", "list", "-o", "json"]
         case .schoolApps:           return ["school", "apps", "list", "-o", "json"]
         case .schoolProfiles:       return ["school", "profiles", "list", "-o", "json"]
         case .schoolDepDevices:     return ["school", "dep-devices", "list", "-o", "json"]
 
         // Safe actions
-        case .blankPush(let s):           return ["pro", "computers", "blank-push", "--serial", s, "--yes"]
-        case .renewMDM(let s):            return ["pro", "computers", "renew-mdm", "--serial", s, "--yes"]
-        case .ddmSync(let s):             return ["pro", "computers", "ddm-sync", "--serial", s, "--yes"]
-        case .flushFailedCommands(let s): return ["pro", "computers", "flush-commands", "--serial", s, "--yes"]
-        case .flushAllCommands(let s):    return ["pro", "computers", "flush-commands", "--serial", s, "--status", "both", "--yes"]
+        case .blankPush(let s):           return ["pro", "computers", "blank-push", Self.serialFlag(s), "--yes"]
+        case .renewMDM(let s):            return ["pro", "computers", "renew-mdm", Self.serialFlag(s), "--yes"]
+        case .ddmSync(let s):             return ["pro", "computers", "ddm-sync", Self.serialFlag(s), "--yes"]
+        case .flushFailedCommands(let s): return ["pro", "computers", "flush-commands", Self.serialFlag(s), "--yes"]
+        case .flushAllCommands(let s):    return ["pro", "computers", "flush-commands", Self.serialFlag(s), "--status", "both", "--yes"]
 
         // Moderate actions
-        case .redeployFramework(let s):    return ["pro", "computers", "redeploy-framework", "--serial", s, "--yes"]
-        case .enableRemoteDesktop(let s):  return ["pro", "computers", "enable-remote-desktop", "--serial", s, "--yes"]
-        case .disableRemoteDesktop(let s): return ["pro", "computers", "disable-remote-desktop", "--serial", s, "--yes"]
-        case .restart(let s):              return ["pro", "computers", "restart", "--serial", s, "--yes"]
-        case .shutdown(let s):             return ["pro", "computers", "shutdown", "--serial", s, "--yes"]
+        case .redeployFramework(let s):    return ["pro", "computers", "redeploy-framework", Self.serialFlag(s), "--yes"]
+        case .enableRemoteDesktop(let s):  return ["pro", "computers", "enable-remote-desktop", Self.serialFlag(s), "--yes"]
+        case .disableRemoteDesktop(let s): return ["pro", "computers", "disable-remote-desktop", Self.serialFlag(s), "--yes"]
+        case .restart(let s):              return ["pro", "computers", "restart", Self.serialFlag(s), "--yes"]
+        case .shutdown(let s):             return ["pro", "computers", "shutdown", Self.serialFlag(s), "--yes"]
 
         // Destructive actions
-        case .removeMDM(let s):       return ["pro", "computers", "remove-mdm", "--serial", s, "--yes"]
-        case .setRecoveryLock(let s): return ["pro", "computers", "set-recovery-lock", "--serial", s, "--yes"]
+        case .removeMDM(let s):       return ["pro", "computers", "remove-mdm", Self.serialFlag(s), "--yes"]
+        case .clearRecoveryLock(let s): return ["pro", "computers", "set-recovery-lock", Self.serialFlag(s), "--yes"]
         // jamf-cli's `computers lock` has no PIN flag, so the lock is sent as a raw
         // DEVICE_LOCK MDM command (body on stdin, see CLIManager.lockComputer).
         case .lock:                   return ["pro", "mdm-commands", "commands", "-o", "json"]
-        case .erase(let s):           return ["pro", "computers", "erase", "--serial", s, "--yes"]
+        case .erase(let s):           return ["pro", "computers", "erase", Self.serialFlag(s), "--yes"]
 
         // Mobile Devices
         case .mobileDeviceList:                    return ["pro", "md", "list", "--all", "-o", "json"]
-        case .mobileDeviceErase(let s):            return ["pro", "md", "erase", "--serial", s, "--yes"]
-        case .mobileDeviceLock(let s):             return ["pro", "md", "lock", "--serial", s, "--yes", "--confirm-destructive"]
-        case .mobileDeviceRestart(let s):          return ["pro", "md", "restart", "--serial", s, "--yes"]
-        case .mobileDeviceShutdown(let s):         return ["pro", "md", "shutdown", "--serial", s, "--yes"]
-        case .mobileDeviceUnmanage(let s):         return ["pro", "md", "unmanage", "--serial", s, "--yes"]
-        case .mobileDeviceEnableLostMode(let s):   return ["pro", "md", "enable-lost-mode", "--serial", s, "--yes"]
-        case .mobileDeviceDisableLostMode(let s):  return ["pro", "md", "disable-lost-mode", "--serial", s, "--yes"]
-        case .mobileDeviceClearPasscode(let s):    return ["pro", "md", "clear-passcode", "--serial", s, "--yes"]
-        case .mobileDeviceUpdateInventory(let s):  return ["pro", "md", "update-inventory", "--serial", s, "--yes"]
+        case .mobileDeviceErase(let s):            return ["pro", "md", "erase", Self.serialFlag(s), "--yes"]
+        case .mobileDeviceLock(let s):             return ["pro", "md", "lock", Self.serialFlag(s), "--yes", "--confirm-destructive"]
+        case .mobileDeviceRestart(let s):          return ["pro", "md", "restart", Self.serialFlag(s), "--yes"]
+        case .mobileDeviceShutdown(let s):         return ["pro", "md", "shutdown", Self.serialFlag(s), "--yes"]
+        case .mobileDeviceUnmanage(let s):         return ["pro", "md", "unmanage", Self.serialFlag(s), "--yes"]
+        case .mobileDeviceEnableLostMode(let s, let message, let phone, let footnote):
+            var args = ["pro", "md", "enable-lost-mode", Self.serialFlag(s), "--message=" + Self.cleanValue(message)]
+            if !Self.cleanValue(phone).isEmpty { args.append("--phone=" + Self.cleanValue(phone)) }
+            if !Self.cleanValue(footnote).isEmpty { args.append("--footnote=" + Self.cleanValue(footnote)) }
+            return args + ["--yes"]
+        case .mobileDeviceDisableLostMode(let s):  return ["pro", "md", "disable-lost-mode", Self.serialFlag(s), "--yes"]
+        case .mobileDeviceUpdateInventory(let s):  return ["pro", "md", "update-inventory", Self.serialFlag(s), "--yes"]
 
         // Reports
         case .reportPatchStatus:              return ["pro", "report", "patch-status", "-o", "json"]
@@ -354,17 +339,12 @@ enum CLICommand: Sendable {
         case .reportSoftwareInstalls:         return ["pro", "report", "software-installs", "-o", "json"]
         case .reportDDMStatus:                return ["pro", "report", "ddm-status", "-o", "json"]
         case .proNotifications:               return ["pro", "notifications", "list", "-o", "json"]
-        case .proAudit(let cat):              return ["pro", "audit", "--checks", cat, "-o", "json"]
+        case .proAudit(let cat):              return ["pro", "audit", "--checks=" + Self.cleanValue(cat), "-o", "json"]
 
         // Bulk Operations
-        case .bulkEnablePolicies(let c):          return ["pro", "bulk", "enable-policies", "--category", c, "--yes"]
-        case .bulkDisablePolicies(let p):         return ["pro", "bulk", "disable-policies", "--name-pattern", p, "--yes"]
-        case .bulkAddToGroup(let g, let f):       return ["pro", "bulk", "add-to-group", "--group", g, "--from-file", f, "--yes"]
-        case .bulkRemoveFromGroup(let g, let f):  return ["pro", "bulk", "remove-from-group", "--group", g, "--from-file", f, "--yes"]
-        case .bulkSendCommand(let cmd, let grp):  return ["pro", "bulk", "send-command", "--command", cmd, "--group", grp, "--yes"]
+        case .bulkEnablePolicies(let c):          return ["pro", "bulk", "enable-policies", "--category=" + Self.cleanValue(c), "--yes"]
+        case .bulkDisablePolicies(let p):         return ["pro", "bulk", "disable-policies", "--name-pattern=" + Self.cleanValue(p), "--yes"]
 
-        // Policy Execute
-        case .policyExecute(let n, let s): return ["pro", "policy-execute", n, "--target", s, "--yes"]
 
         // Org Objects
         case .buildings:       return ["pro", "bld", "list", "-o", "json"]
@@ -377,9 +357,7 @@ enum CLICommand: Sendable {
         // Patch Management
         case .patchTitles:       return ["pro", "classic-patch-titles",  "list", "-o", "json"]
         case .patchPolicies:     return ["pro", "classic-patch-policies", "list", "-o", "json"]
-        case .patchPoliciesUAPI: return ["pro", "patch-policies",         "list", "-o", "json"]
         case .patchSoftwareTitleConfigurations: return ["pro", "patch-software-title-configurations", "list", "-o", "json"]
-        case .patchSoftwareSummary:             return ["pro", "patch-software-title-configurations", "patch-summary", "-o", "json"]
         case .appInstallerTitles:               return ["pro", "app-installer-titles", "list", "-o", "json"]
         case .appInstallerDeployments:          return ["pro", "app-installer-deployments", "list", "-o", "json"]
         case .restrictedSoftware:               return ["pro", "classic-restricted-software", "list", "-o", "json"]
@@ -390,7 +368,7 @@ enum CLICommand: Sendable {
         case .mobileDevicePrestages: return ["pro", "mobile-device-prestages", "list", "-o", "json"]
 
         // Webhooks
-        case .webhooks: return ["pro", "webhooks", "list", "-o", "json"]
+        case .webhooks: return ["pro", "classic-webhooks", "list", "-o", "json"]
 
         // Self Service & Check-In
         case .selfServiceSettings:   return ["pro", "self-service-settings", "get", "-o", "json"]
@@ -398,50 +376,27 @@ enum CLICommand: Sendable {
 
         // Protect extended
         case .protectRemovableStorage:               return Self.protectList("rscs")
-        case .protectRemovableStorageDetail(let n):  return Self.protectGet("rscs", n)
-        case .protectRemovableStorageExport(let n):  return Self.protectExport("rscs", n)
         case .protectUnifiedLogging:                 return Self.protectList("ulf")
         case .protectUnifiedLoggingDetail(let n):    return Self.protectGet("ulf", n)
-        case .protectUnifiedLoggingExport(let n):    return Self.protectExport("ulf", n)
         case .protectActionConfigs:                  return Self.protectList("ac")
-        case .protectActionConfigDetail(let n):      return Self.protectGet("ac", n)
-        case .protectActionConfigExport(let n):      return Self.protectExport("ac", n)
         case .protectTelemetryConfigs:               return Self.protectList("telemetry")
-        case .protectTelemetryDetail(let n):         return Self.protectGet("telemetry", n)
-        case .protectTelemetryExport(let n):         return Self.protectExport("telemetry", n)
         case .protectCustomPreventLists:             return Self.protectList("cpl")
-        case .protectCustomPreventListDetail(let n): return Self.protectGet("cpl", n)
-        case .protectCustomPreventListExport(let n): return Self.protectExport("cpl", n)
         case .protectRoles:                          return Self.protectList("roles")
-        case .protectRoleDetail(let n):              return Self.protectGet("roles", n)
-        case .protectRoleExport(let n):              return Self.protectExport("roles", n)
         case .protectUsers:                          return Self.protectList("users")
-        case .protectUserDetail(let e):              return Self.protectGet("users", e)
-        case .protectUserExport(let e):              return Self.protectExport("users", e)
         case .protectGroups:                         return Self.protectList("groups")
-        case .protectGroupDetail(let n):             return Self.protectGet("groups", n)
-        case .protectGroupExport(let n):             return Self.protectExport("groups", n)
         case .protectAPIClients:                     return Self.protectList("apic")
-        case .protectAPIClientDetail(let n):         return Self.protectGet("apic", n)
-        case .protectAPIClientExport(let n):         return Self.protectExport("apic", n)
         case .protectDataForwarding:                 return ["protect", "df", "get", "-o", "json"]
         case .protectDataRetention:                  return ["protect", "dr", "get", "-o", "json"]
         case .protectConfigFreeze:                   return ["protect", "cf", "get", "-o", "json"]
-        case .protectConfigFreezeEnable:             return ["protect", "cf", "enable", "--yes"]
-        case .protectConfigFreezeDisable:            return ["protect", "cf", "disable", "--yes"]
         case .protectDownloadsSummary:               return ["protect", "downloads", "summary", "-o", "json"]
-        case .protectPlanExport(let n):              return Self.protectExport("plans", n)
         case .protectAnalyticDetail(let n):          return Self.protectGet("analytics", n)
-        case .protectAnalyticExport(let n):          return Self.protectExport("analytics", n)
-        case .protectAnalyticSetExport(let n):       return Self.protectExport("analytic-sets", n)
 
         // Patch Management detail
-        case .patchTitleDetail(let id):          return ["pro", "classic-patch-titles",   "get", id, "-o", "json"]
-        case .patchPolicyDetail(let id):         return ["pro", "classic-patch-policies", "get", id, "-o", "json"]
-        case .restrictedSoftwareDetail(let id):  return ["pro", "classic-restricted-software", "get", id, "-o", "json"]
-        case .scriptDetail(let id):      return ["pro", "scripts", "get", id, "-o", "json"]
+        case .patchTitleDetail(let id):          return ["pro", "classic-patch-titles", "get", "-o", "json", "--", id]
+        case .patchPolicyDetail(let id):         return ["pro", "classic-patch-policies", "get", "-o", "json", "--", id]
+        case .restrictedSoftwareDetail(let id):  return ["pro", "classic-restricted-software", "get", "-o", "json", "--", id]
+        case .scriptDetail(let id):      return ["pro", "scripts", "get", "-o", "json", "--", id]
         case .packageDetail(let id):     return ["pro", "classic-packages", "get", "\(id)", "-o", "json"]
-        case .protectExceptionSetExport(let n):      return ["protect", "exception-sets", "export", n]
 
         // macOS 27 readiness (appended)
         case .softwareUpdatePlans:               return ["pro", "managed-software-updates-plans", "list", "-o", "json"]
@@ -462,7 +417,7 @@ enum CLICommand: Sendable {
             let uuid = id.filter { $0.isHexDigit || $0 == "-" }
             return ["pro", "mdm", "list", "--filter", "clientManagementId==\(uuid)", "--sort", "dateSent:asc", "-o", "json"]
         case .computerHistory(let s, let subset):
-            return ["pro", "classic-computer-history", "get", "--serial", CLICommand.sanitizedSerial(s),
+            return ["pro", "classic-computer-history", "get", CLICommand.serialFlag(s),
                     "--subset", subset.rawValue, "-o", "json"]
         case .computerPrestageDetail(let id):
             return ["pro", "computer-prestages", "get", id.filter { $0.isASCII && $0.isNumber }, "-o", "json"]
@@ -475,7 +430,6 @@ enum CLICommand: Sendable {
         switch self {
         case .securityReport, .securityInventory, .computers, .erase, .lock(_, _),
              .mobileDeviceList, .mobileDeviceErase, .mobileDeviceLock,
-             .bulkAddToGroup, .bulkRemoveFromGroup, .bulkSendCommand,
              .bulkEnablePolicies, .bulkDisablePolicies,
              .reportPatchStatus, .reportPolicyStatus, .reportUpdateStatus,
              .reportDeviceCompliance, .reportSoftwareInstalls,
@@ -493,23 +447,39 @@ enum CLICommand: Sendable {
     /// RSQL filter matching one serial number. The value is quoted and `\` / `"` are
     /// escaped so a crafted serial cannot close the string and append clauses.
     static func serialFilter(_ serial: String) -> String {
-        let escaped = serial
+        let escaped = cleanValue(serial)
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
         return "hardware.serialNumber==\"\(escaped)\""
     }
 
-    /// True for commands that permanently alter or destroy device state.
-    var isDestructive: Bool {
+    /// What a command can do to a device or the Jamf instance.
+    var risk: CLIRisk {
         switch self {
-        case .removeMDM, .setRecoveryLock, .lock(_, _), .erase,
-             .mobileDeviceErase, .mobileDeviceLock, .mobileDeviceUnmanage,
-             .mobileDeviceEnableLostMode,
-             .protectConfigFreezeEnable, .protectConfigFreezeDisable:
-            return true
-        default: return false
+        case .blankPush, .renewMDM, .ddmSync, .flushFailedCommands, .flushAllCommands,
+             .mobileDeviceUpdateInventory:
+            return .safe
+        case .redeployFramework, .enableRemoteDesktop, .disableRemoteDesktop, .restart, .shutdown,
+             .mobileDeviceRestart, .mobileDeviceShutdown, .mobileDeviceDisableLostMode,
+             .bulkEnablePolicies, .bulkDisablePolicies:
+            return .moderate
+        case .removeMDM, .clearRecoveryLock, .lock, .erase,
+             .mobileDeviceErase, .mobileDeviceLock, .mobileDeviceUnmanage, .mobileDeviceEnableLostMode:
+            return .destructive
+        default:
+            return .read
         }
     }
+
+    /// True for commands that permanently alter or destroy device state.
+    var isDestructive: Bool { risk == .destructive }
+}
+
+/// How much a command changes. Anything other than `.read` sends something to devices
+/// or changes Jamf Pro.
+enum CLIRisk: Int, Sendable, Comparable {
+    case read, safe, moderate, destructive
+    static func < (a: CLIRisk, b: CLIRisk) -> Bool { a.rawValue < b.rawValue }
 }
 
 // MARK: - Report Output Format

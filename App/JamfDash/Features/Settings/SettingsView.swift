@@ -22,8 +22,8 @@ struct SettingsView: View {
             BrandingTab(vm: vm)
                 .tabItem { Label("Branding", systemImage: "photo") }
 
-            BackupTab(vm: vm)
-                .tabItem { Label("Backup", systemImage: "arrow.counterclockwise.icloud") }
+            ExportListsTab(vm: vm)
+                .tabItem { Label("Export Lists", systemImage: "square.and.arrow.down.on.square") }
 
             AITab(isEnabled: $isAIEnabled)
                 .tabItem { Label("AI", systemImage: "brain") }
@@ -686,19 +686,20 @@ private struct CLITab: View {
     }
 }
 
-// MARK: - Backup
+// MARK: - Export Lists
 
-private struct BackupTab: View {
+/// Saves the lists jamf-cli returns (names, IDs and summary fields) as JSON files.
+/// This is a record of what exists, not a backup that can be restored.
+private struct ExportListsTab: View {
     let vm: SettingsViewModel
-    @State private var backupFolder: URL? = nil
-    @State private var selectedFormat = 0
+    @State private var folder: URL? = nil
     @State private var isRunning = false
     @State private var logLines: [String] = []
-    @State private var backupResources: Set<BackupResource> = Set(BackupResource.allCases)
+    @State private var selected: Set<ExportList> = Set(ExportList.allCases)
 
-    enum BackupResource: String, CaseIterable, Identifiable {
+    enum ExportList: String, CaseIterable, Identifiable {
         case policies       = "Policies"
-        case configProfiles = "Config Profiles"
+        case configProfiles = "Configuration Profiles"
         case scripts        = "Scripts"
         case packages       = "Packages"
         case smartGroups    = "Smart Groups"
@@ -707,35 +708,50 @@ private struct BackupTab: View {
         case patchPolicies  = "Patch Policies"
         case webhooks       = "Webhooks"
         var id: String { rawValue }
+
+        var fileName: String {
+            rawValue.lowercased().replacingOccurrences(of: " ", with: "-") + ".json"
+        }
+
+        var command: CLICommand {
+            switch self {
+            case .policies:       return .policies
+            case .configProfiles: return .configProfiles
+            case .scripts:        return .scripts
+            case .packages:       return .packages
+            case .smartGroups:    return .smartComputerGroups
+            case .extensionAttrs: return .computerExtensionAttributes
+            case .patchTitles:    return .patchTitles
+            case .patchPolicies:  return .patchPolicies
+            case .webhooks:       return .webhooks
+            }
+        }
     }
 
     var body: some View {
         Form {
             Section {
                 HStack {
-                    Text(backupFolder?.path ?? "No folder selected")
-                        .foregroundStyle(backupFolder == nil ? .secondary : .primary)
-                        .lineLimit(1)
+                    Text(folder?.path ?? "No folder selected")
+                        .foregroundStyle(folder == nil ? .secondary : .primary)
+                        .lineLimit(1).truncationMode(.middle)
                     Spacer()
                     Button("Choose…") { chooseFolder() }
                 }
-                Picker("Format", selection: $selectedFormat) {
-                    Text("JSON (raw CLI output)").tag(0)
-                }
-                .pickerStyle(.menu)
             } header: {
                 Text("Destination")
+            } footer: {
+                Text("Each list is saved as a JSON file in a new dated folder. The files contain the names, IDs and summary fields Jamf Pro returns for each list, not full settings, so they can't be imported back into Jamf Pro.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
-            Section {
-                ForEach(BackupResource.allCases) { res in
-                    Toggle(res.rawValue, isOn: Binding(
-                        get: { backupResources.contains(res) },
-                        set: { if $0 { backupResources.insert(res) } else { backupResources.remove(res) } }
+            Section("Lists") {
+                ForEach(ExportList.allCases) { list in
+                    Toggle(list.rawValue, isOn: Binding(
+                        get: { selected.contains(list) },
+                        set: { if $0 { selected.insert(list) } else { selected.remove(list) } }
                     ))
                 }
-            } header: {
-                Text("Resources to Back Up")
             }
 
             Section {
@@ -747,21 +763,25 @@ private struct BackupTab: View {
                                     .font(.system(.caption, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
                             }
                         }
                     }
                     .frame(minHeight: 100, maxHeight: 180)
                 }
                 HStack {
+                    if let folder, !isRunning, !logLines.isEmpty {
+                        Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder]) }
+                    }
                     Spacer()
-                    Button(isRunning ? "Running…" : "Run Backup") {
-                        Task { await runBackup() }
+                    Button(isRunning ? "Exporting…" : "Export") {
+                        Task { await export() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isRunning || backupFolder == nil || backupResources.isEmpty)
+                    .disabled(isRunning || folder == nil || selected.isEmpty)
                 }
             } header: {
-                Text("Backup Log")
+                Text("Export")
             }
         }
         .formStyle(.grouped)
@@ -771,52 +791,40 @@ private struct BackupTab: View {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = "Choose Backup Folder"
+        panel.prompt = "Choose Folder"
         guard panel.runModal() == .OK else { return }
-        backupFolder = panel.url
+        folder = panel.url
     }
 
-    private func runBackup() async {
-        guard let folder = backupFolder else { return }
+    private func export() async {
+        guard let folder else { return }
         isRunning = true
         logLines = []
         defer { isRunning = false }
         let timestamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")
-        let runFolder = folder.appendingPathComponent("jamfdash-backup-\(timestamp)")
+        let runFolder = folder.appendingPathComponent("jamfdash-export-\(timestamp)")
         do {
             try FileManager.default.createDirectory(at: runFolder, withIntermediateDirectories: true)
-            logLines.append("Created backup folder: \(runFolder.lastPathComponent)")
-            for res in BackupResource.allCases where backupResources.contains(res) {
-                logLines.append("Backing up \(res.rawValue)…")
-                let cmd = backupCommand(for: res)
-                if let data = try? await vm.run(cmd) {
-                    let file = runFolder.appendingPathComponent("\(res.id.replacingOccurrences(of: " ", with: "_")).json")
-                    try data.write(to: file)
-                    logLines.append("  ✓ \(res.rawValue) saved (\(data.count) bytes)")
-                } else {
-                    logLines.append("  ✗ \(res.rawValue) failed")
-                }
-            }
-            logLines.append("Backup complete.")
         } catch {
-            logLines.append("Error: \(error.localizedDescription)")
+            logLines.append("Couldn't create the folder: \(error.localizedDescription)")
+            return
         }
-    }
-
-    private func backupCommand(for resource: BackupResource) -> CLICommand {
-        switch resource {
-        case .policies:       return .policies
-        case .configProfiles: return .configProfiles
-        case .scripts:        return .scripts
-        case .packages:       return .packages
-        case .smartGroups:    return .smartComputerGroups
-        case .extensionAttrs: return .computerExtensionAttributes
-        case .patchTitles:    return .patchTitles
-        case .patchPolicies:  return .patchPolicies
-        case .webhooks:       return .webhooks
+        logLines.append("Exporting to \(runFolder.lastPathComponent)")
+        var failed = 0
+        for list in ExportList.allCases where selected.contains(list) {
+            do {
+                let data = try await vm.run(list.command)
+                try data.write(to: runFolder.appendingPathComponent(list.fileName), options: .atomic)
+                logLines.append("  ✓ \(list.rawValue) (\(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)))")
+            } catch {
+                failed += 1
+                logLines.append("  ✗ \(list.rawValue): \(ErrorMessageFormatter.message(for: error))")
+            }
         }
+        logLines.append(failed == 0 ? "Export complete." : "Export finished with \(failed) failed list\(failed == 1 ? "" : "s").")
     }
 }
 

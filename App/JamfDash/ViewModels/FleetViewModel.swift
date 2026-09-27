@@ -33,7 +33,6 @@ final class FleetViewModel {
     private(set) var depTokensState:              LoadState<[DEPToken]>              = .idle
     private(set) var computerPrestagesState:      LoadState<[ComputerPrestage]>      = .idle
     private(set) var mobileDevicePrestagesState:  LoadState<[MobileDevicePrestage]>  = .idle
-    private(set) var webhooksState:               LoadState<[JamfWebhook]>           = .idle
 
     var searchText = ""
 
@@ -586,14 +585,6 @@ final class FleetViewModel {
         mobileDevicePrestagesState = .loading
         do { mobileDevicePrestagesState = .loaded(try await repository.fetchList(MobileDevicePrestage.self, command: .mobileDevicePrestages)) }
         catch { Self.logger.error("Failed to load mobile device prestages: \(error)"); mobileDevicePrestagesState = .failed(ErrorMessageFormatter.message(for: error)) }
-    }
-
-    func loadWebhooks(force: Bool = false) async {
-        guard force || webhooksState.value == nil else { return }
-        guard force || !webhooksState.isLoading else { return }
-        webhooksState = .loading
-        do { webhooksState = .loaded(try await repository.fetchList(JamfWebhook.self, command: .webhooks)) }
-        catch { Self.logger.error("Failed to load webhooks: \(error)"); webhooksState = .failed(ErrorMessageFormatter.message(for: error)) }
     }
 
     @discardableResult

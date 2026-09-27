@@ -339,8 +339,8 @@ final class EnrollmentCLISafetyTests: XCTestCase {
 
     func testSerialAndPrestageIDAreSanitized() {
         let history = CLICommand.computerHistory(serial: "C02 --url x", subset: .commands).baseArguments
-        XCTAssertEqual(history, ["pro", "classic-computer-history", "get", "--serial", "C02urlx",
-                                 "--subset", "Commands", "-o", "json"])
+        XCTAssertEqual(history, ["pro", "classic-computer-history", "get", "--serial=C02 --url x",
+                                 "--subset", "Commands", "-o", "json"], "the serial stays inside one --serial= argument")
         XCTAssertEqual(CLICommand.computerPrestageDetail(id: "1 --yes").baseArguments,
                        ["pro", "computer-prestages", "get", "1", "-o", "json"])
         let inventory = CLICommand.enrollmentInventory(serial: #"A"B"#).baseArguments

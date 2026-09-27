@@ -580,13 +580,13 @@ struct DeviceActionsPanel: View {
     @State private var lockPIN = ""
 
     enum ConfirmableAction: Identifiable {
-        case removeMDM, setRecoveryLock, erase
+        case removeMDM, clearRecoveryLock, erase
         case restart, shutdown, redeployFramework, flushAllCommands
 
         var id: String {
             switch self {
             case .removeMDM:           return "removeMDM"
-            case .setRecoveryLock:     return "setRecoveryLock"
+            case .clearRecoveryLock:   return "clearRecoveryLock"
             case .erase:               return "erase"
             case .restart:             return "restart"
             case .shutdown:            return "shutdown"
@@ -598,7 +598,7 @@ struct DeviceActionsPanel: View {
         var title: String {
             switch self {
             case .removeMDM:         return "Remove MDM Profile"
-            case .setRecoveryLock:   return "Set Recovery Lock"
+            case .clearRecoveryLock: return "Clear Recovery Lock"
             case .erase:             return "Erase Computer"
             case .restart:           return "Restart"
             case .shutdown:          return "Shut Down"
@@ -610,7 +610,7 @@ struct DeviceActionsPanel: View {
         var message: String {
             switch self {
             case .removeMDM:         return "This will unenroll the device from MDM. The device will need to be re-enrolled manually."
-            case .setRecoveryLock:   return "This will set or clear the Recovery Lock password on Apple Silicon / T2 Macs."
+            case .clearRecoveryLock: return "This will remove the Recovery Lock password on this Mac (Apple silicon or T2). To set a new password, use Jamf Pro."
             case .erase:             return "This will permanently erase all data on the computer. This cannot be undone."
             case .restart:           return "This will restart the computer remotely."
             case .shutdown:          return "This will shut down the computer remotely."
@@ -621,7 +621,7 @@ struct DeviceActionsPanel: View {
 
         var isDestructive: Bool {
             switch self {
-            case .removeMDM, .erase: return true
+            case .removeMDM, .erase, .clearRecoveryLock: return true
             default: return false
             }
         }
@@ -629,7 +629,7 @@ struct DeviceActionsPanel: View {
         func makeCommand(serial: String) -> CLICommand {
             switch self {
             case .removeMDM:         return .removeMDM(serial: serial)
-            case .setRecoveryLock:   return .setRecoveryLock(serial: serial)
+            case .clearRecoveryLock: return .clearRecoveryLock(serial: serial)
             case .erase:             return .erase(serial: serial)
             case .restart:           return .restart(serial: serial)
             case .shutdown:          return .shutdown(serial: serial)
@@ -725,8 +725,8 @@ struct DeviceActionsPanel: View {
                             actionButton("Remove MDM", icon: "wifi.slash", tint: .orange) {
                                 confirmAction = .removeMDM
                             }
-                            actionButton("Set Recovery Lock", icon: "lock.rotation", tint: .orange) {
-                                confirmAction = .setRecoveryLock
+                            actionButton("Clear Recovery Lock", icon: "lock.rotation", tint: .orange) {
+                                confirmAction = .clearRecoveryLock
                             }
                             actionButton("Lock", icon: "lock.fill", tint: .red) {
                                 lockPIN = ""

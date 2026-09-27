@@ -13,11 +13,15 @@ enum CLIError: Error, Sendable {
     case untrustedBinary(String)
     case unexpectedPrompt(String)
     case cliTooOld(installed: String, minimum: String)
+    /// Demo mode has no sample data for this command.
+    case notInDemo
 }
 
 extension CLIError: LocalizedError {
     var errorDescription: String? {
         switch self {
+        case .notInDemo:
+            return "This isn't included in demo mode. Connect a Jamf instance to see it."
         case .binaryMissing:
             return "jamf-cli binary is not installed. Open Settings to download it."
         case .launchFailed(let msg):

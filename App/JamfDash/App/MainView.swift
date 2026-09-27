@@ -67,7 +67,7 @@ struct MainView: View {
             case .protectOverview:
                 ProtectOverviewView(vm: env.protectVM)
             case .protectEvents:
-                ProtectEventsView()
+                ProtectEventsView(vm: env.protectVM)
             case .protectComputers:
                 ProtectComputersView(vm: env.protectVM)
             case .protectPlans:

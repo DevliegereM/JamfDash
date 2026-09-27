@@ -7,7 +7,7 @@ struct DemoCLIManager: CLIRunning, Sendable {
     func run(_ command: CLICommand) async throws -> Data {
         // Brief simulated latency so loading states are visible
         try await Task.sleep(nanoseconds: 350_000_000)
-        let json = demoJSON(for: command)
+        let json = try demoJSON(for: command)
         guard let data = json.data(using: .utf8) else {
             throw CLIError.decodingFailed("Failed to encode demo payload")
         }
@@ -17,7 +17,7 @@ struct DemoCLIManager: CLIRunning, Sendable {
     func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
         try await Task.sleep(nanoseconds: 350_000_000)
         if outputFormat == .json {
-            let json = demoJSON(for: command)
+            let json = try demoJSON(for: command)
             guard let data = json.data(using: .utf8) else {
                 throw CLIError.decodingFailed("Failed to encode demo payload")
             }
@@ -32,7 +32,7 @@ struct DemoCLIManager: CLIRunning, Sendable {
 
     // MARK: - Route
 
-    private func demoJSON(for command: CLICommand) -> String {
+    private func demoJSON(for command: CLICommand) throws -> String {
         if let enrollment = DemoEnrollmentData.json(for: command) { return enrollment }
         switch command {
         // Jamf Pro
@@ -112,8 +112,19 @@ struct DemoCLIManager: CLIRunning, Sendable {
         case .softwareUpdatePlansForComputer(let id): return softwareUpdatePlansJSON(forComputer: id)
         case .softwareUpdateStatuses:    return softwareUpdateStatusesJSON
         case .computersUpdateReadiness:  return computersUpdateReadinessJSON
-        // Device actions - return a simple success payload
+        case .installedApps:             return installedAppsJSON
+        case .blueprints:                return blueprintsJSON
+        case .complianceBenchmarks:      return complianceBenchmarksJSON
+        case .buildings:                 return buildingsJSON
+        case .departments:               return departmentsJSON
+        case .networkSegments:           return networkSegmentsJSON
+        case .webhooks:                  return webhooksJSON
+        case .schoolProfiles:            return schoolProfilesJSON
+        case .schoolDepDevices:          return schoolDepDevicesJSON
         default:
+            // Actions are simulated; reads without sample data say so instead of
+            // returning a payload the caller can't decode.
+            guard command.risk != .read else { throw CLIError.notInDemo }
             return #"{"status":"success","message":"Action simulated in demo mode"}"#
         }
     }
@@ -1322,4 +1333,71 @@ private let computersUpdateReadinessJSON = """
   {"id":"10","general":{"name":"Jake's MacBook Air","declarativeDeviceManagementEnabled":false},"hardware":{"serialNumber":"C02XA010DEMO"},"operatingSystem":{"version":"13.7.2"},"configurationProfiles":[]},
   {"id":"11","general":{"name":"Karen's MacBook Pro","declarativeDeviceManagementEnabled":true},"hardware":{"serialNumber":"C02XA011DEMO"},"operatingSystem":{"version":"15.4"},"configurationProfiles":[]}
 ]}
+"""
+
+// MARK: - Release 1.0 additions
+
+private let installedAppsJSON = """
+{"totalCount":1,"results":[{"id":"1","general":{"name":"Frank's MacBook Pro"},"applications":[
+  {"name":"Google Chrome.app","version":"129.0.6668.90","bundleId":"com.google.Chrome"},
+  {"name":"Microsoft Outlook.app","version":"16.89","bundleId":"com.microsoft.Outlook"},
+  {"name":"Slack.app","version":"4.40.128","bundleId":"com.tinyspeck.slackmacgap"},
+  {"name":"Zoom.us.app","version":"6.2.5","bundleId":"us.zoom.xos"},
+  {"name":"Self Service.app","version":"11.10.0","bundleId":"com.jamfsoftware.selfservice.mac"},
+  {"name":"Safari.app","version":"26.0","bundleId":"com.apple.Safari"},
+  {"name":"Xcode.app","version":"26.0","bundleId":"com.apple.dt.Xcode"}
+]}]}
+"""
+
+private let blueprintsJSON = """
+[
+  {"id":"bp-001","name":"Baseline Security"},
+  {"id":"bp-002","name":"Wi-Fi and Certificates"},
+  {"id":"bp-003","name":"Software Update Deadlines"}
+]
+"""
+
+private let complianceBenchmarksJSON = """
+[
+  {"id":"cb-001","name":"CIS macOS Level 1"},
+  {"id":"cb-002","name":"NIST 800-53 Moderate"}
+]
+"""
+
+private let buildingsJSON = """
+{"totalCount":3,"results":[{"id":"1","name":"Headquarters"},{"id":"2","name":"Ghent Office"},{"id":"3","name":"Remote"}]}
+"""
+
+private let departmentsJSON = """
+{"totalCount":4,"results":[{"id":"1","name":"Engineering"},{"id":"2","name":"Finance"},{"id":"3","name":"Marketing"},{"id":"4","name":"IT"}]}
+"""
+
+private let networkSegmentsJSON = """
+[
+  {"id":1,"name":"HQ Wired","startingAddress":"10.10.0.1","endingAddress":"10.10.255.254"},
+  {"id":2,"name":"Ghent Wi-Fi","startingAddress":"10.20.0.1","endingAddress":"10.20.15.254"}
+]
+"""
+
+private let webhooksJSON = """
+[
+  {"id":1,"name":"Computer Added → Slack","enabled":true,"event":"ComputerAdded"},
+  {"id":2,"name":"Policy Finished → SIEM","enabled":false,"event":"ComputerPolicyFinished"}
+]
+"""
+
+private let schoolProfilesJSON = """
+[
+  {"id":1,"name":"Classroom Wi-Fi","scope":"All Devices","payloadCount":1,"enabled":true},
+  {"id":2,"name":"Restrictions — Grade 5","scope":"Grade 5 iPads","payloadCount":3,"enabled":true},
+  {"id":3,"name":"Exam Mode","scope":"Exam Group","payloadCount":2,"enabled":false}
+]
+"""
+
+private let schoolDepDevicesJSON = """
+[
+  {"serialNumber":"DMPXK1A2B3C4","model":"iPad (10th generation)","profileName":"Students","status":"Enrolled"},
+  {"serialNumber":"DMPXK1A2B3C5","model":"iPad (10th generation)","profileName":"Students","status":"Pending"},
+  {"serialNumber":"DMPXK1A2B3C6","model":"iPad Air (M2)","profileName":"Teachers","status":"Enrolled"}
+]
 """

@@ -1059,32 +1059,6 @@ struct MobileDevicePrestage: Decodable, Sendable, Hashable, Identifiable {
     }
 }
 
-// MARK: - Webhooks
-
-struct JamfWebhook: Decodable, Sendable, Hashable, Identifiable {
-    let id: String
-    let name: String
-    let enabled: Bool?
-    let event: String?
-    let url: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, enabled, event, url, webhookUrl, webHookUrl
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        if let s = try? c.decode(String.self, forKey: .id) { id = s }
-        else { id = String(try c.decode(Int.self, forKey: .id)) }
-        name    = (try? c.decode(String.self, forKey: .name))    ?? ""
-        enabled = try? c.decode(Bool.self,   forKey: .enabled)
-        event   = try? c.decode(String.self, forKey: .event)
-        url     = (try? c.decode(String.self, forKey: .url))
-               ?? (try? c.decode(String.self, forKey: .webhookUrl))
-               ?? (try? c.decode(String.self, forKey: .webHookUrl))
-    }
-}
-
 // MARK: - Computer inventory
 
 struct Computer: Codable, Sendable, Hashable, Identifiable {

@@ -3,24 +3,67 @@ import SwiftUI
 // MARK: - Alerts (event feed)
 
 struct ProtectEventsView: View {
+    @Bindable var vm: ProtectViewModel
+    @State private var searchText = ""
+    @State private var statusFilter = "All"
+    @State private var sortOrder = [KeyPathComparator(\ProtectEvent.severityRank)]
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 40))
-                .foregroundStyle(.orange)
-            Text("Alerts Not Available via CLI")
-                .font(.headline)
-            Text("Triggered security alerts are only accessible through the Jamf Protect web console.\nThe jamf-cli tool does not expose an alerts list endpoint.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 380)
+        AsyncContentView(state: vm.eventsState, retry: { await vm.loadEvents(force: true) }) { events in
+            let statuses = ["All"] + Array(Set(events.compactMap { $0.status?.capitalized })).sorted()
+            let filtered = events.filter { e in
+                (statusFilter == "All" || e.status?.capitalized == statusFilter)
+                    && (searchText.isEmpty
+                        || (e.analyticName ?? "").localizedCaseInsensitiveContains(searchText)
+                        || (e.hostName ?? "").localizedCaseInsensitiveContains(searchText))
+            }.sorted(using: sortOrder)
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    summary(events)
+                    Spacer()
+                    Picker("Status", selection: $statusFilter) {
+                        ForEach(statuses, id: \.self) { Text($0).tag($0) }
+                    }
+                    .fixedSize()
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                Divider()
+                if filtered.isEmpty {
+                    protectEmptyState(icon: "checkmark.shield",
+                                      label: events.isEmpty ? "No alerts" : "No alerts match the filter")
+                } else {
+                    Table(filtered, sortOrder: $sortOrder) {
+                        TableColumn("Severity", value: \.severityRank) { e in SeverityBadge(severity: e.severity) }
+                            .width(min: 80, ideal: 90)
+                        TableColumn("Analytic") { Text($0.analyticName ?? "—") }
+                        TableColumn("Computer") { Text($0.hostName ?? "—").foregroundStyle(.secondary) }
+                        TableColumn("Status") { Text($0.status?.capitalized ?? "—").foregroundStyle(.secondary) }
+                            .width(min: 80, ideal: 100)
+                        TableColumn("Created") { Text($0.formattedTimestamp ?? "—").foregroundStyle(.secondary).monospacedDigit() }
+                            .width(min: 110, ideal: 140)
+                    }
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
+        .searchable(text: $searchText, prompt: "Search by analytic or computer")
         .navigationTitle("Protect Alerts")
+        .toolbar { refreshButton { await vm.loadEvents(force: true) } }
+        .task { await vm.loadEvents() }
+    }
+
+    private func summary(_ events: [ProtectEvent]) -> some View {
+        let high = events.filter { $0.severityRank == 0 }.count
+        let medium = events.filter { $0.severityRank == 1 }.count
+        return HStack(spacing: 10) {
+            Text("\(events.count) alert\(events.count == 1 ? "" : "s")").fontWeight(.medium)
+            if high > 0 { Text("\(high) high").foregroundStyle(.red) }
+            if medium > 0 { Text("\(medium) medium").foregroundStyle(.orange) }
+        }
+        .font(.callout)
+        .accessibilityElement(children: .combine)
     }
 }
+
 
 // MARK: - Overview
 
@@ -593,6 +636,7 @@ private struct ConnectionStatusBadge: View {
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(color(for: s).opacity(0.15), in: Capsule())
             .foregroundStyle(color(for: s))
+            .accessibilityLabel("Severity \(s)")
     }
 
     private func color(for s: String) -> Color {
@@ -670,7 +714,7 @@ private struct SeverityBadge: View {
 
     private func color(for s: String) -> Color {
         switch s.lowercased() {
-        case "high":          return .red
+        case "high", "critical": return .red
         case "medium":        return .orange
         case "low":           return .yellow
         case "informational": return .blue
@@ -907,135 +951,6 @@ struct ProtectAPIClientsView: View {
 
 // MARK: - Config-as-Code Export Sheet
 
-struct ExportSheetView: View {
-    @Bindable var vm: ProtectViewModel
-    @Environment(AppEnvironment.self) private var env
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedResources: Set<ExportResource> = Set(ExportResource.allCases)
-    @State private var yamlOutput = ""
-    @State private var isGenerating = false
-
-    enum ExportResource: String, CaseIterable, Identifiable {
-        case plans = "Plans"
-        case analytics = "Analytics"
-        case analyticSets = "Analytic Sets"
-        case exceptionSets = "Exception Sets"
-        case removableStorage = "Removable Storage CSets"
-        case unifiedLogging = "Unified Logging Filters"
-        case actionConfigs = "Action Configs"
-        case telemetry = "Telemetry Configs"
-        case preventLists = "Custom Prevent Lists"
-        var id: String { rawValue }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Config-as-Code Export").font(.title2).bold()
-                Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
-            }
-            .padding(20)
-
-            Divider()
-
-            HSplitView {
-                // Resource picker
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Resources").font(.headline).padding(.horizontal, 16).padding(.top, 16)
-                    List(ExportResource.allCases, selection: $selectedResources) { res in
-                        Label(res.rawValue, systemImage: "checkmark")
-                            .tag(res)
-                    }
-                    .listStyle(.sidebar)
-
-                    Button {
-                        Task { await generateYAML() }
-                    } label: {
-                        Label(isGenerating ? "Generating…" : "Generate YAML", systemImage: "doc.badge.gearshape")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isGenerating || selectedResources.isEmpty)
-                    .padding(.horizontal, 16).padding(.bottom, 16)
-                }
-                .frame(minWidth: 200, maxWidth: 220)
-
-                // YAML output
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack {
-                        Text("YAML").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                        Spacer()
-                        if !yamlOutput.isEmpty {
-                            Button("Copy") { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(yamlOutput, forType: .string) }
-                                .buttonStyle(.bordered).controlSize(.small)
-                            Button("Save…") { saveYAML() }
-                                .buttonStyle(.bordered).controlSize(.small)
-                        }
-                    }
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(Color.primary.opacity(0.04))
-
-                    Divider()
-
-                    if yamlOutput.isEmpty {
-                        Text("Select resources and click Generate YAML")
-                            .foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else {
-                        ScrollView {
-                            Text(yamlOutput)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(16)
-                        }
-                    }
-                }
-            }
-        }
-        .frame(minWidth: 720, minHeight: 500)
-    }
-
-    private func generateYAML() async {
-        isGenerating = true
-        defer { isGenerating = false }
-        var sections: [String] = []
-        for res in ExportResource.allCases where selectedResources.contains(res) {
-            let yaml = await exportYAML(for: res)
-            if !yaml.isEmpty { sections.append("# \(res.rawValue)\n\(yaml)") }
-        }
-        yamlOutput = sections.joined(separator: "\n\n")
-    }
-
-    private func exportYAML(for resource: ExportResource) async -> String {
-        do {
-            let cmd: CLICommand
-            switch resource {
-            case .plans:           cmd = .protectPlanExport(name: "--all")
-            case .analytics:       cmd = .protectAnalyticExport(name: "--all")
-            case .analyticSets:    cmd = .protectAnalyticSetExport(name: "--all")
-            case .exceptionSets:   cmd = .protectExceptionSetExport(name: "--all")
-            case .removableStorage: cmd = .protectRemovableStorageExport(name: "--all")
-            case .unifiedLogging:  cmd = .protectUnifiedLoggingExport(name: "--all")
-            case .actionConfigs:   cmd = .protectActionConfigExport(name: "--all")
-            case .telemetry:       cmd = .protectTelemetryExport(name: "--all")
-            case .preventLists:    cmd = .protectCustomPreventListExport(name: "--all")
-            }
-            let data = try await env.cliManager.run(cmd)
-            return String(data: data, encoding: .utf8) ?? ""
-        } catch {
-            return "# Error exporting \(resource.rawValue): \(error.localizedDescription)"
-        }
-    }
-
-    private func saveYAML() {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "jamf-protect-config.yaml"
-        panel.allowedContentTypes = [.yaml]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        try? yamlOutput.write(to: url, atomically: true, encoding: .utf8)
-    }
-}
 
 // MARK: - Named entry list (shared pattern for simple resource lists)
 
