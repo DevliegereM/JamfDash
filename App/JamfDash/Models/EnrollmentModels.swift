@@ -7,7 +7,7 @@ import Foundation
 
 /// The order a Mac goes through enrollment. The flow and the timeline both use it.
 enum EnrollmentPhase: Int, CaseIterable, Sendable, Comparable, Identifiable {
-    case adeAssignment, setupAssistant, mdmEnrollment, prestageItems, profiles
+    case adeAssignment, setupAssistant, mdmEnrollment, prestageItems, setupManager, profiles
     case policies, apps, ddm, inventory, otherMDM
 
     var id: Int { rawValue }
@@ -19,6 +19,7 @@ enum EnrollmentPhase: Int, CaseIterable, Sendable, Comparable, Identifiable {
         case .setupAssistant: return "Setup Assistant"
         case .mdmEnrollment:  return "MDM enrollment"
         case .prestageItems:  return "PreStage items"
+        case .setupManager:   return "Setup Manager"
         case .profiles:       return "Configuration profiles"
         case .policies:       return "Policies"
         case .apps:           return "Apps"
@@ -34,6 +35,7 @@ enum EnrollmentPhase: Int, CaseIterable, Sendable, Comparable, Identifiable {
         case .setupAssistant: return "macwindow"
         case .mdmEnrollment:  return "person.badge.shield.checkmark"
         case .prestageItems:  return "shippingbox"
+        case .setupManager:   return "list.bullet.rectangle.portrait"
         case .profiles:       return "doc.badge.gearshape"
         case .policies:       return "scroll"
         case .apps:           return "app.badge"
@@ -233,6 +235,8 @@ struct ScopedProfile: Sendable, Identifiable {
     let name: String
     let identifier: String?
     let scope: JamfScope
+    /// Set when the profile configures Jamf Setup Manager (`com.jamf.setupmanager`).
+    var setupManager: SetupManagerConfig? = nil
 }
 
 struct ScopedPolicy: Sendable, Identifiable {
@@ -241,6 +245,8 @@ struct ScopedPolicy: Sendable, Identifiable {
     let enabled: Bool
     let enrollmentTrigger: Bool
     let scope: JamfScope
+    /// Custom event trigger (`jamf policy -event …`), used by Setup Manager policy steps.
+    var customTrigger: String? = nil
 }
 
 struct ScopeScanResult: Sendable {
@@ -248,6 +254,92 @@ struct ScopeScanResult: Sendable {
     let policies: [ScopedPolicy]
     let failures: Int
     let scannedAt: Date
+}
+
+// MARK: - Setup Manager
+
+/// A Jamf Setup Manager configuration (https://github.com/jamf/setup-manager), read from the
+/// configuration profile that sets the `com.jamf.setupmanager` preferences.
+struct SetupManagerConfig: Sendable, Hashable {
+    let title: String?
+    /// "enrollment" (default) or "loginwindow".
+    let runAt: String?
+    /// "continue" (default), "restart", "shutdown" or "none".
+    let finalAction: String?
+    let finishedTrigger: String?
+    let steps: [SetupManagerStep]
+
+    var runAtLabel: String {
+        runAt?.lowercased() == "loginwindow" ? "Starts at the login window" : "Starts right after enrollment"
+    }
+
+    var finalActionLabel: String {
+        switch (finalAction ?? "continue").lowercased() {
+        case "restart":  return "Restarts the Mac when done"
+        case "shutdown": return "Shuts down the Mac when done"
+        case "none":     return "No button when done"
+        default:         return "Continues to Setup Assistant or the login window when done"
+        }
+    }
+}
+
+struct SetupManagerStep: Sendable, Hashable, Identifiable {
+    enum Kind: String, Sendable, Hashable {
+        case policy, installomator, shell, watchPath, wait, recon, waitForUserEntry, other
+
+        var title: String {
+            switch self {
+            case .policy:           return "Policy"
+            case .installomator:    return "Installomator"
+            case .shell:            return "Shell"
+            case .watchPath:        return "Wait for file"
+            case .wait:             return "Wait"
+            case .recon:            return "Inventory"
+            case .waitForUserEntry: return "User entry"
+            case .other:            return "Other"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .policy:           return "scroll"
+            case .installomator:    return "arrow.down.app"
+            case .shell:            return "terminal"
+            case .watchPath:        return "doc.viewfinder"
+            case .wait:             return "hourglass"
+            case .recon:            return "list.clipboard"
+            case .waitForUserEntry: return "person.text.rectangle"
+            case .other:            return "questionmark.square"
+            }
+        }
+    }
+
+    let id: Int
+    let label: String
+    let kind: Kind
+    /// The policy trigger, Installomator label, command or path.
+    let value: String?
+}
+
+/// Setup Manager configuration found in a profile, with where it came from.
+struct SetupManagerSource: Sendable, Identifiable {
+    var id: Int { profileID }
+    let profileID: Int
+    let profileName: String
+    let config: SetupManagerConfig
+    /// Why this one was chosen, e.g. "In the PreStage" or "Chosen in Settings".
+    let reason: String
+}
+
+/// One Setup Manager step on one Mac.
+struct SetupManagerStepRow: Identifiable, Sendable, Hashable {
+    var id: Int { step.id }
+    let step: SetupManagerStep
+    /// Policies with the step's trigger.
+    let policies: [String]
+    let status: PolicyRowStatus?
+    let date: Date?
+    let note: String
 }
 
 // MARK: - Flow (what a new Mac gets)
@@ -689,25 +781,69 @@ enum EnrollmentParsing {
         let root = json(data) as? [String: Any] ?? [:]
         let policy = (root["policy"] as? [String: Any]) ?? root
         let general = policy["general"] as? [String: Any] ?? [:]
-        return ScopedPolicy(
+        var result = ScopedPolicy(
             id: id,
             name: fallbackName.isEmpty ? (string(general["name"]) ?? "Untitled") : fallbackName,
             enabled: bool(general["enabled"]) ?? true,
             enrollmentTrigger: bool(first(general, ["trigger_enrollment_complete", "triggerEnrollmentComplete"])) ?? false,
             scope: FleetRepository.extractScope(from: data)
         )
+        result.customTrigger = string(general["trigger_other"])
+        return result
     }
 
     static func scopedProfile(_ data: Data, id: Int, fallbackName: String) -> ScopedProfile {
         let root = json(data) as? [String: Any] ?? [:]
         let profile = (root["os_x_configuration_profile"] as? [String: Any]) ?? root
         let general = profile["general"] as? [String: Any] ?? [:]
-        return ScopedProfile(
+        var result = ScopedProfile(
             id: id,
             name: fallbackName.isEmpty ? (string(general["name"]) ?? "Untitled") : fallbackName,
             identifier: string(first(general, ["uuid", "payload_identifier"])),
             scope: FleetRepository.extractScope(from: data)
         )
+        if let payloads = string(general["payloads"]), payloads.contains("enrollmentActions") {
+            result.setupManager = setupManager(payloads: payloads)
+        }
+        return result
+    }
+
+    /// Reads Setup Manager's settings from a profile's payload plist. They sit in a custom
+    /// settings payload (`com.apple.ManagedClient.preferences` → `com.jamf.setupmanager` →
+    /// `Forced` → `mcx_preference_settings`) or directly in a `com.jamf.setupmanager` payload;
+    /// the search looks for the dictionary with `enrollmentActions` wherever it is.
+    static func setupManager(payloads: String) -> SetupManagerConfig? {
+        guard let data = payloads.data(using: .utf8),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
+              let settings = findDictionary(withKey: "enrollmentActions", in: plist),
+              let actions = settings["enrollmentActions"] as? [[String: Any]] else { return nil }
+        let kinds: [(String, SetupManagerStep.Kind)] = [
+            ("policy", .policy), ("installomator", .installomator), ("shell", .shell), ("watchPath", .watchPath),
+            ("waitForUserEntry", .waitForUserEntry), ("recon", .recon), ("wait", .wait),
+        ]
+        let steps = actions.enumerated().map { index, action -> SetupManagerStep in
+            let match = kinds.first { action[$0.0] != nil }
+            var value = match.flatMap { string(action[$0.0]) }
+            if match?.1 == .shell, let args = action["arguments"] as? [String], !args.isEmpty {
+                value = ([value ?? ""] + args).joined(separator: " ")
+            }
+            if match?.1 == .recon || match?.1 == .waitForUserEntry { value = nil }
+            return SetupManagerStep(id: index, label: string(action["label"]) ?? "Step \(index + 1)",
+                                    kind: match?.1 ?? .other, value: value)
+        }
+        return SetupManagerConfig(title: string(settings["title"]), runAt: string(settings["runAt"]),
+                                  finalAction: string(settings["finalAction"]),
+                                  finishedTrigger: string(settings["finishedTrigger"]), steps: steps)
+    }
+
+    private static func findDictionary(withKey key: String, in value: Any) -> [String: Any]? {
+        if let dict = value as? [String: Any] {
+            if dict[key] != nil { return dict }
+            for child in dict.values { if let hit = findDictionary(withKey: key, in: child) { return hit } }
+        } else if let array = value as? [Any] {
+            for child in array { if let hit = findDictionary(withKey: key, in: child) { return hit } }
+        }
+        return nil
     }
 
     // MARK: Settings

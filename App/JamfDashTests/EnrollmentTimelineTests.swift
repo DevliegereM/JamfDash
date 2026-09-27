@@ -188,6 +188,112 @@ final class EnrollmentRealShapeTests: XCTestCase {
     }
 }
 
+final class SetupManagerTests: XCTestCase {
+    /// As Jamf Pro stores it: a custom settings payload with the settings under Forced.
+    private let payloads = """
+        <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>PayloadContent</key><array>
+        <dict><key>PayloadType</key><string>com.apple.ManagedClient.preferences</string><key>PayloadContent</key><dict>
+        <key>com.jamf.setupmanager</key><dict><key>Forced</key><array><dict><key>mcx_preference_settings</key><dict>
+        <key>runAt</key><string>loginwindow</string><key>finalAction</key><string>restart</string>
+        <key>finishedTrigger</key><string>sm_done</string>
+        <key>enrollmentActions</key><array>
+          <dict><key>label</key><string>Rosetta 2</string><key>policy</key><string>EnrollRosetta2</string></dict>
+          <dict><key>label</key><string>Teams</string><key>installomator</key><string>microsoftteams</string></dict>
+          <dict><key>label</key><string>Time zone</string><key>shell</key><string>/usr/sbin/systemsetup</string>
+                <key>arguments</key><array><string>-setTimeZone</string><string>Europe/Brussels</string></array></dict>
+          <dict><key>label</key><string>Protect</string><key>watchPath</key><string>/Applications/JamfProtect.app</string></dict>
+          <dict><key>label</key><string>Wait</string><key>wait</key><integer>20</integer></dict>
+          <dict><key>label</key><string>Inventory</string><key>recon</key><true/></dict>
+          <dict><key>label</key><string>Check-in</string><key>policy</key><string></string></dict>
+        </array></dict></dict></array></dict></dict></dict></array></dict></plist>
+        """
+
+    func testParsesStepsFromCustomSettingsPayload() throws {
+        let config = try XCTUnwrap(EnrollmentParsing.setupManager(payloads: payloads))
+        XCTAssertEqual(config.steps.map(\.kind), [.policy, .installomator, .shell, .watchPath, .wait, .recon, .policy])
+        XCTAssertEqual(config.steps[0].value, "EnrollRosetta2")
+        XCTAssertEqual(config.steps[2].value, "/usr/sbin/systemsetup -setTimeZone Europe/Brussels")
+        XCTAssertEqual(config.steps[4].value, "20")
+        XCTAssertNil(config.steps[5].value)
+        XCTAssertEqual(config.finishedTrigger, "sm_done")
+        XCTAssertEqual(config.runAtLabel, "Starts at the login window")
+        XCTAssertEqual(config.finalActionLabel, "Restarts the Mac when done")
+        XCTAssertNil(EnrollmentParsing.setupManager(payloads: "<plist><dict/></plist>"))
+    }
+
+    private func scan(profiles: [ScopedProfile], policies: [ScopedPolicy] = []) -> ScopeScanResult {
+        ScopeScanResult(profiles: profiles, policies: policies, failures: 0, scannedAt: Date())
+    }
+
+    private func smProfile(_ id: Int, all: Bool = false) -> ScopedProfile {
+        var p = ScopedProfile(id: id, name: "SM \(id)", identifier: nil, scope: JamfScope(allComputers: all))
+        p.setupManager = EnrollmentParsing.setupManager(payloads: payloads)
+        return p
+    }
+
+    func testChoosesTheRightProfile() {
+        let s = scan(profiles: [smProfile(1), smProfile(2, all: true), smProfile(3),
+                                ScopedProfile(id: 4, name: "Other", identifier: nil, scope: JamfScope(allComputers: true))])
+        let prestage = PrestageDetail(id: "1", name: "P", profileIDs: [3], packageIDs: [], skipItems: [:],
+                                      customizationID: nil, adeInstanceID: nil, facts: [])
+        XCTAssertEqual(EnrollmentAnalyzer.setupManagerCandidates(s).map(\.id), [1, 2, 3])
+        XCTAssertEqual(EnrollmentAnalyzer.setupManagerSource(scan: s, preferredProfileID: 1, prestage: prestage)?.profileID, 1)
+        XCTAssertEqual(EnrollmentAnalyzer.setupManagerSource(scan: s, preferredProfileID: nil, prestage: prestage,
+                                                             installedProfileIDs: [2])?.profileID, 2)
+        XCTAssertEqual(EnrollmentAnalyzer.setupManagerSource(scan: s, preferredProfileID: nil, prestage: prestage)?.profileID, 3)
+        XCTAssertEqual(EnrollmentAnalyzer.setupManagerSource(scan: s, preferredProfileID: 99, prestage: nil)?.reason,
+                       "Scoped to All Computers", "an unknown preference falls back to automatic")
+        XCTAssertNil(EnrollmentAnalyzer.setupManagerSource(scan: scan(profiles: []), preferredProfileID: nil, prestage: nil))
+    }
+
+    func testStepStatusFromPolicyLogs() throws {
+        var rosetta = ScopedPolicy(id: 11, name: "Install Rosetta 2", enabled: true, enrollmentTrigger: false,
+                                   scope: JamfScope(allComputers: true))
+        rosetta.customTrigger = "EnrollRosetta2"
+        let s = scan(profiles: [smProfile(1)], policies: [rosetta])
+        let source = try XCTUnwrap(EnrollmentAnalyzer.setupManagerSource(scan: s, preferredProfileID: nil, prestage: nil))
+        XCTAssertEqual(EnrollmentAnalyzer.setupManagerPolicyIDs(source, scan: s), [11: "Rosetta 2"])
+
+        let log = EnrollmentEvent(id: "p", date: Date(), completedDate: nil, phase: .setupManager, kind: "Setup Manager · Rosetta 2",
+                                  title: "Install Rosetta 2", detail: nil, status: .completed, isApproximate: false,
+                                  source: .policyLogs, profileIdentifier: nil)
+        let rows = EnrollmentAnalyzer.setupManagerRows(source, scan: s, events: [log])
+        XCTAssertEqual(rows[0].status, .completed)
+        XCTAssertEqual(rows[0].policies, ["Install Rosetta 2"])
+        XCTAssertNil(rows[1].status, "Installomator steps aren't logged by Jamf Pro")
+        XCTAssertEqual(rows[6].note, "Runs the Recurring Check-in policies")
+
+        let none = EnrollmentAnalyzer.setupManagerRows(source, scan: s, events: [])
+        XCTAssertEqual(none[0].status, .notRunYet)
+        let flowRows = EnrollmentAnalyzer.setupManagerRows(source, scan: s, events: nil)
+        XCTAssertNil(flowRows[0].status, "the flow shows no status")
+    }
+
+    func testTimelineMarksSetupManagerPolicies() {
+        var input = EnrollmentAnalyzer.TimelineInput()
+        input.policyLogs = [PolicyLogRecord(policyID: 11, name: "Install Rosetta 2", status: "Completed", date: Date())]
+        input.setupManagerPolicies = [11: "Rosetta 2"]
+        let e = EnrollmentAnalyzer.buildEvents(input).first
+        XCTAssertEqual(e?.phase, .setupManager)
+        XCTAssertEqual(e?.kind, "Setup Manager · Rosetta 2")
+    }
+
+    func testDemoHasSetupManager() async throws {
+        let repo = EnrollmentRepository(cli: DemoCLIManager())
+        let scan = try await repo.scanScopes { _, _ in }
+        let prestageDetail = try await repo.prestageDetail(id: "1")
+        let source = try XCTUnwrap(EnrollmentAnalyzer.setupManagerSource(scan: scan, preferredProfileID: nil,
+                                                                         prestage: prestageDetail))
+        XCTAssertEqual(source.profileName, "Jamf Setup Manager")
+        let timeline = try await repo.timeline(serial: "C02XA001DEMO",
+                                               setupManagerPolicies: EnrollmentAnalyzer.setupManagerPolicyIDs(source, scan: scan))
+        let rows = EnrollmentAnalyzer.setupManagerRows(source, scan: scan, events: timeline.events)
+        XCTAssertEqual(rows.map(\.status), [.completed, .completed, .completed, .completed, .notRunYet, nil, nil])
+        let flow = EnrollmentAnalyzer.buildFlow(.init(prestage: try XCTUnwrap(prestageDetail), scan: scan, setupManager: source))
+        XCTAssertEqual(flow.phases.first { $0.phase == .setupManager }?.items.count, 7)
+    }
+}
+
 final class EnrollmentCLISafetyTests: XCTestCase {
 
     func testManagementIDMustBeAUUIDAndIsFiltered() {
@@ -519,6 +625,16 @@ final class EnrollmentLiveProbeTests: XCTestCase {
         print("LIVE profile rows: \(Dictionary(grouping: rows, by: \.status.label).mapValues(\.count))")
         let policies = EnrollmentAnalyzer.policyRows(timeline: t, events: t.events, scan: scan)
         print("LIVE policy rows: \(Dictionary(grouping: policies, by: \.status.label).mapValues(\.count))")
+        let installed = Set(t.installedProfiles.compactMap(\.jamfID))
+        print("LIVE setup manager candidates: \(EnrollmentAnalyzer.setupManagerCandidates(scan).map { "\($0.id) \($0.name) (\($0.setupManager!.steps.count))" })")
+        if let sm = EnrollmentAnalyzer.setupManagerSource(scan: scan, preferredProfileID: nil, prestage: t.prestage,
+                                                          installedProfileIDs: installed) {
+            print("LIVE setup manager: \(sm.profileName) — \(sm.reason)")
+            let t2 = try await repo.timeline(serial: serial, setupManagerPolicies: EnrollmentAnalyzer.setupManagerPolicyIDs(sm, scan: scan))
+            for row in EnrollmentAnalyzer.setupManagerRows(sm, scan: scan, events: t2.events) {
+                print("LIVE   \(row.step.id + 1). \(row.step.label) [\(row.step.kind.title)] → \(row.status?.label ?? "—") \(row.policies.count) policies \(row.note)")
+            }
+        }
         if let p = t.prestage {
             let flow = EnrollmentAnalyzer.buildFlow(.init(prestage: p, scan: scan))
             print("LIVE flow: " + flow.phases.map { "\($0.phase.title)=\($0.summary) [\($0.items.count)]" }.joined(separator: " | "))

@@ -23,6 +23,8 @@ enum EnrollmentAnalyzer {
         var enrollmentPolicyIDs: Set<Int> = []
         /// Configuration profile names by Jamf Pro ID, to name commands for profiles that aren't installed.
         var profileNamesByID: [Int: String] = [:]
+        /// Policy ID → Setup Manager step label, for policies a Setup Manager step triggers.
+        var setupManagerPolicies: [Int: String] = [:]
     }
 
     static func buildEvents(_ input: TimelineInput, now: Date = Date()) -> [EnrollmentEvent] {
@@ -108,9 +110,11 @@ enum EnrollmentAnalyzer {
         for (i, log) in input.policyLogs.enumerated() {
             guard let date = log.date else { continue }
             let enrollment = log.policyID.map(input.enrollmentPolicyIDs.contains) ?? false
+            let setupStep = log.policyID.flatMap { input.setupManagerPolicies[$0] }
             events.append(EnrollmentEvent(
-                id: "policy-\(i)", date: date, completedDate: date, phase: .policies,
-                kind: enrollment ? "Enrollment policy" : "Policy", title: log.name,
+                id: "policy-\(i)", date: date, completedDate: date, phase: setupStep == nil ? .policies : .setupManager,
+                kind: setupStep != nil ? "Setup Manager · \(setupStep!)" : enrollment ? "Enrollment policy" : "Policy",
+                title: log.name,
                 detail: log.failed ? log.status : nil,
                 status: log.failed ? .failed : .completed, isApproximate: false,
                 source: .policyLogs, profileIdentifier: nil))
@@ -369,6 +373,92 @@ enum EnrollmentAnalyzer {
         }
     }
 
+    // MARK: - Setup Manager
+
+    /// Profiles in the scan that configure Setup Manager.
+    static func setupManagerCandidates(_ scan: ScopeScanResult?) -> [ScopedProfile] {
+        (scan?.profiles ?? []).filter { $0.setupManager != nil }
+    }
+
+    /// The Setup Manager configuration that applies: the one chosen in Settings, else the one
+    /// installed on the Mac, else the one in the PreStage, else one scoped to All Computers.
+    static func setupManagerSource(scan: ScopeScanResult?, preferredProfileID: Int?, prestage: PrestageDetail?,
+                                   installedProfileIDs: Set<Int> = []) -> SetupManagerSource? {
+        let candidates = setupManagerCandidates(scan)
+        guard !candidates.isEmpty else { return nil }
+        func source(_ p: ScopedProfile, _ reason: String) -> SetupManagerSource? {
+            p.setupManager.map { SetupManagerSource(profileID: p.id, profileName: p.name, config: $0, reason: reason) }
+        }
+        if let id = preferredProfileID, let p = candidates.first(where: { $0.id == id }) {
+            return source(p, "Chosen in Settings")
+        }
+        if let p = candidates.first(where: { installedProfileIDs.contains($0.id) }) {
+            return source(p, "Installed on this Mac")
+        }
+        if let ids = prestage?.profileIDs, let p = candidates.first(where: { ids.contains($0.id) }) {
+            return source(p, "In the PreStage")
+        }
+        if let p = candidates.first(where: { $0.scope.allComputers && $0.scope.exclusions.computerGroups.isEmpty }) {
+            return source(p, "Scoped to All Computers")
+        }
+        return candidates.count == 1 ? source(candidates[0], "The only Setup Manager profile") : nil
+    }
+
+    /// Enabled policies by custom trigger (lowercased).
+    static func policiesByTrigger(_ scan: ScopeScanResult?) -> [String: [ScopedPolicy]] {
+        Dictionary(grouping: (scan?.policies ?? []).filter { $0.enabled && ($0.customTrigger?.isEmpty == false) },
+                   by: { $0.customTrigger!.lowercased() })
+    }
+
+    /// Policy ID → step label for every policy a Setup Manager step triggers.
+    static func setupManagerPolicyIDs(_ source: SetupManagerSource?, scan: ScopeScanResult?) -> [Int: String] {
+        guard let source else { return [:] }
+        let byTrigger = policiesByTrigger(scan)
+        var out: [Int: String] = [:]
+        for step in source.config.steps where step.kind == .policy {
+            for p in byTrigger[(step.value ?? "").lowercased()] ?? [] { out[p.id] = step.label }
+        }
+        return out
+    }
+
+    /// Each step with the policies it runs and, for one Mac, what its policy logs say.
+    static func setupManagerRows(_ source: SetupManagerSource, scan: ScopeScanResult?,
+                                 events: [EnrollmentEvent]?) -> [SetupManagerStepRow] {
+        let byTrigger = policiesByTrigger(scan)
+        let logs = (events ?? []).filter { $0.source == .policyLogs }
+        return source.config.steps.map { step in
+            switch step.kind {
+            case .policy:
+                let policies = byTrigger[(step.value ?? "").lowercased()] ?? []
+                let names = policies.map(\.name)
+                guard !policies.isEmpty else {
+                    let note = (step.value ?? "").isEmpty ? "Runs the Recurring Check-in policies"
+                                                          : "No enabled policy has the trigger “\(step.value ?? "")”"
+                    return SetupManagerStepRow(step: step, policies: [], status: nil, date: nil, note: note)
+                }
+                guard events != nil else {
+                    return SetupManagerStepRow(step: step, policies: names, status: nil, date: nil, note: "")
+                }
+                let ran = logs.filter { e in names.contains { $0.caseInsensitiveCompare(e.title) == .orderedSame } }
+                if let failed = ran.last(where: { $0.status == .failed }) {
+                    return SetupManagerStepRow(step: step, policies: names, status: .failed, date: failed.date,
+                                               note: failed.detail ?? "The policy failed")
+                }
+                if let done = ran.first {
+                    return SetupManagerStepRow(step: step, policies: names, status: .completed, date: done.date, note: "")
+                }
+                return SetupManagerStepRow(step: step, policies: names, status: .notRunYet, date: nil,
+                                           note: "No policy log for this step yet")
+            case .recon:
+                return SetupManagerStepRow(step: step, policies: [], status: nil, date: nil,
+                                           note: "Updates inventory; not logged as a policy")
+            default:
+                return SetupManagerStepRow(step: step, policies: [], status: nil, date: nil,
+                                           note: "Runs on the Mac; Jamf Pro doesn't log this step")
+            }
+        }
+    }
+
     // MARK: - Flow for a PreStage
 
     struct FlowInput: Sendable {
@@ -379,6 +469,7 @@ enum EnrollmentAnalyzer {
         var checkInMinutes: Int?
         var scan: ScopeScanResult?
         var appInstallers: [AppInstallerDeployment] = []
+        var setupManager: SetupManagerSource?
     }
 
     static func buildFlow(_ input: FlowInput) -> EnrollmentFlow {
@@ -426,6 +517,25 @@ enum EnrollmentAnalyzer {
                                 summary: "\(p.profileIDs.count) profile\(p.profileIDs.count == 1 ? "" : "s") · \(p.packageIDs.count) package\(p.packageIDs.count == 1 ? "" : "s")",
                                 lines: ["Installed while Setup Assistant runs."],
                                 items: prestageItems, needsScan: false))
+
+        if let sm = input.setupManager {
+            let byTrigger = policiesByTrigger(input.scan)
+            let items = sm.config.steps.map { step -> FlowItem in
+                var condition = step.kind.title
+                if let v = step.value, !v.isEmpty { condition += " · \(v)" }
+                if step.kind == .policy {
+                    let names = (byTrigger[(step.value ?? "").lowercased()] ?? []).map(\.name)
+                    condition += names.isEmpty ? " · no policy with this trigger" : " → " + names.joined(separator: ", ")
+                }
+                return FlowItem(id: "sm\(step.id)", name: step.label, certainty: .certain,
+                                condition: condition, identifier: step.value)
+            }
+            var lines = ["Profile “\(sm.profileName)” (\(sm.reason.prefix(1).lowercased() + sm.reason.dropFirst())).",
+                         sm.config.runAtLabel + ". " + sm.config.finalActionLabel + "."]
+            if let t = sm.config.finishedTrigger { lines.append("Afterwards it runs the policy trigger “\(t)”.") }
+            phases.append(FlowPhase(phase: .setupManager, summary: "\(sm.config.steps.count) steps",
+                                    lines: lines, items: items, needsScan: false))
+        }
 
         let prestageIDs = Set(p.profileIDs)
         var profileItems: [FlowItem] = []

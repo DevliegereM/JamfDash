@@ -160,7 +160,7 @@ enum DemoEnrollmentData {
         1: "Security Baseline", 2: "FileVault Enforcement", 3: "Firewall Configuration", 4: "Energy Saver",
         5: "Wi-Fi (Corporate)", 6: "VPN Settings", 7: "Login Window", 8: "System Preferences Restrictions",
         9: "Password Policy", 10: "Certificates - Internal CA", 11: "Software Update Deferrals",
-        12: "Privacy Preferences (PPPC)",
+        12: "Privacy Preferences (PPPC)", 13: "Jamf Setup Manager",
     ]
 
     /// Profiles every demo Mac gets (scoped to All Computers in the demo profile details).
@@ -174,7 +174,8 @@ enum DemoEnrollmentData {
     }
 
     private static func setup(prestagePackage: Bool) -> [Command] {
-        var out = [Command(offset: 37, type: "INSTALL_PROFILE", state: "ACKNOWLEDGED", profileID: 10)]
+        var out = [Command(offset: 37, type: "INSTALL_PROFILE", state: "ACKNOWLEDGED", profileID: 10),
+                   Command(offset: 41, type: "INSTALL_PROFILE", state: "ACKNOWLEDGED", profileID: 13)]
         if prestagePackage { out.append(Command(offset: 62, type: "INSTALL_ENTERPRISE_APPLICATION", state: "ACKNOWLEDGED", historyOnly: true)) }
         out.append(Command(offset: 199, type: "DEVICE_CONFIGURED", state: "ACKNOWLEDGED", historyOnly: true))
         out.append(Command(offset: 120, type: "DECLARATIVE_MANAGEMENT", state: "ACKNOWLEDGED"))
@@ -183,9 +184,12 @@ enum DemoEnrollmentData {
     }
 
     private static let enrollmentPolicies: [PolicyRun] = [
+        PolicyRun(offset: 230, id: 11, name: "Install Rosetta 2"),
+        PolicyRun(offset: 262, id: 4, name: "Install Google Chrome"),
+        PolicyRun(offset: 301, id: 12, name: "Install Jamf Connect"),
+        PolicyRun(offset: 340, id: 13, name: "Install Sophos"),
         PolicyRun(offset: 359, id: 7, name: "Configure Login Window"),
         PolicyRun(offset: 397, id: 8, name: "Set Energy Saver Settings"),
-        PolicyRun(offset: 420, id: 11, name: "Install Rosetta 2"),
         PolicyRun(offset: 470, id: 17, name: "Collect Inventory"),
     ]
 
@@ -263,7 +267,7 @@ enum DemoEnrollmentData {
             "isMandatory": true, "isMdmRemovable": id == "3", "autoAdvanceSetup": false,
             "installProfilesDuringSetup": true, "enableRecoveryLock": id != "3",
             "skipSetupItems": skip,
-            "prestageInstalledProfileIds": id == "3" ? [] : ["10"],
+            "prestageInstalledProfileIds": id == "3" ? [] : ["10", "13"],
             "customPackageIds": ["1": ["1"], "4": ["2"]][id] ?? [],
             "enrollmentCustomizationId": id == "1" ? "1" : "0",
             "deviceEnrollmentProgramInstanceId": id == "3" ? "" : "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",

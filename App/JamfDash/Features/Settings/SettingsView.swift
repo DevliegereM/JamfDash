@@ -28,6 +28,9 @@ struct SettingsView: View {
             AITab(isEnabled: $isAIEnabled)
                 .tabItem { Label("AI", systemImage: "brain") }
 
+            EnrollmentSettingsTab()
+                .tabItem { Label("Enrollment", systemImage: "person.badge.plus") }
+
             SecurityCloudTab()
                 .tabItem { Label("Security Cloud", systemImage: "shield.checkered") }
 
@@ -37,6 +40,63 @@ struct SettingsView: View {
         .padding(20)
         .frame(minWidth: 620, minHeight: 520)
         .task { await vm.loadExisting() }
+    }
+}
+
+// MARK: - Enrollment
+
+/// Which Jamf Setup Manager profile the Enrollment section uses when there are several.
+/// Only written when changed; `defaults delete be.devliegere.JamfDash
+/// jamfDash.enrollment.setupManagerProfileID` resets it.
+private struct EnrollmentSettingsTab: View {
+    @Environment(AppEnvironment.self) private var env
+    @AppStorage(EnrollmentFlowViewModel.setupManagerProfileKey) private var profileID = 0
+
+    var body: some View {
+        let vm = env.enrollmentVM
+        Form {
+            Section {
+                if vm.setupManagerCandidates.isEmpty {
+                    switch vm.scanState {
+                    case .scanning(let done, let total):
+                        HStack {
+                            ProgressView(value: Double(done), total: Double(max(total, 1))).frame(maxWidth: 200)
+                            Text("Looking for Setup Manager profiles…").foregroundStyle(.secondary)
+                        }
+                    case .finished:
+                        Text("No configuration profile with Setup Manager settings (com.jamf.setupmanager) was found.")
+                            .foregroundStyle(.secondary)
+                    default:
+                        HStack {
+                            Text("Jamf Dash finds Setup Manager profiles when it scans policy and profile scopes.")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Find Profiles") { vm.startScan() }
+                        }
+                    }
+                } else {
+                    Picker("Setup Manager profile", selection: $profileID) {
+                        Text("Automatic").tag(0)
+                        Divider()
+                        ForEach(vm.setupManagerCandidates) { p in
+                            Text("\(p.name) (\(p.setupManager?.steps.count ?? 0) steps)").tag(p.id)
+                        }
+                    }
+                    .onChange(of: profileID) { _, _ in vm.setupManagerPreferenceChanged() }
+                }
+            } header: {
+                Text("Jamf Setup Manager")
+            } footer: {
+                Text("Setup Manager shows a window with enrollment steps and runs them in order. Its steps appear in Enrollment → Flow and on each Mac's timeline. Automatic uses the profile installed on the Mac, else the one in the PreStage, else one scoped to All Computers.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Stuck commands") {
+                Text("A command counts as stuck when it has been pending for 4 hours or more and the Mac has checked in since it was sent.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

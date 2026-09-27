@@ -50,6 +50,16 @@ final class EnrollmentFlowViewModel {
     private(set) var recentState: LoadState<[RecentEnrollment]> = .idle
     var searchText = ""
     private(set) var selectedSerial: String?
+    /// Status per Mac in the list (serial → badge), filled in the background for the first Macs.
+    private(set) var badges: [String: RecentBadge] = [:]
+
+    struct RecentBadge: Sendable, Hashable {
+        let problems: Int      // failed + stuck
+        let pending: Int
+    }
+
+    /// Settings → Enrollment: the Setup Manager profile to use (0 or missing = automatic).
+    static let setupManagerProfileKey = "jamfDash.enrollment.setupManagerProfileID"
     private(set) var timelineState: LoadState<EnrollmentTimeline> = .idle
     var timelineWindow: TimelineWindow = .firstDay
     /// Routine inventory polling (Device Information, Profile List, …) is hidden by default.
@@ -72,6 +82,7 @@ final class EnrollmentFlowViewModel {
     private let repository: EnrollmentRepository
     private var timelineCache: [String: EnrollmentTimeline] = [:]
     private var timelineTask: Task<Void, Never>?
+    private var badgeTask: Task<Void, Never>?
     private var flowTask: Task<Void, Never>?
     private var scanTask: Task<Void, Never>?
     private var flowInputs: (tokens: [String: String], profiles: [Int: String], packages: [Int: String],
@@ -124,13 +135,35 @@ final class EnrollmentFlowViewModel {
 
     // MARK: - Recent enrollments
 
+    /// The selected row in the list, by Jamf computer ID (serials can be missing).
+    var selectedRecentID: String? {
+        guard let serial = selectedSerial else { return nil }
+        return recentState.value?.first { $0.serial?.caseInsensitiveCompare(serial) == .orderedSame }?.id
+    }
+
+    func selectRecent(id: String?) {
+        guard let id, let mac = recentState.value?.first(where: { $0.id == id }) else { return }
+        guard let serial = mac.serial else {
+            timelineTask?.cancel()
+            selectedSerial = nil
+            timelineState = .failed("\(mac.name) has no serial number in Jamf Pro, so its history can't be looked up.")
+            return
+        }
+        select(serial: serial)
+    }
+
     func loadRecent(force: Bool = false) async {
         guard force || recentState.value == nil, !recentState.isLoading else { return }
         recentState = .loading
         do {
             let list = try await repository.recentEnrollments(withinDays: windowDays)
             recentState = .loaded(list)
-            if selectedSerial == nil, let first = list.first?.serial { select(serial: first) }
+            let stillListed = list.contains { $0.serial?.caseInsensitiveCompare(selectedSerial ?? "") == .orderedSame }
+            if !stillListed, timelineState.value == nil || selectedSerial == nil {
+                if let first = list.first?.serial { select(serial: first) }
+                else { timelineTask?.cancel(); selectedSerial = nil; timelineState = .idle }
+            }
+            prefetchBadges(list)
         } catch {
             Self.logger.error("Recent enrollments failed: \(error.localizedDescription, privacy: .public)")
             recentState = .failed(EnrollmentRepository.message(for: error))
@@ -138,6 +171,44 @@ final class EnrollmentFlowViewModel {
     }
 
     // MARK: - Timeline
+
+    /// Loads the timelines of the first Macs in the background (three at a time) for the
+    /// list's status badges. Results go into the same in-memory cache as a normal selection.
+    private func prefetchBadges(_ list: [RecentEnrollment]) {
+        badgeTask?.cancel()
+        for mac in list { if let s = mac.serial, let t = timelineCache[s] { badges[s] = badge(for: t) } }
+        let serials = list.prefix(12).compactMap(\.serial).filter { timelineCache[$0] == nil }
+        guard !serials.isEmpty else { return }
+        let policyIDs = enrollmentPolicyIDs, smPolicies = setupManagerPolicies
+        badgeTask = Task { [repository] in
+            await withTaskGroup(of: (String, EnrollmentTimeline?).self) { group in
+                var queue = serials[...]
+                func next() {
+                    guard let serial = queue.popFirst() else { return }
+                    group.addTask {
+                        (serial, try? await repository.timeline(serial: serial, enrollmentPolicyIDs: policyIDs,
+                                                                setupManagerPolicies: smPolicies))
+                    }
+                }
+                for _ in 0..<3 { next() }
+                for await (serial, timeline) in group {
+                    if Task.isCancelled { group.cancelAll(); return }
+                    if let timeline {
+                        self.timelineCache[serial] = timeline
+                        self.badges[serial] = self.badge(for: timeline)
+                    }
+                    next()
+                }
+            }
+        }
+    }
+
+    private func badge(for t: EnrollmentTimeline) -> RecentBadge {
+        let events = EnrollmentAnalyzer.eventsInWindow(t.events, enrolledAt: t.device.enrolledAt, window: 7 * 86_400)
+            .filter { $0.phase != .inventory }
+        return RecentBadge(problems: events.filter { $0.status == .failed || $0.status == .stuck }.count,
+                           pending: events.filter { $0.status == .pending }.count)
+    }
 
     func select(serial: String?) {
         guard serial != selectedSerial || timelineState.value == nil else { return }
@@ -150,12 +221,14 @@ final class EnrollmentFlowViewModel {
             return
         }
         timelineState = .loading
-        let policyIDs = enrollmentPolicyIDs
+        let policyIDs = enrollmentPolicyIDs, smPolicies = setupManagerPolicies
         timelineTask = Task { [repository] in
             do {
-                let timeline = try await repository.timeline(serial: serial, enrollmentPolicyIDs: policyIDs)
+                let timeline = try await repository.timeline(serial: serial, enrollmentPolicyIDs: policyIDs,
+                                                             setupManagerPolicies: smPolicies)
                 guard !Task.isCancelled, self.selectedSerial == serial else { return }
                 self.timelineCache[serial] = timeline
+                self.badges[serial] = self.badge(for: timeline)
                 self.timelineState = .loaded(timeline)
             } catch {
                 guard !Task.isCancelled, self.selectedSerial == serial else { return }
@@ -179,6 +252,56 @@ final class EnrollmentFlowViewModel {
 
     private var enrollmentPolicyIDs: Set<Int> {
         Set((scan?.policies ?? []).filter { $0.enabled && $0.enrollmentTrigger }.map(\.id))
+    }
+
+    // MARK: - Setup Manager
+
+    var preferredSetupManagerID: Int? {
+        let id = UserDefaults.standard.integer(forKey: Self.setupManagerProfileKey)
+        return id > 0 ? id : nil
+    }
+
+    /// Profiles that configure Setup Manager (known after the scope scan).
+    var setupManagerCandidates: [ScopedProfile] { EnrollmentAnalyzer.setupManagerCandidates(scan) }
+
+    /// Policies triggered by any Setup Manager profile's steps, so their logs show as Setup Manager.
+    private var setupManagerPolicies: [Int: String] {
+        var out: [Int: String] = [:]
+        for p in setupManagerCandidates {
+            let source = SetupManagerSource(profileID: p.id, profileName: p.name, config: p.setupManager!, reason: "")
+            out.merge(EnrollmentAnalyzer.setupManagerPolicyIDs(source, scan: scan)) { a, _ in a }
+        }
+        return out
+    }
+
+    /// The Setup Manager configuration for the selected Mac.
+    var timelineSetupManager: SetupManagerSource? {
+        guard let t = timelineState.value else { return nil }
+        let installed = Set(t.installedProfiles.compactMap(\.jamfID))
+        return EnrollmentAnalyzer.setupManagerSource(scan: scan, preferredProfileID: preferredSetupManagerID,
+                                                     prestage: t.prestage, installedProfileIDs: installed)
+    }
+
+    var setupManagerRows: [SetupManagerStepRow] {
+        guard let source = timelineSetupManager, let t = timelineState.value else { return [] }
+        let events = EnrollmentAnalyzer.eventsInWindow(t.events, enrolledAt: t.device.enrolledAt, window: nil)
+        return EnrollmentAnalyzer.setupManagerRows(source, scan: scan, events: events)
+    }
+
+    /// The Setup Manager configuration for the PreStage shown in the Flow tab.
+    var flowSetupManager: SetupManagerSource? {
+        guard let flow = flowState.value else { return nil }
+        return EnrollmentAnalyzer.setupManagerSource(scan: scan, preferredProfileID: preferredSetupManagerID,
+                                                     prestage: flow.prestage)
+    }
+
+    var flowSetupManagerRows: [SetupManagerStepRow] {
+        flowSetupManager.map { EnrollmentAnalyzer.setupManagerRows($0, scan: scan, events: nil) } ?? []
+    }
+
+    /// Call after the Setup Manager choice changes in Settings.
+    func setupManagerPreferenceChanged() {
+        refreshFlowFromScan()
     }
 
     /// Sends a blank push so a stuck Mac checks in; the existing safe device action.
@@ -247,7 +370,9 @@ final class EnrollmentFlowViewModel {
             prestage: detail,
             adeTokenName: detail.adeInstanceID.flatMap { inputs.tokens[$0] },
             profileNames: inputs.profiles, packageNames: inputs.packages,
-            checkInMinutes: inputs.checkIn, scan: scan, appInstallers: inputs.apps))
+            checkInMinutes: inputs.checkIn, scan: scan, appInstallers: inputs.apps,
+            setupManager: EnrollmentAnalyzer.setupManagerSource(scan: scan, preferredProfileID: preferredSetupManagerID,
+                                                                prestage: detail)))
     }
 
     /// Rebuilds the flow after the scan finishes, without new calls.
@@ -268,8 +393,10 @@ final class EnrollmentFlowViewModel {
                 }
                 self.scanState = .finished(result)
                 self.refreshFlowFromScan()
-                // Policy log entries can now be marked as enrollment policies.
+                // Policy log entries can now be marked as enrollment and Setup Manager policies.
                 self.timelineCache.removeAll()
+                self.badges.removeAll()
+                if let list = self.recentState.value { self.prefetchBadges(list) }
                 if let serial = self.selectedSerial, self.timelineState.value != nil {
                     self.selectedSerial = nil
                     self.select(serial: serial)
@@ -294,10 +421,13 @@ final class EnrollmentFlowViewModel {
         switch tab {
         case .recent:
             timelineCache.removeAll()
+            badges.removeAll()
+            await repository.cache.removeAll()
             await loadRecent(force: true)
             reloadTimeline()
         case .flow:
             flowInputs = nil
+            await repository.cache.removeAll()
             await loadPrestages(force: true)
             if let id = selectedPrestageID { selectedPrestageID = nil; selectPrestage(id) }
         case .setup:
@@ -307,7 +437,9 @@ final class EnrollmentFlowViewModel {
 
     /// Forgets everything, e.g. after switching to another Jamf instance.
     func reset() {
-        timelineTask?.cancel(); flowTask?.cancel(); scanTask?.cancel()
+        timelineTask?.cancel(); flowTask?.cancel(); scanTask?.cancel(); badgeTask?.cancel()
+        badges.removeAll()
+        Task { [repository] in await repository.cache.removeAll() }
         recentState = .idle
         selectedSerial = nil
         timelineState = .idle

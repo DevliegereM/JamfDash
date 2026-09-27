@@ -7,26 +7,24 @@ struct EnrollmentSectionView: View {
     @Bindable var fleetVM: FleetViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Enrollment section", selection: $vm.tab) {
-                ForEach(EnrollmentTab.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .background(.bar)
-            Divider()
-
+        Group {
             switch vm.tab {
             case .recent: RecentEnrollmentsView(vm: vm)
             case .flow:   EnrollmentFlowView(vm: vm)
             case .setup:  EnrollmentView(vm: fleetVM)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle("Enrollment")
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Enrollment section", selection: $vm.tab) {
+                    ForEach(EnrollmentTab.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task {
@@ -51,11 +49,13 @@ private struct RecentEnrollmentsView: View {
     @Bindable var vm: EnrollmentFlowViewModel
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             list
-                .frame(minWidth: 240, idealWidth: 280, maxWidth: 360)
+                .frame(width: 290)
+                .frame(maxHeight: .infinity)
+            Divider()
             detail
-                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .task { await vm.loadRecent() }
     }
@@ -63,12 +63,16 @@ private struct RecentEnrollmentsView: View {
     private var list: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                TextField("Search Macs", text: $vm.searchText)
-                    .textFieldStyle(.roundedBorder)
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                    TextField("Search Macs", text: $vm.searchText).textFieldStyle(.plain)
+                }
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 7))
                 Picker("Enrolled in the last", selection: $vm.windowDays) {
-                    Text("7 days").tag(7)
-                    Text("30 days").tag(30)
-                    Text("90 days").tag(90)
+                    Text("Last 7 days").tag(7)
+                    Text("Last 30 days").tag(30)
+                    Text("Last 90 days").tag(90)
                 }
                 .labelsHidden()
                 .fixedSize()
@@ -86,19 +90,25 @@ private struct RecentEnrollmentsView: View {
                              ? "No Macs enrolled in the last \(vm.windowDays) days. Choose a longer period above."
                              : "No recently enrolled Mac matches “\(vm.searchText)”.")
                     }
+                    .frame(maxHeight: .infinity)
                 } else {
-                    List(selection: Binding(get: { vm.selectedSerial }, set: { vm.select(serial: $0) })) {
+                    List(selection: Binding(get: { vm.selectedRecentID }, set: { vm.selectRecent(id: $0) })) {
                         ForEach(macs) { mac in
-                            RecentRow(mac: mac).tag(mac.serial)
+                            RecentRow(mac: mac, badge: mac.serial.flatMap { vm.badges[$0] }).tag(mac.id)
                         }
                     }
                     .listStyle(.sidebar)
+                    .scrollContentBackground(.hidden)
                 }
             }
+            .frame(maxHeight: .infinity, alignment: .top)
+
             if let count = vm.recentState.value?.count, count > 0 {
+                Divider()
                 Text("\(count) Mac\(count == 1 ? "" : "s") enrolled in the last \(vm.windowDays) days")
                     .font(.caption).foregroundStyle(.secondary)
-                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
             }
         }
     }
@@ -117,7 +127,6 @@ private struct RecentEnrollmentsView: View {
                     .multilineTextAlignment(.center)
             }
             .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let message):
             ContentUnavailableView {
                 Label("Couldn't Load the Timeline", systemImage: "exclamationmark.triangle")
@@ -134,23 +143,63 @@ private struct RecentEnrollmentsView: View {
 
 private struct RecentRow: View {
     let mac: RecentEnrollment
+    let badge: EnrollmentFlowViewModel.RecentBadge?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(mac.name).fontWeight(.medium).lineLimit(1)
-            HStack(spacing: 4) {
-                if let d = mac.enrolledAt {
-                    Text(d, format: .dateTime.day().month(.abbreviated).hour().minute())
-                }
-                if let m = mac.method {
-                    Text("·")
-                    Text(m).lineLimit(1)
-                }
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(mac.name).fontWeight(.semibold).lineLimit(1)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
-            .font(.caption).foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            badgeView
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    private var subtitle: String {
+        var parts: [String] = []
+        if let d = mac.enrolledAt { parts.append(d.formatted(.dateTime.day().month(.abbreviated))) }
+        if let m = mac.method {
+            let isPrestage = EnrollmentParsing.isPrestageMethod(type: mac.methodType, viaADE: mac.viaADE)
+            parts.append(isPrestage ? "PreStage “\(m)”" : m)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private var badgeView: some View {
+        if let badge {
+            if badge.problems > 0 {
+                CountBadge(text: "\(badge.problems)", color: .red)
+                    .help("\(badge.problems) failed or stuck")
+                    .accessibilityLabel("\(badge.problems) failed or stuck")
+            } else if badge.pending > 0 {
+                CountBadge(text: "\(badge.pending)", color: .orange)
+                    .help("\(badge.pending) pending")
+                    .accessibilityLabel("\(badge.pending) pending")
+            } else {
+                Image(systemName: "checkmark")
+                    .font(.caption2.weight(.bold)).foregroundStyle(.green)
+                    .frame(width: 20, height: 20)
+                    .background(Color.green.opacity(0.15), in: Circle())
+                    .help("Nothing failed or waiting")
+                    .accessibilityLabel("Nothing failed or waiting")
+            }
+        }
+    }
+}
+
+private struct CountBadge: View {
+    let text: String
+    let color: Color
+    var body: some View {
+        Text(text)
+            .font(.caption2.weight(.bold)).monospacedDigit()
+            .foregroundStyle(color)
+            .frame(minWidth: 20, minHeight: 20)
+            .background(color.opacity(0.15), in: Circle())
     }
 }
 
@@ -165,13 +214,17 @@ struct EnrollmentTimelineView: View {
     @State private var confirmPush = false
 
     enum Page: String, CaseIterable, Identifiable {
-        case timeline = "Timeline", profiles = "Profiles", policies = "Policies & Apps"
+        case timeline = "Timeline", profiles = "Profiles", policies = "Policies & Apps", setupManager = "Setup Manager"
         var id: String { rawValue }
+    }
+
+    private var pages: [Page] {
+        vm.timelineSetupManager == nil ? [.timeline, .profiles, .policies] : Page.allCases
     }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
                 header
                 counts
                 if !vm.attention.isEmpty { attentionBox }
@@ -180,21 +233,27 @@ struct EnrollmentTimelineView: View {
                 }
                 unavailableSources
                 Picker("Show", selection: $page) {
-                    ForEach(Page.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(pages) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .fixedSize()
+                .padding(.top, 4)
 
                 switch page {
-                case .timeline: timelinePage
-                case .profiles: EnrollmentProfilesPage(vm: vm)
-                case .policies: policiesPage
+                case .timeline:     timelinePage
+                case .profiles:     EnrollmentProfilesPage(vm: vm)
+                case .policies:     policiesPage
+                case .setupManager: setupManagerPage
                 }
+
+                Divider().padding(.top, 6)
+                sourcesLine
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .onChange(of: pages) { _, now in if !now.contains(page) { page = .timeline } }
         .confirmationDialog("Send a blank push to \(timeline.device.name)?", isPresented: $confirmPush) {
             Button("Send Blank Push") { Task { await vm.blankPush() } }
         } message: {
@@ -208,8 +267,7 @@ struct EnrollmentTimelineView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(timeline.device.name).font(.title2.weight(.semibold))
-                Text(headerLine).font(.callout).foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                headerLine
                 if let ddm = timeline.ddm {
                     Text(ddmLine(ddm)).font(.caption).foregroundStyle(.secondary)
                 }
@@ -219,14 +277,17 @@ struct EnrollmentTimelineView: View {
         }
     }
 
-    private var headerLine: String {
+    private var headerLine: some View {
         let d = timeline.device
-        var parts = [d.serial]
+        var parts: [String] = []
         if let m = d.method { parts.append(m) }
         if let p = timeline.prestage?.name, p != d.method { parts.append("PreStage “\(p)”") }
         if let e = d.enrolledAt { parts.append("enrolled \(e.formatted(date: .abbreviated, time: .shortened))") }
         if d.supervised == true { parts.append("supervised") }
-        return parts.joined(separator: " · ")
+        return (Text(d.serial).font(.system(.callout, design: .monospaced))
+            + Text(parts.isEmpty ? "" : " · " + parts.joined(separator: " · ")))
+            .font(.callout).foregroundStyle(.secondary)
+            .textSelection(.enabled)
     }
 
     private func ddmLine(_ ddm: EnrollmentTimeline.DDMSummary) -> String {
@@ -245,8 +306,10 @@ struct EnrollmentTimelineView: View {
         return HStack(spacing: 8) {
             StatusPill(status: .completed, text: "\(done) done")
             if failed > 0 { StatusPill(status: .failed, text: "\(failed) failed") }
-            if stuck > 0 { StatusPill(status: .stuck, text: "\(stuck) stuck") }
-            if pending > 0 { StatusPill(status: .pending, text: "\(pending) pending") }
+            if pending + stuck > 0 {
+                StatusPill(status: stuck > 0 ? .stuck : .pending,
+                           text: "\(pending + stuck) pending" + (stuck > 0 ? " · \(stuck) stuck" : ""))
+            }
             Spacer()
             Picker("Period", selection: $vm.timelineWindow) {
                 ForEach(TimelineWindow.allCases) { Text($0.title).tag($0) }
@@ -258,21 +321,30 @@ struct EnrollmentTimelineView: View {
     }
 
     private var attentionBox: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Needs Attention", systemImage: "exclamationmark.triangle.fill")
-                .font(.headline).foregroundStyle(.red)
+        let start = timeline.device.enrolledAt
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("NEEDS ATTENTION")
+                .font(.caption.weight(.bold)).tracking(0.6)
+                .foregroundStyle(.red)
             ForEach(vm.attention) { e in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    StatusPill(status: e.status, text: e.status.label)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(e.title) · \(e.kind)").fontWeight(.medium)
-                        Text(attentionReason(e)).font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 8) {
+                        StatusPill(status: e.status, text: e.status.label)
+                        (Text(e.title).fontWeight(.semibold) + Text(" · \(e.kind)").foregroundStyle(.secondary))
+                            .lineLimit(1)
+                        Spacer()
+                        if e.status == .stuck {
+                            Button("Send Blank Push…") { confirmPush = true }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.small)
+                        } else if let start {
+                            Text(EnrollmentAnalyzer.relative(e.date, to: start))
+                                .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                        }
                     }
-                    Spacer()
-                    if e.status == .stuck {
-                        Button("Send Blank Push…") { confirmPush = true }
-                    }
+                    Text(attentionReason(e)).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 4)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -282,8 +354,8 @@ struct EnrollmentTimelineView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.25)))
+        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.3)))
     }
 
     private func attentionReason(_ e: EnrollmentEvent) -> String {
@@ -299,10 +371,8 @@ struct EnrollmentTimelineView: View {
     @ViewBuilder
     private var unavailableSources: some View {
         let missing = EnrollmentSource.allCases.compactMap { source -> (EnrollmentSource, String)? in
-            switch timeline.sources[source] {
-            case .unavailable(let why): return (source, why)
-            default: return nil
-            }
+            if case .unavailable(let why) = timeline.sources[source] { return (source, why) }
+            return nil
         }
         if !missing.isEmpty {
             EnrollmentNote(
@@ -317,45 +387,49 @@ struct EnrollmentTimelineView: View {
     private var timelinePage: some View {
         let events = vm.visibleEvents.filter { phaseFilter == nil || $0.phase == phaseFilter }
         let start = timeline.device.enrolledAt ?? events.first?.date ?? Date()
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
                 Picker("Phase", selection: $phaseFilter) {
                     Text("All phases").tag(EnrollmentPhase?.none)
                     Divider()
                     ForEach(EnrollmentPhase.allCases) { Label($0.title, systemImage: $0.symbol).tag(Optional($0)) }
                 }
                 .fixedSize()
-                Toggle("Inventory commands", isOn: $vm.showRoutineCommands)
+                Toggle("Show inventory commands", isOn: $vm.showRoutineCommands)
                     .toggleStyle(.checkbox)
-                    .help("Show routine inventory polling such as Device Information and Profile List")
+                    .help("Routine inventory polling such as Device Information and Profile List")
                 Spacer()
-                sourcesLine
             }
+            .padding(.bottom, 6)
             if events.isEmpty {
                 ContentUnavailableView("No Events in This Period", systemImage: "clock",
                                        description: Text("Choose “Since enrollment” to see everything Jamf Pro recorded for this Mac."))
                     .frame(maxWidth: .infinity)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(events.enumerated()), id: \.element.id) { index, e in
-                        TimelineEventRow(event: e, start: start, isLast: index == events.count - 1)
+                ForEach(Array(events.enumerated()), id: \.element.id) { index, e in
+                    if index == 0 || events[index - 1].phase != e.phase {
+                        PhaseHeader(phase: e.phase).padding(.top, index == 0 ? 0 : 10)
                     }
+                    TimelineEventRow(event: e, start: start)
                 }
             }
         }
     }
 
     private var sourcesLine: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
+            Text("Sources:")
             ForEach(EnrollmentSource.allCases, id: \.self) { source in
                 let status = timeline.sources[source]
-                Label(source.rawValue, systemImage: status?.isOK == true ? "checkmark.circle.fill" : "minus.circle")
-                    .foregroundStyle(status?.isOK == true ? Color.secondary : Color.orange)
-                    .help(sourceHelp(status))
+                HStack(spacing: 3) {
+                    Text(source.rawValue)
+                    Image(systemName: status?.isOK == true ? "checkmark" : "minus")
+                        .foregroundStyle(status?.isOK == true ? Color.green : Color.orange)
+                }
+                .help(sourceHelp(status))
             }
         }
-        .font(.caption)
-        .labelStyle(.titleAndIcon)
+        .font(.caption).foregroundStyle(.secondary)
     }
 
     private func sourceHelp(_ status: SourceStatus?) -> String {
@@ -373,57 +447,63 @@ struct EnrollmentTimelineView: View {
         let apps = vm.appEvents
         return VStack(alignment: .leading, spacing: 16) {
             ScanPrompt(vm: vm, reason: "Scan policy scopes to see which enrollment policies should have run on this Mac.")
-            GroupBox("Policies") {
+            SectionCard(title: "Policies") {
                 if policies.isEmpty {
                     Text("No policy logs since enrollment.").foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(policies) { row in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                PolicyStatusPill(status: row.status)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text(row.name).fontWeight(.medium)
-                                        if row.enrollmentTriggered {
-                                            Text("Enrollment").font(.caption2).padding(.horizontal, 5).padding(.vertical, 1)
-                                                .background(Color.accentColor.opacity(0.15), in: Capsule())
-                                        }
-                                    }
-                                    Text(row.detail).font(.caption).foregroundStyle(.secondary)
+                    ForEach(policies) { row in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            PolicyStatusPill(status: row.status)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text(row.name).fontWeight(.medium)
+                                    if row.enrollmentTriggered { Tag(text: "Enrollment") }
                                 }
-                                Spacer()
-                                if let d = row.date {
-                                    Text(d, format: .dateTime.day().month(.abbreviated).hour().minute())
-                                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                                }
+                                Text(row.detail).font(.caption).foregroundStyle(.secondary)
                             }
-                            .accessibilityElement(children: .combine)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            GroupBox("Apps and packages") {
-                if apps.isEmpty {
-                    Text("No app or package install commands in this period.").foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(apps) { e in
-                            HStack(spacing: 10) {
-                                StatusPill(status: e.status, text: e.status.label)
-                                Text(e.title).fontWeight(.medium)
-                                Text(e.kind).font(.caption).foregroundStyle(.secondary)
-                                Spacer()
-                                Text(e.date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                            Spacer()
+                            if let d = row.date {
+                                Text(d, format: .dateTime.day().month(.abbreviated).hour().minute())
                                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                             }
-                            .accessibilityElement(children: .combine)
                         }
+                        .accessibilityElement(children: .combine)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+            SectionCard(title: "Apps and packages") {
+                if apps.isEmpty {
+                    Text("No app or package install commands in this period.").foregroundStyle(.secondary)
+                } else {
+                    ForEach(apps) { e in
+                        HStack(spacing: 10) {
+                            StatusPill(status: e.status, text: e.status.label)
+                            Text(e.title).fontWeight(.medium)
+                            Text(e.kind).font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Text(e.date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Setup Manager page
+
+    @ViewBuilder
+    private var setupManagerPage: some View {
+        if let source = vm.timelineSetupManager {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("“\(source.profileName)” · \(source.reason). \(source.config.runAtLabel). \(source.config.finalActionLabel).")
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                SetupManagerStepList(rows: vm.setupManagerRows, showStatus: true)
+                Text("Status comes from this Mac's policy logs in Jamf Pro. Steps that aren't policies run on the Mac only; their result is in /private/var/log/setupManager.log on the Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -446,7 +526,7 @@ private struct EnrollmentProfilesPage: View {
                     TableColumn("Status", value: \.status) { ProfileStatusPill(status: $0.status) }
                         .width(min: 90, ideal: 100)
                     TableColumn("Profile", value: \.name) { Text($0.name).help($0.identifier ?? "") }
-                        .width(min: 160, ideal: 220)
+                        .width(min: 160, ideal: 240)
                     TableColumn("Source", value: \.source) { Text($0.source).foregroundStyle(.secondary) }
                         .width(min: 80, ideal: 110)
                     TableColumn("Why") { Text($0.reason).foregroundStyle(.secondary).help($0.reason) }
@@ -459,7 +539,7 @@ private struct EnrollmentProfilesPage: View {
                     TableColumn("Last command") { Text($0.lastCommand ?? "—").foregroundStyle(.secondary) }
                         .width(min: 110, ideal: 160)
                 }
-                .frame(minHeight: CGFloat(min(rows.count, 14)) * 26 + 32)
+                .frame(height: CGFloat(min(rows.count, 16)) * 26 + 34)
                 .contextMenu(forSelectionType: ProfileRow.ID.self) { ids in
                     if let id = ids.first, let row = rows.first(where: { $0.id == id }) {
                         Button("Copy Name") { copy(row.name) }
@@ -478,6 +558,66 @@ private struct EnrollmentProfilesPage: View {
 
 // MARK: - Shared pieces
 
+/// Setup Manager's steps in order, with the policies they run and (for one Mac) their status.
+struct SetupManagerStepList: View {
+    let rows: [SetupManagerStepRow]
+    let showStatus: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(rows) { row in
+                HStack(alignment: .top, spacing: 10) {
+                    Text("\(row.step.id + 1)")
+                        .font(.caption.weight(.bold)).monospacedDigit()
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Color.accentColor, in: Circle())
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text(row.step.label).fontWeight(.medium)
+                            Tag(text: row.step.kind.title, symbol: row.step.kind.symbol)
+                            if let v = row.step.value, !v.isEmpty {
+                                Text(v).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                                    .lineLimit(1).truncationMode(.middle)
+                            }
+                        }
+                        if !row.policies.isEmpty {
+                            Text("Runs " + row.policies.joined(separator: ", "))
+                                .font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if !row.note.isEmpty {
+                            Text(row.note).font(.caption)
+                                .foregroundStyle(row.note.hasPrefix("No enabled policy") ? Color.orange : Color.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    if showStatus {
+                        if let status = row.status {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                PolicyStatusPill(status: status)
+                                if let d = row.date {
+                                    Text(d, format: .dateTime.day().month(.abbreviated).hour().minute())
+                                        .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                                }
+                            }
+                        } else {
+                            Text("—").foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .padding(.vertical, 8).padding(.horizontal, 10)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Step \(row.step.id + 1): \(row.step.label), \(row.step.kind.title)\(row.status.map { ", \($0.label)" } ?? "")")
+                Divider().padding(.leading, 40)
+            }
+        }
+        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
 /// Offers the scope scan where the comparison needs it.
 struct ScanPrompt: View {
     @Bindable var vm: EnrollmentFlowViewModel
@@ -492,7 +632,7 @@ struct ScanPrompt: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button("Scan Scopes") { vm.startScan() }
-                    .help("Reads every policy and configuration profile once. On large instances this takes a few minutes.")
+                    .help("Reads every policy and configuration profile once.")
             }
             .padding(10)
             .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
@@ -538,45 +678,83 @@ struct EnrollmentNote: View {
     }
 }
 
+/// A titled group with a subtle background, lighter than GroupBox.
+struct SectionCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased()).font(.caption.weight(.semibold)).tracking(0.5).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) { content }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+}
+
+/// Small capsule label, e.g. "PreStage" or "Policy".
+struct Tag: View {
+    let text: String
+    var symbol: String? = nil
+
+    var body: some View {
+        HStack(spacing: 3) {
+            if let symbol { Image(systemName: symbol).accessibilityHidden(true) }
+            Text(text)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .background(Color.secondary.opacity(0.15), in: Capsule())
+        .fixedSize()
+    }
+}
+
+private struct PhaseHeader: View {
+    let phase: EnrollmentPhase
+
+    var body: some View {
+        Label(phase.title.uppercased(), systemImage: phase.symbol)
+            .font(.caption.weight(.semibold))
+            .tracking(0.5)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 124)
+            .padding(.bottom, 2)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 private struct TimelineEventRow: View {
     let event: EnrollmentEvent
     let start: Date
-    let isLast: Bool
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(event.date, format: .dateTime.hour().minute().second())
-                    .font(.system(.caption, design: .monospaced))
-                Text(EnrollmentAnalyzer.relative(event.date, to: start))
-                    .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-            }
-            .frame(width: 70, alignment: .trailing)
-
-            VStack(spacing: 0) {
-                marker
-                if !isLast {
-                    Rectangle().fill(Color.secondary.opacity(0.25)).frame(width: 2).frame(maxHeight: .infinity)
-                }
-            }
-            .frame(width: 14)
-
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(event.date, format: .dateTime.hour().minute().second())
+                .font(.system(.callout, design: .monospaced))
+                .frame(width: 66, alignment: .leading)
+            Text(EnrollmentAnalyzer.relative(event.date, to: start))
+                .font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                .frame(width: 48, alignment: .leading)
+            marker
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Image(systemName: event.phase.symbol).foregroundStyle(.secondary).font(.caption)
-                        .help(event.phase.title)
-                    Text(event.title).fontWeight(.medium)
-                    Text(event.kind).font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    if event.kind != event.title {
+                        Text(event.kind).font(.system(.caption, design: .monospaced)).foregroundStyle(.secondary)
+                    }
+                    Text(event.title).fontWeight(.semibold)
                 }
                 if let detail = event.detail {
                     Text(detail).font(.caption).foregroundStyle(event.status == .failed ? .red : .secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.bottom, 12)
-            Spacer()
-            StatusPill(status: event.status, text: event.isApproximate ? "Approx." : event.status.label)
+            Spacer(minLength: 8)
+            StatusPill(status: event.status, text: event.isApproximate ? "Inferred" : event.status.label)
         }
+        .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(event.date.formatted(date: .omitted, time: .standard)), \(event.title), \(event.kind), \(event.status.label)")
     }
@@ -585,11 +763,9 @@ private struct TimelineEventRow: View {
     private var marker: some View {
         if event.isApproximate {
             Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [2, 2]))
-                .foregroundStyle(.secondary).frame(width: 11, height: 11)
-                .padding(.top, 3)
+                .foregroundStyle(.secondary).frame(width: 10, height: 10)
         } else {
-            Circle().fill(StatusPill.color(for: event.status)).frame(width: 11, height: 11)
-                .padding(.top, 3)
+            Circle().fill(StatusPill.color(for: event.status)).frame(width: 10, height: 10)
         }
     }
 }

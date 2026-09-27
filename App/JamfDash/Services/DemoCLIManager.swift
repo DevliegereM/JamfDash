@@ -295,7 +295,8 @@ private let configProfilesJSON = """
   {"id":9,"name":"Password Policy"},
   {"id":10,"name":"Certificates - Internal CA"},
   {"id":11,"name":"Software Update Deferrals"},
-  {"id":12,"name":"Privacy Preferences (PPPC)"}
+  {"id":12,"name":"Privacy Preferences (PPPC)"},
+  {"id":13,"name":"Jamf Setup Manager"}
 ]
 """
 
@@ -455,10 +456,12 @@ private func demoPolicyDetailJSON(id: Int) -> String {
     let (catId, catName) = cats[id] ?? (-1, "No category assigned")
     // Enrollment Complete policies for the Enrollment section's flow (Dock only for Engineering).
     let enrollmentTrigger = [7, 8, 11, 14, 17].contains(id)
-    let allComputers = [7, 8, 11, 17].contains(id)
+    let allComputers = [7, 8, 11, 17, 4, 5, 12, 13].contains(id)
+    // Custom triggers that the demo Setup Manager profile runs.
+    let customTrigger = [4: "EnrollChrome", 5: "Enroll1Password", 11: "EnrollRosetta2", 12: "EnrollJamfConnect", 13: "EnrollSophos"][id] ?? ""
     return """
     {
-      "general": {"id": \(id), "name": "Policy \(id)", "enabled": true, "trigger_enrollment_complete": \(enrollmentTrigger), "category": {"id": \(catId), "name": "\(catName)"}},
+      "general": {"id": \(id), "name": "Policy \(id)", "enabled": true, "trigger_enrollment_complete": \(enrollmentTrigger), "trigger_other": "\(customTrigger)", "category": {"id": \(catId), "name": "\(catName)"}},
       "scope": {
         "all_computers": \(allComputers),
         "computers": [],
@@ -490,7 +493,7 @@ private func demoConfigProfileDetailJSON(id: Int) -> String {
         .replacingOccurrences(of: "\"", with: "\\\"")
         .replacingOccurrences(of: "\n", with: "\\n")
     // Scopes for the Enrollment section's flow: most profiles go to All Computers, a few to groups.
-    let allComputers = [1, 2, 3, 5, 7, 9, 10, 12].contains(id)
+    let allComputers = [1, 2, 3, 5, 7, 9, 10, 12, 13].contains(id)
     let groups: String
     switch id {
     case 6:  groups = #"[{"id": 21, "name": "Engineering VPN Users"}]"#
@@ -1234,12 +1237,28 @@ private let demoProfileNames: [Int: String] = [
     1: "Security Baseline", 2: "FileVault Enforcement", 3: "Firewall Configuration",
     4: "Energy Saver", 5: "Wi-Fi (Corporate)", 6: "VPN Settings", 7: "Login Window",
     8: "System Preferences Restrictions", 9: "Password Policy", 10: "Certificates - Internal CA",
-    11: "Software Update Deferrals", 12: "Privacy Preferences (PPPC)",
+    11: "Software Update Deferrals", 12: "Privacy Preferences (PPPC)", 13: "Jamf Setup Manager",
 ]
 
 private func demoProfileName(id: Int) -> String {
     demoProfileNames[id] ?? "Profile \(id)"
 }
+
+/// Jamf Setup Manager settings as Jamf Pro stores them (Application & Custom Settings).
+private let demoSetupManagerPayload = """
+<dict><key>PayloadType</key><string>com.apple.ManagedClient.preferences</string><key>PayloadContent</key><dict>\
+<key>com.jamf.setupmanager</key><dict><key>Forced</key><array><dict><key>mcx_preference_settings</key><dict>\
+<key>title</key><string>Welcome to Acme</string><key>finalAction</key><string>restart</string>\
+<key>enrollmentActions</key><array>\
+<dict><key>label</key><string>Rosetta 2</string><key>policy</key><string>EnrollRosetta2</string></dict>\
+<dict><key>label</key><string>Google Chrome</string><key>policy</key><string>EnrollChrome</string></dict>\
+<dict><key>label</key><string>Jamf Connect</string><key>policy</key><string>EnrollJamfConnect</string></dict>\
+<dict><key>label</key><string>Sophos</string><key>policy</key><string>EnrollSophos</string></dict>\
+<dict><key>label</key><string>1Password</string><key>policy</key><string>Enroll1Password</string></dict>\
+<dict><key>label</key><string>Microsoft Teams</string><key>installomator</key><string>microsoftteams</string></dict>\
+<dict><key>label</key><string>Inventory</string><key>recon</key><true/></dict>\
+</array></dict></dict></array></dict></dict></dict>
+"""
 
 /// Minimal profile plists so the deprecation audit rules have something to find in Demo Mode.
 private func demoProfilePayloadsPlist(id: Int) -> String {
@@ -1251,6 +1270,7 @@ private func demoProfilePayloadsPlist(id: Int) -> String {
     case 10: payload = "<dict><key>PayloadType</key><string>com.apple.AssetCache.managed</string><key>AllowSharedCaching</key><true/></dict>"
     case 11: payload = "<dict><key>PayloadType</key><string>com.apple.applicationaccess</string><key>forceDelayedSoftwareUpdates</key><true/><key>enforcedSoftwareUpdateDelay</key><integer>30</integer></dict>"
     case 12: payload = "<dict><key>PayloadType</key><string>com.apple.TCC.configuration-profile-policy</string><key>Services</key><dict/></dict>"
+    case 13: payload = demoSetupManagerPayload
     default: payload = "<dict><key>PayloadType</key><string>com.apple.loginwindow</string><key>SHOWFULLNAME</key><true/></dict>"
     }
     return """

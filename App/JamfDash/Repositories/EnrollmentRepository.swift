@@ -5,6 +5,8 @@ import OSLog
 /// the view model keeps results in memory for the session.
 struct EnrollmentRepository: Sendable {
     let cli: any CLIRunning
+    /// Lists that every timeline needs (profile names, PreStages, …), shared for ten minutes.
+    let cache = EnrollmentListCache()
     private static let logger = Logger(subsystem: "com.jamfdash", category: "EnrollmentRepository")
 
     // MARK: - Recent enrollments
@@ -30,7 +32,8 @@ struct EnrollmentRepository: Sendable {
 
     /// Loads everything known about one Mac's enrollment. Only the inventory lookup is
     /// required; every other source that fails is reported in `sources` instead.
-    func timeline(serial rawSerial: String, enrollmentPolicyIDs: Set<Int> = [], now: Date = Date()) async throws -> EnrollmentTimeline {
+    func timeline(serial rawSerial: String, enrollmentPolicyIDs: Set<Int> = [],
+                  setupManagerPolicies: [Int: String] = [:], now: Date = Date()) async throws -> EnrollmentTimeline {
         let serial = CLICommand.sanitizedSerial(rawSerial)
         guard !serial.isEmpty else { throw TimelineError.notFound(rawSerial) }
 
@@ -83,7 +86,7 @@ struct EnrollmentRepository: Sendable {
                               parse: { (try? DDMMonitorViewModel.decodeStatusItems(from: $0)) ?? [] })
         let isPrestage = EnrollmentParsing.isPrestageMethod(type: method.type, viaADE: viaADE)
         async let prestage: PrestageDetail? = isPrestage ? matchPrestage(name: method.name, id: method.id) : nil
-        async let retention = try? await cli.run(.logFlushingSettings)
+        async let retention = cache.data(for: "logFlushing") { try? await cli.run(.logFlushingSettings) }
         async let profileNames = namedList(.configProfiles)
 
         let (mdmRecords, mdmStatus) = await mdm
@@ -96,7 +99,7 @@ struct EnrollmentRepository: Sendable {
             supervised: device.supervised, lastContact: device.lastContact,
             mdmCommands: mdmRecords, historyCommands: historyRecords, policyLogs: policyRecords,
             installedProfiles: installed, enrollmentPolicyIDs: enrollmentPolicyIDs,
-            profileNamesByID: await profileNames)
+            profileNamesByID: await profileNames, setupManagerPolicies: setupManagerPolicies)
 
         let ddmSummary: EnrollmentTimeline.DDMSummary? = ddmItems.isEmpty ? nil : .init(
             itemCount: ddmItems.count,
@@ -153,7 +156,11 @@ struct EnrollmentRepository: Sendable {
     // MARK: - PreStages
 
     func prestages() async throws -> [ComputerPrestage] {
-        let data = try await cli.run(.computerPrestages)
+        let cli = self.cli
+        var cached = await cache.data(for: "prestages", load: { try? await cli.run(.computerPrestages) })
+        // The cache swallows errors; run it once more so the caller sees what went wrong.
+        if cached == nil { cached = try await cli.run(.computerPrestages) }
+        let data = cached ?? Data()
         let rows = EnrollmentParsing.rows(data)
         let rowsData = try JSONSerialization.data(withJSONObject: rows)
         return try JSONDecoder().decode([ComputerPrestage].self, from: rowsData)
@@ -177,7 +184,8 @@ struct EnrollmentRepository: Sendable {
     // MARK: - Names for the flow
 
     func namedList(_ command: CLICommand) async -> [Int: String] {
-        guard let data = try? await cli.run(command) else { return [:] }
+        guard let data = await cache.data(for: command.baseArguments.joined(separator: " "),
+                                          load: { try? await cli.run(command) }) else { return [:] }
         var out: [Int: String] = [:]
         for row in EnrollmentParsing.rows(data) {
             if let id = EnrollmentParsing.int(row["id"]), let name = EnrollmentParsing.string(row["name"]) { out[id] = name }
@@ -261,4 +269,20 @@ struct EnrollmentRepository: Sendable {
             policies: scannedPolicies.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
             failures: failures, scannedAt: Date())
     }
+}
+
+/// In-memory cache for lists that rarely change during a session. Nothing is written to disk.
+actor EnrollmentListCache {
+    private var entries: [String: (data: Data, at: Date)] = [:]
+    private let lifetime: TimeInterval = 10 * 60
+
+    /// Cached data for `key`, or the result of `load` (cached when it isn't nil).
+    func data(for key: String, load: @Sendable () async -> Data?) async -> Data? {
+        if let hit = entries[key], Date().timeIntervalSince(hit.at) < lifetime { return hit.data }
+        guard let fresh = await load() else { return nil }
+        entries[key] = (fresh, Date())
+        return fresh
+    }
+
+    func removeAll() { entries.removeAll() }
 }
