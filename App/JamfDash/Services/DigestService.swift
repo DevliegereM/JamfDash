@@ -11,7 +11,25 @@ struct DigestEntry: Codable, Identifiable, Sendable {
     let date: Date
     let bullets: [String]
     let rawSummary: String
+
+    /// Older digests stored the model's own bullet markers; newer ones store plain text.
+    static func stripBullet(_ s: String) -> String {
+        var t = s.trimmingCharacters(in: .whitespaces)
+        while let c = t.first, c == "•" || c == "-" || c == "*" {
+            t = String(t.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return t
+    }
 }
+
+#if canImport(FoundationModels)
+@available(macOS 26, *)
+@Generable
+struct DigestSummary {
+    @Guide(description: "Exactly three short, factual points an admin should know today, most important first. No bullet characters.", .count(3))
+    let bullets: [String]
+}
+#endif
 
 // MARK: - DigestService
 
@@ -22,21 +40,31 @@ final class DigestService {
 
     private let cli: any CLIRunning
     private let storageURL: URL
+    private let notifies: Bool
     private(set) var entries: [DigestEntry] = []
     private(set) var isRunning = false
 
     // MARK: Initialization
 
-    init(cli: any CLIRunning) {
+    /// `storageURL` is for tests; the app uses Application Support/JamfDash/digests.json.
+    init(cli: any CLIRunning, storageURL: URL? = nil, notifies: Bool = true) {
         self.cli = cli
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let dir = appSupport.appendingPathComponent("JamfDash", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        self.storageURL = dir.appendingPathComponent("digests.json")
-        self.entries = (try? JSONDecoder().decode([DigestEntry].self, from: Data(contentsOf: storageURL))) ?? []
+        self.notifies = notifies
+        if let storageURL {
+            self.storageURL = storageURL
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            let dir = appSupport.appendingPathComponent("JamfDash", isDirectory: true)
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            self.storageURL = dir.appendingPathComponent("digests.json")
+        }
+        self.entries = (try? JSONDecoder().decode([DigestEntry].self, from: Data(contentsOf: self.storageURL))) ?? []
     }
 
     // MARK: Public Methods
+
+    /// Digests kept on disk; older ones are dropped.
+    static let maxStoredEntries = 60
 
     func runIfNeeded() async {
         guard !isRunning else { return }
@@ -44,6 +72,8 @@ final class DigestService {
         await run()
     }
 
+    /// Collects today's data and saves a digest. Nothing is saved when no data could be
+    /// fetched or the model couldn't summarise it, so the next launch tries again.
     func run() async {
         isRunning = true
         defer { isRunning = false }
@@ -52,59 +82,62 @@ final class DigestService {
         let securityData  = try? await cli.run(.securityReport)
         let patchData     = try? await cli.run(.reportPatchStatus)
 
-        let context = buildContext(overview: overviewData, security: securityData, patch: patchData)
-        let summary = await generateSummary(context: context)
-        let bullets = parseBullets(from: summary)
+        let context = Self.buildContext(overview: overviewData, security: securityData, patch: patchData)
+        guard !context.isEmpty else { return }
+        guard let bullets = await generateBullets(context: context), !bullets.isEmpty else { return }
 
-        let entry = DigestEntry(id: UUID(), date: Date(), bullets: bullets, rawSummary: summary)
+        let entry = DigestEntry(id: UUID(), date: Date(), bullets: bullets,
+                                rawSummary: bullets.map { "• \($0)" }.joined(separator: "\n"))
         entries.append(entry)
+        if entries.count > Self.maxStoredEntries {
+            entries.removeFirst(entries.count - Self.maxStoredEntries)
+        }
         persist()
-        await notify(entry: entry)
+        if notifies { await notify(entry: entry) }
     }
 
     // MARK: Private Methods
 
-    private func buildContext(overview: Data?, security: Data?, patch: Data?) -> String {
+    /// Compact, readable facts for the model — the same summaries Dashie's tools produce,
+    /// instead of raw JSON cut off mid-object.
+    static func buildContext(overview: Data?, security: Data?, patch: Data?) -> String {
         var parts: [String] = []
-        if let d = overview, let s = String(data: d, encoding: .utf8) {
-            parts.append("## Overview\n\(s.prefix(2000))")
+        #if canImport(FoundationModels)
+        if #available(macOS 26, *) {
+            if let d = overview { parts.append("## Overview\n" + GetOverviewTool.summarize(d)) }
+            if let d = security { parts.append("## Security\n" + GetSecurityReportTool.summarize(d)) }
+            if let d = patch    { parts.append("## Patches\n" + GetPatchStatusTool.summarize(d)) }
         }
-        if let d = security, let s = String(data: d, encoding: .utf8) {
-            parts.append("## Security\n\(s.prefix(2000))")
-        }
-        if let d = patch, let s = String(data: d, encoding: .utf8) {
-            parts.append("## Patches\n\(s.prefix(2000))")
-        }
+        #endif
         return parts.joined(separator: "\n\n")
     }
 
-    private func generateSummary(context: String) async -> String {
+    private func generateBullets(context: String) async -> [String]? {
         #if canImport(FoundationModels)
         if #available(macOS 26, *) {
-            let session = LanguageModelSession(model: .default)
-            let prompt = """
-            You are a Jamf Pro admin assistant. Given the following JSON data from a Jamf Pro instance, write exactly 3 concise bullet points (each starting with "• ") summarizing the most important status or issues an admin should know today. Be direct and factual.
-
-            \(context)
-            """
-            if let response = try? await session.respond(to: prompt) {
-                return response.content
+            guard case .available = SystemLanguageModel.default.availability else { return nil }
+            let session = LanguageModelSession(
+                model: .default,
+                instructions: "You are a Jamf Pro admin assistant. Be direct and factual; keep numbers exact."
+            )
+            do {
+                let response = try await session.respond(
+                    to: "Summarise the most important status or issues an admin should know today.\n\n\(context)",
+                    generating: DigestSummary.self
+                )
+                return response.content.bullets
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            } catch {
+                return nil
             }
         }
         #endif
-        return "• Daily digest data collected (on-device AI unavailable)\n• Check the Security and Overview tabs for details\n• No automated summary generated"
-    }
-
-    private func parseBullets(from text: String) -> [String] {
-        let lines = text.components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { $0.hasPrefix("•") || $0.hasPrefix("-") || $0.hasPrefix("*") }
-        let candidates = Array(lines.prefix(3))
-        return candidates.isEmpty ? [text] : candidates
+        return nil
     }
 
     private func persist() {
-        try? JSONEncoder().encode(entries).write(to: storageURL)
+        try? JSONEncoder().encode(entries).write(to: storageURL, options: .atomic)
     }
 
     private func notify(entry: DigestEntry) async {

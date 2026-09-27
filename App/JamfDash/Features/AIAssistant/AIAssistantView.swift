@@ -1,3 +1,5 @@
+import FoundationModels
+import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -27,9 +29,20 @@ struct AIAssistantInnerView: View {
     @Environment(AppEnvironment.self) private var env
     @FocusState private var inputFocused: Bool
     @State private var showingHelp = false
+    @State private var showingImagePicker = false
     @State private var showDigestHistory = false
+    @State private var intelligence = AppleIntelligenceStatus()
 
     var body: some View {
+        if intelligence.state == .ready {
+            chat
+        } else {
+            AppleIntelligenceSetupView(status: intelligence)
+                .navigationTitle("AI Assistant")
+        }
+    }
+
+    private var chat: some View {
         VStack(spacing: 0) {
             compactHeader
 
@@ -82,7 +95,7 @@ struct AIAssistantInnerView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Dashie").font(.system(size: 13, weight: .semibold))
-                StatePill(state: vm.state)
+                StatePill(state: vm.state, toolName: vm.activeToolName)
             }
             Spacer()
             Button {
@@ -196,7 +209,7 @@ struct AIAssistantInnerView: View {
     private func messageRow(for message: AIAssistantViewModel.Message) -> some View {
         switch message.role {
         case .user:
-            UserBubble(text: message.content)
+            UserBubble(text: message.content, imageData: message.imageData)
         case .assistant:
             AssistantBubble(text: message.content, partial: message.isStreaming)
         }
@@ -204,9 +217,66 @@ struct AIAssistantInnerView: View {
 
     // MARK: - Composer
 
+    private var canAttachImages: Bool { AIAssistantViewModel.supportsImages }
+
     private var composer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let data = vm.pendingImage, let image = NSImage(data: data) {
+                HStack(spacing: 8) {
+                    Image(nsImage: image)
+                        .resizable().scaledToFill()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    Text("Image attached — read on this Mac").font(.caption).foregroundStyle(.secondary)
+                    Button { vm.pendingImage = nil } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove attached image")
+                }
+            }
+            composerRow
+        }
+        .onDrop(of: [.image, .fileURL], isTargeted: nil) { providers in
+            guard canAttachImages else { return false }
+            return attachImage(from: providers)
+        }
+        .onPasteCommand(of: [.image, .png, .tiff]) { providers in
+            guard canAttachImages else { return }
+            _ = attachImage(from: providers)
+        }
+        .fileImporter(isPresented: $showingImagePicker, allowedContentTypes: [.image]) { result in
+            if case .success(let url) = result {
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                if let data = try? Data(contentsOf: url) { vm.pendingImage = ImageAttachmentLoader.png(from: data) }
+            }
+        }
+    }
+
+    private func attachImage(from providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first(where: { $0.canLoadObject(ofClass: NSImage.self) }) else { return false }
+        _ = provider.loadObject(ofClass: NSImage.self) { object, _ in
+            guard let image = object as? NSImage, let tiff = image.tiffRepresentation else { return }
+            let png = ImageAttachmentLoader.png(from: tiff)
+            Task { @MainActor in vm.pendingImage = png }
+        }
+        return true
+    }
+
+    private var composerRow: some View {
         HStack(spacing: 10) {
-            TextField("Ask about your fleet…", text: $vm.inputText, axis: .vertical)
+            if canAttachImages {
+                Button { showingImagePicker = true } label: {
+                    Image(systemName: "paperclip").font(.system(size: 15))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Attach a screenshot or image (or paste / drop one). Dashie reads it on this Mac.")
+                .accessibilityLabel("Attach image")
+            }
+            TextField(vm.pendingImage == nil ? "Ask about your fleet…" : "Ask about the image…",
+                      text: $vm.inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .lineLimit(1...5)
@@ -231,9 +301,24 @@ struct AIAssistantInnerView: View {
                     .font(.system(size: 22))
             }
             .buttonStyle(.plain)
-            .disabled(vm.isResponding || vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(vm.isResponding || (vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty && vm.pendingImage == nil))
             .accessibilityLabel("Send message")
         }
+    }
+}
+
+/// Normalises attached images to a PNG no larger than 1 600 px on the long side.
+enum ImageAttachmentLoader {
+    static func png(from data: Data, maxDimension: CGFloat = 1_600) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimension,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        let rep = NSBitmapImageRep(cgImage: image)
+        return rep.representation(using: .png, properties: [:])
     }
 }
 
@@ -242,6 +327,7 @@ struct AIAssistantInnerView: View {
 @available(macOS 26, *)
 private struct StatePill: View {
     let state: AssistantState
+    var toolName: String? = nil
 
     var body: some View {
         HStack(spacing: 5) {
@@ -263,7 +349,7 @@ private struct StatePill: View {
         switch state {
         case .idle:     return "Ready"
         case .thinking: return "Thinking…"
-        case .tool:     return "Looking things up…"
+        case .tool:     return toolName.map(Self.toolLabel) ?? "Looking things up…"
         case .talking:  return "Responding…"
         }
     }
@@ -271,24 +357,54 @@ private struct StatePill: View {
     private var dotColor: Color {
         state == .idle ? .green : .accentColor
     }
+
+    static func toolLabel(_ name: String) -> String {
+        switch name {
+        case "listComputers":        return "Looking up Macs…"
+        case "getComputerDetail":    return "Reading device details…"
+        case "getInstalledApps":     return "Reading installed apps…"
+        case "getSecurityReport":    return "Checking security posture…"
+        case "getCompliance":        return "Checking compliance…"
+        case "getOverview":          return "Reading the fleet overview…"
+        case "getPatchStatus":       return "Checking patch status…"
+        case "getPolicies":          return "Reading policies…"
+        case "getSmartGroups":       return "Reading smart groups…"
+        case "getInventorySummary":  return "Summarising inventory…"
+        case "searchFleetKnowledge": return "Searching the fleet index…"
+        default:                     return "Waiting for confirmation…"
+        }
+    }
 }
 
 // MARK: - Bubbles
 
 private struct UserBubble: View {
     let text: String
+    var imageData: Data? = nil
 
     var body: some View {
         HStack {
             Spacer()
-            Text(text)
-                .font(.system(size: 13))
-                .padding(.horizontal, 13)
-                .padding(.vertical, 9)
-                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
-                .foregroundStyle(.white)
-                .frame(maxWidth: 440, alignment: .trailing)
-                .textSelection(.enabled)
+            VStack(alignment: .trailing, spacing: 6) {
+                if let imageData, let image = NSImage(data: imageData) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 260, maxHeight: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .accessibilityLabel("Attached image")
+                }
+                if !text.isEmpty {
+                    Text(text)
+                        .font(.system(size: 13))
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 9)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(.white)
+                        .textSelection(.enabled)
+                }
+            }
+            .frame(maxWidth: 440, alignment: .trailing)
         }
     }
 }
@@ -564,6 +680,7 @@ private struct MarkdownText: View {
 // MARK: - Help popover
 
 @available(macOS 26, *)
+@available(macOS 26, *)
 private struct HelpPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -577,7 +694,7 @@ private struct HelpPopover: View {
             tipRow(icon: "cpu", title: "Hardware lookups need a serial",
                    body: "For CPU, RAM, disk, or apps on a specific device, include the serial number. For fleet-wide breakdowns, just ask.")
             tipRow(icon: "arrow.counterclockwise", title: "Start a new chat when it slows down",
-                   body: "The model has a 4 096-token context window. Long conversations fill it up — use \"New Chat\" to reset.")
+                   body: "The on-device model has a \(SystemLanguageModel.default.contextSize.formatted())-token context window. Dashie shortens older results automatically, but a fresh chat is fastest — use \"New Chat\".")
             tipRow(icon: "lock.shield", title: "Everything stays on your Mac",
                    body: "Dashie runs entirely on-device via Apple Intelligence. No data leaves your machine.")
 

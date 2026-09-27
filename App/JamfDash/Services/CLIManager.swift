@@ -33,10 +33,15 @@ enum CLICommand: Sendable {
     // MARK: Blueprints
     case blueprints
     case blueprintDetail(name: String)
+    case blueprintStatus                    // Platform report: deployment state + device counts
 
     // MARK: Compliance Benchmarks
     case complianceBenchmarks
     case complianceBenchmarkDetail(name: String)
+    case benchmarkCompliancePercentage(id: String)
+    case benchmarkRuleStats(id: String)
+    case benchmarkRuleDevices(id: String, ruleID: String)
+    case benchmarkFailingDevices(title: String)
 
     // MARK: Jamf Protect — data fetching
     case protectOverview
@@ -242,10 +247,21 @@ enum CLICommand: Sendable {
         // Blueprints
         case .blueprints:                          return ["pro", "bp", "list", "-o", "json"]
         case .blueprintDetail(let n):              return ["pro", "bp", "get", n, "-o", "json"]
+        case .blueprintStatus:                     return ["pro", "report", "blueprint-status", "-o", "json"]
 
         // Compliance Benchmarks
         case .complianceBenchmarks:                return ["pro", "cb", "list", "-o", "json"]
         case .complianceBenchmarkDetail(let n):    return ["pro", "cb", "get", n, "-o", "json"]
+        // IDs and titles go after `--` so a value starting with "-" can't be read as a flag.
+        case .benchmarkCompliancePercentage(let id):
+            return ["pro", "benchmark-reports", "compliance-percentage", "-o", "json", "--", id]
+        case .benchmarkRuleStats(let id):
+            return ["pro", "benchmark-reports", "rules", "--sort", "failed:desc", "-o", "json", "--", id]
+        case .benchmarkRuleDevices(let id, let ruleID):
+            return ["pro", "benchmark-reports", "devices", "--rule-id", ruleID, "--rule-result", "FAILED",
+                    "--sort", "deviceName", "-o", "json", "--", id]
+        case .benchmarkFailingDevices(let title):
+            return ["pro", "report", "compliance-devices", "-o", "json", "--", title]
 
         // Jamf Protect — data
         case .protectEvents:        return ["protect", "alerts", "list", "-o", "json"]
@@ -320,7 +336,7 @@ enum CLICommand: Sendable {
 
         // Bulk Operations
         case .bulkEnablePolicies(let c):          return ["pro", "bulk", "enable-policies", "--category", c, "--yes"]
-        case .bulkDisablePolicies(let p):         return ["pro", "bulk", "disable-policies", "--name", p, "--yes"]
+        case .bulkDisablePolicies(let p):         return ["pro", "bulk", "disable-policies", "--name-pattern", p, "--yes"]
         case .bulkAddToGroup(let g, let f):       return ["pro", "bulk", "add-to-group", "--group", g, "--from-file", f, "--yes"]
         case .bulkRemoveFromGroup(let g, let f):  return ["pro", "bulk", "remove-from-group", "--group", g, "--from-file", f, "--yes"]
         case .bulkSendCommand(let cmd, let grp):  return ["pro", "bulk", "send-command", "--command", cmd, "--group", grp, "--yes"]
@@ -423,7 +439,8 @@ enum CLICommand: Sendable {
              .bulkEnablePolicies, .bulkDisablePolicies,
              .reportPatchStatus, .reportPolicyStatus, .reportUpdateStatus,
              .reportDeviceCompliance, .reportSoftwareInstalls,
-             .ddmStatusItems(_), .ddmComputers, .reportDDMStatus:
+             .ddmStatusItems(_), .ddmComputers, .reportDDMStatus, .blueprintStatus,
+             .benchmarkFailingDevices:
             return 120
         case .computersUpdateReadiness, .softwareUpdatePlans, .softwareUpdateStatuses:
             return 120
@@ -481,10 +498,14 @@ extension CLICommand {
     func arguments(outputFormat: ReportOutputFormat) -> [String] {
         guard outputFormat != .json else { return baseArguments }
         var args = baseArguments
-        if let oIdx = args.lastIndex(of: "-o") {
+        // Flags must stay before a `--` separator; everything after it is positional.
+        let end = args.firstIndex(of: "--") ?? args.endIndex
+        if let oIdx = args[..<end].lastIndex(of: "-o") {
             args.removeSubrange(oIdx...(oIdx + 1))
         }
-        return args + ["-o", outputFormat.rawValue]
+        let insertAt = args.firstIndex(of: "--") ?? args.endIndex
+        args.insert(contentsOf: ["-o", outputFormat.rawValue], at: insertAt)
+        return args
     }
 }
 

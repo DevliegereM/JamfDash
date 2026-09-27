@@ -792,6 +792,8 @@ struct AppInstallerDeployment: Identifiable, Sendable {
     let availableCount: Int?       // computerStatuses.available
     let inProgressCount: Int?      // computerStatuses.inProgress
     let failedCount: Int?          // computerStatuses.failed
+    let smartGroupName: String?    // smartGroup.name (target)
+    let iconURL: URL?              // app.iconUrl, only when served by Jamf over https
 
     /// Total devices targeted = installed + available + inProgress + failed + unqualified.
     var assignedCount: Int? {
@@ -826,7 +828,9 @@ extension AppInstallerDeployment: Decodable {
         let latestVersion: String?
         let selectedVersion: String?
         let deployedVersion: String?
+        let iconUrl: String?
         private enum CodingKeys: String, CodingKey {
+            case iconUrl, icon_url
             case latestVersion, latest_version
             case selectedVersion, selected_version
             case deployedVersion, deployed_version
@@ -839,6 +843,8 @@ extension AppInstallerDeployment: Decodable {
                            ?? (try? c.decode(String.self, forKey: .selected_version))
             deployedVersion = (try? c.decode(String.self, forKey: .deployedVersion))
                            ?? (try? c.decode(String.self, forKey: .deployed_version))
+            iconUrl = (try? c.decode(String.self, forKey: .iconUrl))
+                   ?? (try? c.decode(String.self, forKey: .icon_url))
         }
     }
 
@@ -888,6 +894,9 @@ extension AppInstallerDeployment: Decodable {
         latestVersion   = appObj?.latestVersion
         selectedVersion = appObj?.selectedVersion
         deployedVersion = appObj?.deployedVersion
+        iconURL         = appObj?.iconUrl.flatMap(Self.trustedIconURL)
+        smartGroupName  = ((try? c.decode(NamedObj.self, forKey: .smartGroup))
+                        ?? (try? c.decode(NamedObj.self, forKey: .smart_group)))?.name
 
         // computerStatuses sub-object
         let statuses     = (try? c.decode(ComputerStatuses.self, forKey: .computerStatuses))
@@ -896,6 +905,15 @@ extension AppInstallerDeployment: Decodable {
         availableCount   = statuses?.available
         inProgressCount  = statuses?.inProgress
         failedCount      = statuses?.failed
+    }
+
+    /// Icons are fetched straight from the URL in the API response, so only https URLs
+    /// on Jamf's own domains are used (e.g. appinstallers-packages.services.jamfcloud.com).
+    static func trustedIconURL(_ string: String) -> URL? {
+        guard let url = URL(string: string), url.scheme == "https",
+              let host = url.host?.lowercased(),
+              host == "jamfcloud.com" || host.hasSuffix(".jamfcloud.com") else { return nil }
+        return url
     }
 }
 

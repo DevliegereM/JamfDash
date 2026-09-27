@@ -75,6 +75,7 @@
 		8A34C52484E8AE50473F1346 /* DevicesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA72476386D56067F74E8649 /* DevicesView.swift */; };
 		8BBA3568F443F30D927EE7B0 /* AuditViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42C0BB02CE1D0ED4006C1D1 /* AuditViewModel.swift */; };
 		8EAF36826209649C1FAD4CE5 /* AIAssistantView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 906EBC992866D89B797DECBD /* AIAssistantView.swift */; };
+		8FAED68BE52331CD4D2935A4 /* FleetKnowledgeIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FC3CDE86DBB84D39F9FF3BD /* FleetKnowledgeIndex.swift */; };
 		903DBCB94E6BA078C9D1F9A8 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A6DA05E6B12A19B3C9E78CB /* SidebarView.swift */; };
 		9456C39D71CCBAF8D4AD74E0 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BE7D76996F833E0E179A7B9 /* OnboardingViewModel.swift */; };
 		94CA47A611E3124987F08A0C /* SchoolViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB95840FADB6D77AD7C263CB /* SchoolViewModel.swift */; };
@@ -90,6 +91,7 @@
 		AB228A3F9AF539CD01099042 /* StatCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF753970C444E49A60F45A9 /* StatCardView.swift */; };
 		AB85A29444EA8B6C4A2ECED6 /* OSDistributionChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6776F556AFF8D6E2DAB81DEC /* OSDistributionChart.swift */; };
 		ADB62F5FAA9EAD87A329B1DE /* JamfSecurityRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6DB8BA0D1CC0EF525ADA88 /* JamfSecurityRepository.swift */; };
+		B33F1CE34B36B8F885A12352 /* AppleIntelligenceSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A7438B295EE84A88A76741 /* AppleIntelligenceSetupView.swift */; };
 		B61544C2012C7E4712FDB3C4 /* JamfProduct.swift in Sources */ = {isa = PBXBuildFile; fileRef = A57655D2D81B3538CDA41FAA /* JamfProduct.swift */; };
 		B66F9DC4EDECAEE439DDB434 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F296E3F2BC4F04419299C8C /* AppState.swift */; };
 		B97FA917612AAF40CA35D426 /* CLISecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFB78E8D8D6A83AED291B489 /* CLISecurityTests.swift */; };
@@ -229,6 +231,7 @@
 		8BE7D76996F833E0E179A7B9 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
 		8D62B4AB84EBA1823F7502C7 /* JamfSecurityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfSecurityViewModel.swift; sourceTree = "<group>"; };
 		8F9A6C85EB10ABC52D4CDAD4 /* JamfDashCLIWorker.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = JamfDashCLIWorker.entitlements; sourceTree = "<group>"; };
+		8FC3CDE86DBB84D39F9FF3BD /* FleetKnowledgeIndex.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FleetKnowledgeIndex.swift; sourceTree = "<group>"; };
 		906EBC992866D89B797DECBD /* AIAssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAssistantView.swift; sourceTree = "<group>"; };
 		92E7FF6814276E89C88BE2EB /* LoadingStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingStateView.swift; sourceTree = "<group>"; };
 		93D6342CADCC7D9FF8F0C85E /* DigestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigestService.swift; sourceTree = "<group>"; };
@@ -266,6 +269,7 @@
 		CF8F47E68F35A1E7D496C965 /* JamfSecurityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfSecurityView.swift; sourceTree = "<group>"; };
 		CFB78E8D8D6A83AED291B489 /* CLISecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CLISecurityTests.swift; sourceTree = "<group>"; };
 		D11104400C1207BCA192BA6A /* DeviceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSearchView.swift; sourceTree = "<group>"; };
+		D4A7438B295EE84A88A76741 /* AppleIntelligenceSetupView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleIntelligenceSetupView.swift; sourceTree = "<group>"; };
 		D5540969548238B221C48B1B /* UpdateReadinessView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UpdateReadinessView.swift; sourceTree = "<group>"; };
 		D5DFBA4FB2776A824875D03C /* DDMMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DDMMonitorView.swift; sourceTree = "<group>"; };
 		D680C907B1E954A20B5DBF2C /* DeprecationRules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeprecationRules.swift; sourceTree = "<group>"; };
@@ -372,6 +376,7 @@
 				0C9BD1B387D17ED51B8D421B /* CodeSignatureVerifier.swift */,
 				09D1F672BC28420E0CCD8A78 /* ProfileDeprecationScanner.swift */,
 				AB433244F94F9BA7AA03334D /* JamfCLIConfigFile.swift */,
+				8FC3CDE86DBB84D39F9FF3BD /* FleetKnowledgeIndex.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -406,6 +411,7 @@
 				906EBC992866D89B797DECBD /* AIAssistantView.swift */,
 				AB936842570B6FC032714727 /* AITools.swift */,
 				F14F0DCA6FFBA2126BBC3C89 /* DigestHistoryView.swift */,
+				D4A7438B295EE84A88A76741 /* AppleIntelligenceSetupView.swift */,
 			);
 			path = AIAssistant;
 			sourceTree = "<group>";
@@ -960,6 +966,8 @@
 				C2E7C2392F62DA2E5B5456BB /* JamfDashIntents.swift in Sources */,
 				08A44500F621EFF454CD6EB6 /* JamfCLIConfigFile.swift in Sources */,
 				405FC0803C204EB7B7BD4FFF /* PlatformSetup.swift in Sources */,
+				8FAED68BE52331CD4D2935A4 /* FleetKnowledgeIndex.swift in Sources */,
+				B33F1CE34B36B8F885A12352 /* AppleIntelligenceSetupView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

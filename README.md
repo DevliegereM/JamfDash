@@ -256,13 +256,16 @@ Dashie is an on-device AI fleet assistant powered by Apple Intelligence (macOS 2
 - An eligible device (Apple Silicon Mac or qualifying Intel Mac)
 
 **Context compaction:**
-When a conversation grows large, Dashie automatically summarises the history into a compact JSON file — capturing message counts, key topics, devices discussed, actions taken, and important findings — then continues seamlessly with a fresh context. Summaries are saved to `~/Library/Application Support/JamfDash/conversation-summary-<timestamp>.json` and the path is shown in the chat.
+When a conversation grows large, Dashie summarises the earlier part (topics, devices, actions and key findings, including what its tools returned) and continues with that summary. The summary stays in memory only; nothing is written to disk.
+
+**Fleet index:**
+After each sync Dashie keeps a local keyword index of policy, configuration profile, script, package, smart group and Mac names, blueprint states, compliance results and recent daily digests. Ask things like "What do we have for FileVault?". The index is stored in Application Support (readable only by you), is never added to Spotlight, and is cleared when you switch to another Jamf instance.
 
 **macOS 27:**
-On macOS 27 Dashie measures how full its context window is and summarises before it runs out. You can opt in to Apple's **Private Cloud Compute** model under **Settings → AI** for a larger context; it is off by default, and Dashie falls back to the on-device model if it is unavailable.
+Dashie uses the new on-device model features: it measures its context window (8 192 tokens on current models) and sizes tool results to match, shortens older tool results automatically so long chats keep fitting, and shows which tool it is running. On Macs whose model supports vision you can attach, paste or drop a screenshot and ask about it — the image is read on your Mac. Everything runs on-device; Dashie does not use Private Cloud Compute.
 
 **Limitations:**
-Apart from enabling or disabling policies, Dashie cannot create, update, or delete Jamf Pro objects. For configuration changes use the Jamf Pro web console. With the default on-device model, all data stays on your Mac.
+Apart from enabling or disabling policies, Dashie cannot create, update, or delete Jamf Pro objects. For configuration changes use the Jamf Pro web console. All data stays on your Mac.
 
 ---
 

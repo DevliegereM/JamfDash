@@ -1,12 +1,10 @@
 import Foundation
 import Observation
 
+/// Removes the setting older builds stored for the dropped Private Cloud Compute option.
 enum AIAssistantSettings {
-    /// Opt-in Private Cloud Compute model on macOS 27+. Defaults to off.
-    static let privateCloudComputeKey = "jamfDash.aiUsePrivateCloudCompute"
-
-    static var usePrivateCloudCompute: Bool {
-        UserDefaults.standard.bool(forKey: privateCloudComputeKey)
+    static func removeLegacySettings() {
+        UserDefaults.standard.removeObject(forKey: "jamfDash.aiUsePrivateCloudCompute")
     }
 }
 
@@ -23,6 +21,8 @@ final class AIAssistantViewModel {
         let role: Role
         var content: String
         var isStreaming: Bool = false
+        /// PNG of an image the user attached (macOS 27 on-device vision).
+        var imageData: Data? = nil
     }
 
     var messages: [Message] = []
@@ -30,32 +30,50 @@ final class AIAssistantViewModel {
     var isResponding: Bool { state != .idle }
     var inputText = ""
 
+    /// Image to send with the next message (PNG).
+    var pendingImage: Data?
+    /// Tool Dashie is running right now, shown in the status pill (macOS 27 tool-call hooks).
+    var activeToolName: String?
+
     // Stores a LanguageModelSession on macOS 26+ so conversation history is preserved
     // across sends within a single chat session.
     var _session: Any?
 
-    /// True when the current session runs on the Private Cloud Compute model (macOS 27+, opt-in).
-    var usesPrivateCloudCompute = false
+    /// Summary of the chat before the last compaction; carried into the new session's
+    /// instructions and into the next summary. Kept in memory only.
+    var conversationSummary: String?
+
+    /// Number of `messages` already folded into `conversationSummary`.
+    var compactedMessageCount = 0
+
+    /// Bumped by "New Chat". A reply that started in an earlier chat checks this and stops
+    /// touching `messages`; its session stays alive until the reply ends, because releasing a
+    /// LanguageModelSession mid-generation crashes inside FoundationModels.
+    private(set) var chatGeneration = 0
 
     let cli: any CLIRunning
 
     init(cli: any CLIRunning) {
         self.cli = cli
+        AIAssistantSettings.removeLegacySettings()
     }
 
     func send() async {
-        guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let image = pendingImage
+        guard !text.isEmpty || image != nil else { return }
 
-        let userMessage = Message(role: .user, content: inputText)
-        messages.append(userMessage)
-        let prompt = inputText
+        messages.append(Message(role: .user, content: text, imageData: image))
+        let prompt = text.isEmpty ? "What does this image show? If it relates to Jamf or Mac management, explain it." : text
         inputText = ""
+        pendingImage = nil
+        let generation = chatGeneration
 
         state = .thinking
 
         #if canImport(FoundationModels)
         if #available(macOS 26, *) {
-            await sendWithFoundationModels(prompt: prompt)
+            await sendWithFoundationModels(prompt: prompt, imageData: image)
         } else {
             appendErrorMessage()
         }
@@ -63,14 +81,20 @@ final class AIAssistantViewModel {
         appendErrorMessage()
         #endif
 
-        state = .idle
+        // A reply from a chat the user already cleared must not reset the new chat's state.
+        if generation == chatGeneration { state = .idle }
     }
 
     func clearHistory() {
+        chatGeneration += 1
+        state = .idle
+        activeToolName = nil
+        pendingImage = nil
         messages = []
         inputText = ""
         _session = nil
-        usesPrivateCloudCompute = false
+        conversationSummary = nil
+        compactedMessageCount = 0
     }
 
     private func appendErrorMessage() {

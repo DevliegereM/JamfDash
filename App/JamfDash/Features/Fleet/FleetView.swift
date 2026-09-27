@@ -1192,7 +1192,19 @@ struct PatchView: View {
                         AsyncContentView(state: vm.appInstallerDeploymentsState,
                                          retry: { await vm.loadAppInstallerDeployments(force: true) }) { deployments in
                             Table(deployments) {
-                                TableColumn("Name") { Text($0.name) }
+                                TableColumn("Name") { d in
+                                    HStack(spacing: 8) {
+                                        AppInstallerIcon(url: d.iconURL)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(d.name)
+                                            if let g = d.smartGroupName {
+                                                Text(g).font(.caption2).foregroundStyle(.tertiary)
+                                                    .lineLimit(1).truncationMode(.middle)
+                                                    .help("Target group: \(g)")
+                                            }
+                                        }
+                                    }
+                                }
                                 TableColumn("Category") { d in
                                     Text(d.categoryName ?? "—")
                                         .foregroundStyle(d.categoryName != nil ? .secondary : .tertiary)
@@ -1227,6 +1239,12 @@ struct PatchView: View {
                                         .foregroundStyle(.secondary).monospacedDigit()
                                 }
                                 .width(70)
+                                TableColumn("In Progress") { d in
+                                    Text(d.inProgressCount.map { $0 > 0 ? "\($0)" : "—" } ?? "—")
+                                        .foregroundStyle(d.inProgressCount.map { $0 > 0 ? Color.orange : Color.secondary } ?? .secondary)
+                                        .monospacedDigit()
+                                }
+                                .width(80)
                                 TableColumn("Failed") { d in
                                     Text(d.failedCount.map { $0 > 0 ? "\($0)" : "—" } ?? "—")
                                         .foregroundStyle(d.failedCount.map { $0 > 0 ? Color.red : Color.secondary } ?? .secondary)
@@ -1292,6 +1310,27 @@ struct PatchView: View {
                 .help("Refresh all patch management data")
             }
         }
+    }
+}
+
+/// App icon from the App Installers catalogue, with a neutral placeholder.
+private struct AppInstallerIcon: View {
+    let url: URL?
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            if let image = phase.image {
+                image.resizable().interpolation(.high)
+            } else {
+                Image(systemName: "app.dashed")
+                    .resizable()
+                    .foregroundStyle(.tertiary)
+                    .padding(3)
+            }
+        }
+        .frame(width: 24, height: 24)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 

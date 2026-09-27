@@ -76,7 +76,8 @@ struct BlueprintsView: View {
         } else {
             List(selection: $vm.selectedBlueprintID) {
                 ForEach(blueprints, id: \.id) { bp in
-                    Text(bp.name).tag(bp.id)
+                    BlueprintListRow(name: bp.name, status: vm.blueprintStatuses[bp.name])
+                        .tag(bp.id)
                 }
             }
             .listStyle(.sidebar)
@@ -100,7 +101,72 @@ struct BlueprintsView: View {
             VStack { Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange); Text(e).font(.caption) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let result):
-            BlueprintDetailView(result: result)
+            BlueprintDetailView(result: result,
+                                status: result.detail.flatMap { vm.blueprintStatuses[$0.name] })
+        }
+    }
+}
+
+// MARK: - List row
+
+private struct BlueprintListRow: View {
+    let name: String
+    let status: BlueprintStatus?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(name).lineLimit(2)
+            if let status {
+                HStack(spacing: 8) {
+                    if let state = status.state {
+                        Text(BlueprintStatusFormat.stateLabel(state))
+                            .foregroundStyle(BlueprintStatusFormat.stateColor(state))
+                    }
+                    if status.hasCounts {
+                        BlueprintCountsText(status: status)
+                    }
+                }
+                .font(.caption)
+            }
+        }
+        .padding(.vertical, 1)
+    }
+}
+
+private struct BlueprintCountsText: View {
+    let status: BlueprintStatus
+
+    var body: some View {
+        HStack(spacing: 6) {
+            count(status.succeeded, "checkmark.circle.fill", .green, "succeeded")
+            count(status.failed, "xmark.circle.fill", .red, "failed")
+            count(status.pending, "clock.fill", .orange, "pending")
+        }
+        .monospacedDigit()
+    }
+
+    @ViewBuilder
+    private func count(_ n: Int?, _ symbol: String, _ color: Color, _ label: String) -> some View {
+        if let n, n > 0 {
+            Label("\(n)", systemImage: symbol)
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(color)
+                .accessibilityLabel("\(n) \(label)")
+        }
+    }
+}
+
+enum BlueprintStatusFormat {
+    static func stateLabel(_ state: String) -> String {
+        state.replacingOccurrences(of: "_", with: " ").lowercased().capitalized
+    }
+
+    static func stateColor(_ state: String) -> Color {
+        switch state.uppercased() {
+        case "DEPLOYED", "SUCCEEDED": return .green
+        case "FAILED": return .red
+        case "NOT_DEPLOYED": return .secondary
+        default: return .orange
         }
     }
 }
@@ -126,6 +192,56 @@ private struct DeploymentStateBadge: View {
             .padding(.vertical, 3)
             .background(badgeColor.opacity(0.15), in: Capsule())
             .accessibilityLabel("Deployment state: \(state)")
+    }
+}
+
+// MARK: - Device progress
+
+/// Succeeded / failed / pending devices as a stacked bar with a legend.
+private struct DeviceProgressRow: View {
+    let status: BlueprintStatus
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            Text("Devices")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 110, alignment: .leading)
+            VStack(alignment: .leading, spacing: 6) {
+                if status.total > 0 {
+                    GeometryReader { geo in
+                        HStack(spacing: 1) {
+                            segment(status.succeeded, .green, geo.size.width)
+                            segment(status.failed, .red, geo.size.width)
+                            segment(status.pending, .orange, geo.size.width)
+                        }
+                    }
+                    .frame(height: 8)
+                    .clipShape(Capsule())
+                    .accessibilityHidden(true)
+                }
+                HStack(spacing: 12) {
+                    legend("Succeeded", status.succeeded, .green)
+                    legend("Failed", status.failed, .red)
+                    legend("Pending", status.pending, .orange)
+                }
+                .font(.caption)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func segment(_ n: Int?, _ color: Color, _ width: CGFloat) -> some View {
+        let n = n ?? 0
+        return color.frame(width: n == 0 ? 0 : max(2, width * CGFloat(n) / CGFloat(status.total)))
+    }
+
+    private func legend(_ label: String, _ n: Int?, _ color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 7, height: 7)
+            Text("\(label) \(n ?? 0)").monospacedDigit()
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -160,10 +276,11 @@ private struct BlueprintInfoRow: View {
 
 private struct BlueprintDetailView: View {
     let result: BlueprintDetailResult
+    let status: BlueprintStatus?
 
     var body: some View {
         if let detail = result.detail {
-            BlueprintStructuredView(detail: detail)
+            BlueprintStructuredView(detail: detail, status: status)
         } else {
             ScrollView {
                 Text(result.rawJSON)
@@ -180,6 +297,7 @@ private struct BlueprintDetailView: View {
 
 private struct BlueprintStructuredView: View {
     let detail: BlueprintDetail
+    let status: BlueprintStatus?
 
     private static let dateFormatter: Date.FormatStyle = .dateTime.day().month(.abbreviated).year().hour().minute()
 
@@ -193,7 +311,7 @@ private struct BlueprintStructuredView: View {
             VStack(alignment: .leading, spacing: 16) {
                 headerSection
                 detailsSection
-                if detail.deploymentState != nil {
+                if detail.deploymentState != nil || status?.hasCounts == true {
                     deploymentSection
                 }
                 if detail.scope != nil {
@@ -257,6 +375,10 @@ private struct BlueprintStructuredView: View {
                         let lastRunValue = "\(formattedDate(last.started))  (\(last.state))"
                         BlueprintInfoRow(label: "Last Run", value: lastRunValue)
                     }
+                }
+                if let status, status.hasCounts {
+                    if detail.deploymentState != nil { Divider() }
+                    DeviceProgressRow(status: status)
                 }
             }
             .padding(14)

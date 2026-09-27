@@ -176,4 +176,22 @@ final class DeviceSearchViewModel {
         searchText = ""
         clearSelection()
     }
+
+    /// Searches for a device by exact name or serial, as when another view links here.
+    func lookUp(_ query: String) {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        clearSelection()
+        searchText = q
+        let exact = devicesVM.allComputers.first {
+            $0.name.caseInsensitiveCompare(q) == .orderedSame
+                || ($0.serialNumber?.caseInsensitiveCompare(q) == .orderedSame)
+        }
+        if let device = exact ?? (localResults.count == 1 ? localResults.first : nil) {
+            selectDevice(device)
+        } else if localResults.isEmpty {
+            Task { await fetchDetail(serial: q) }
+        }
+        // Several partial matches: leave them listed for the user to pick.
+    }
 }

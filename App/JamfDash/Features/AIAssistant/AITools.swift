@@ -19,8 +19,21 @@ private func parseArray(_ data: Data) -> JSONArray? {
     return nil
 }
 
-/// Cap a string at `limit` chars; append a truncation notice if cut.
+/// Output sizes were tuned for a 4 096-token model; macOS 27's on-device models have 8 192
+/// (measured on AFM 3 Core Advanced), so tool output may use proportionally more.
+enum DashieBudget {
+    static let scale: Double = {
+        guard #available(macOS 26, *) else { return 1 }
+        let size = SystemLanguageModel.default.contextSize
+        return min(max(Double(size) / 4_096, 1), 2)
+    }()
+
+    static func characters(_ base: Int) -> Int { Int(Double(base) * scale) }
+}
+
+/// Cap a string at `limit` chars (scaled to the model's context); append a notice if cut.
 private func cap(_ s: String, _ limit: Int = 800) -> String {
+    let limit = DashieBudget.characters(limit)
     guard s.count > limit else { return s }
     return String(s.prefix(limit)) + "\n…(truncated)"
 }
@@ -30,6 +43,7 @@ private func cap(_ s: String, _ limit: Int = 800) -> String {
 /// falls back to an app-modal alert otherwise.
 @MainActor
 private func confirmAction(title: String, message: String, confirmTitle: String) async -> Bool {
+    if let answer = DashieToolConfirmation.testOverride { return answer(title) }
     let alert = NSAlert()
     alert.messageText = title
     alert.informativeText = message
@@ -46,25 +60,66 @@ private func confirmAction(title: String, message: String, confirmTitle: String)
     }
 }
 
+/// Lets tests answer action confirmations without showing a dialog. Never set in the app.
+@MainActor
+enum DashieToolConfirmation {
+    static var testOverride: ((String) -> Bool)?
+}
+
 // MARK: - Query tools
 
 @available(macOS 26, *)
 struct ListComputersTool: Tool {
-    let description = "List all managed computers: names, serial numbers, last check-in time, and macOS version."
+    let name = "listComputers"
+    let description = """
+        List managed computers (name, serial number, macOS version, last check-in). \
+        Use the optional filters to narrow the list instead of reading the whole fleet.
+        """
     let cli: any CLIRunning
 
-    @Generable struct Arguments {}
+    @Generable struct Arguments {
+        @Guide(description: "Only Macs whose name contains this text (case-insensitive). Omit for all names.")
+        let nameContains: String?
+        @Guide(description: "Only Macs on this macOS version or version prefix, e.g. \"15\" or \"14.7\". Omit for all versions.")
+        let osVersion: String?
+        @Guide(description: "Only Macs that have not checked in for at least this many days. Omit for all.")
+        let notSeenForDays: Int?
+    }
+
+    struct Filter: Sendable {
+        var nameContains: String?
+        var osVersion: String?
+        var notSeenForDays: Int?
+
+        var isEmpty: Bool { nameContains == nil && osVersion == nil && notSeenForDays == nil }
+
+        var summary: String {
+            var parts: [String] = []
+            if let n = nameContains { parts.append("name contains “\(n)”") }
+            if let v = osVersion { parts.append("macOS \(v)") }
+            if let d = notSeenForDays { parts.append("not seen for \(d)+ days") }
+            return parts.joined(separator: ", ")
+        }
+    }
+
+    /// Rows listed in full; beyond this only the count is given.
+    static var maxListed: Int { Int(25 * DashieBudget.scale) }
 
     func call(arguments: Arguments) async throws -> String {
+        let filter = Filter(
+            nameContains: arguments.nameContains.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 },
+            osVersion: arguments.osVersion.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 },
+            notSeenForDays: arguments.notSeenForDays.flatMap { $0 > 0 ? $0 : nil }
+        )
         do {
             let data = try await cli.run(.computers)
-            return Self.summarize(data)
+            return Self.summarize(data, filter: filter)
         } catch {
             return "Failed to list computers: \(error.localizedDescription)"
         }
     }
 
-    static func summarize(_ data: Data) -> String {
+    static func summarize(_ data: Data, filter: Filter = Filter(), now: Date = Date()) -> String {
         let items: JSONArray
         var total: Int? = nil
         if let wrap = parse(data) as? JSONObject,
@@ -76,31 +131,64 @@ struct ListComputersTool: Tool {
         } else {
             return "Could not parse computer list."
         }
-        let count = total ?? items.count
-        var lines = ["Total: \(count) managed Mac\(count == 1 ? "" : "s")."]
-        let preview = items.prefix(40)
-        for item in preview {
+
+        struct Row { let name, serial, version, lastSeen: String; let lastDate: Date? }
+        let rows: [Row] = items.map { item in
             let gen  = item["general"]  as? JSONObject
             let hw   = item["hardware"] as? JSONObject
             let os   = item["operatingSystem"] as? JSONObject
-            let name   = gen?["name"]         as? String ?? item["name"]         as? String ?? "Unknown"
-            let serial = hw?["serialNumber"]  as? String ?? item["serialNumber"] as? String ?? "—"
-            let ver    = os?["version"]       as? String ?? item["osVersion"]    as? String ?? "—"
             let lastIn = gen?["lastContactTime"] as? String
                       ?? gen?["lastCheckIn"]     as? String
-                      ?? item["lastCheckIn"]     as? String ?? "—"
-            let shortDate = lastIn.count > 10 ? String(lastIn.prefix(10)) : lastIn
-            lines.append("• \(name) (SN: \(serial)) — macOS \(ver) — last seen \(shortDate)")
+                      ?? item["lastCheckIn"]     as? String
+            return Row(
+                name:    gen?["name"]        as? String ?? item["name"]         as? String ?? "Unknown",
+                serial:  hw?["serialNumber"] as? String ?? item["serialNumber"] as? String ?? "—",
+                version: os?["version"]      as? String ?? item["osVersion"]    as? String ?? "—",
+                lastSeen: lastIn.map { String($0.prefix(10)) } ?? "—",
+                lastDate: lastIn.flatMap(dayDate)
+            )
         }
-        if items.count > 40 {
-            lines.append("… and \(items.count - 40) more.")
+
+        let matches = rows.filter { row in
+            if let n = filter.nameContains, !row.name.localizedCaseInsensitiveContains(n) { return false }
+            if let v = filter.osVersion, !(row.version == v || row.version.hasPrefix(v + ".")) { return false }
+            if let days = filter.notSeenForDays {
+                guard let last = row.lastDate else { return true }   // never seen counts as not seen
+                if now.timeIntervalSince(last) < Double(days) * 86_400 { return false }
+            }
+            return true
         }
-        return cap(lines.joined(separator: "\n"))
+
+        let count = total ?? items.count
+        var lines = ["Total: \(count) managed Mac\(count == 1 ? "" : "s")."]
+        if !filter.isEmpty {
+            lines.append("Matching \(filter.summary): \(matches.count).")
+        }
+        for row in matches.prefix(maxListed) {
+            lines.append("• \(row.name) (SN: \(row.serial)) — macOS \(row.version) — last seen \(row.lastSeen)")
+        }
+        if matches.count > maxListed {
+            lines.append("… and \(matches.count - maxListed) more. Use a filter to narrow the list.")
+        }
+        return cap(lines.joined(separator: "\n"), 2400)
+    }
+
+    /// The day of a Jamf timestamp such as `2026-09-01T10:12:00.123Z`.
+    private static func dayDate(_ timestamp: String) -> Date? {
+        let day = timestamp.prefix(10)
+        guard day.count == 10 else { return nil }
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.date(from: String(day))
     }
 }
 
 @available(macOS 26, *)
 struct GetComputerDetailTool: Tool {
+    let name = "getComputerDetail"
     let description = """
         Get complete details for a specific Mac: make, model, CPU type and speed, \
         RAM amount, disk size and free space, serial number, macOS version, last check-in, \
@@ -177,6 +265,7 @@ struct GetComputerDetailTool: Tool {
 
 @available(macOS 26, *)
 struct GetSecurityReportTool: Tool {
+    let name = "getSecurityReport"
     let description = "Get the security posture report: FileVault, Gatekeeper, SIP, firewall, and MDM-lock status across all managed Macs."
     let cli: any CLIRunning
 
@@ -251,6 +340,7 @@ struct GetSecurityReportTool: Tool {
 
 @available(macOS 26, *)
 struct GetComplianceTool: Tool {
+    let name = "getCompliance"
     let description = "Get device compliance status: which computers meet organisational security requirements and which do not."
     let cli: any CLIRunning
 
@@ -296,6 +386,7 @@ struct GetComplianceTool: Tool {
 
 @available(macOS 26, *)
 struct GetOverviewTool: Tool {
+    let name = "getOverview"
     let description = "Get a high-level summary of the Jamf Pro instance: total device count, recent enrolments, OS distribution, and key stats."
     let cli: any CLIRunning
 
@@ -335,6 +426,7 @@ struct GetOverviewTool: Tool {
 
 @available(macOS 26, *)
 struct GetPatchStatusTool: Tool {
+    let name = "getPatchStatus"
     let description = "Get patch management status across the fleet: which software titles are up-to-date, outdated, or missing patches."
     let cli: any CLIRunning
 
@@ -386,6 +478,7 @@ struct GetPatchStatusTool: Tool {
 
 @available(macOS 26, *)
 struct GetPoliciesTool: Tool {
+    let name = "getPolicies"
     let description = "List all Jamf Pro policies: names, enabled/disabled state, triggers, frequency, and scope."
     let cli: any CLIRunning
 
@@ -430,6 +523,7 @@ struct GetPoliciesTool: Tool {
 
 @available(macOS 26, *)
 struct GetSmartGroupsTool: Tool {
+    let name = "getSmartGroups"
     let description = "List all smart computer groups: names, member counts, and criteria."
     let cli: any CLIRunning
 
@@ -462,6 +556,7 @@ struct GetSmartGroupsTool: Tool {
 
 @available(macOS 26, *)
 struct GetInventorySummaryTool: Tool {
+    let name = "getInventorySummary"
     let description = """
         Get a fleet-wide inventory summary: breakdown by hardware model (MacBook Pro, Mac mini, …), \
         CPU types, RAM distribution, disk sizes, macOS version spread, and storage usage. \
@@ -523,6 +618,7 @@ struct GetInventorySummaryTool: Tool {
 
 @available(macOS 26, *)
 struct GetInstalledAppsTool: Tool {
+    let name = "getInstalledApps"
     let description = "Get the list of applications installed on a specific Mac. Returns app names, versions, and bundle IDs. Requires the serial number."
     let cli: any CLIRunning
 
@@ -570,10 +666,32 @@ struct GetInstalledAppsTool: Tool {
     }
 }
 
+@available(macOS 26, *)
+struct SearchFleetKnowledgeTool: Tool {
+    let name = "searchFleetKnowledge"
+    let description = """
+        Search a local index of this Jamf instance by keyword: names of policies, configuration \
+        profiles, scripts, packages, smart groups and Macs, blueprint states, compliance rule \
+        results and past daily digests. Use it for "what do we have for X?", to find objects \
+        by name, or for what earlier digests said.
+        """
+
+    @Generable struct Arguments {
+        @Guide(description: "Keywords to look up, e.g. \"FileVault\", \"Chrome\", \"digest patches\"")
+        let query: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        let query = String(arguments.query.prefix(200))
+        return await MainActor.run { FleetKnowledgeStore.shared.answer(query) }
+    }
+}
+
 // MARK: - Device action tools
 
 @available(macOS 26, *)
 struct BlankPushTool: Tool {
+    let name = "blankPush"
     let description = "Send a blank MDM push to a Mac to wake it up and prompt it to check in with Jamf Pro. Requires the serial number."
     let cli: any CLIRunning
 
@@ -594,6 +712,7 @@ struct BlankPushTool: Tool {
 
 @available(macOS 26, *)
 struct RenewMDMProfileTool: Tool {
+    let name = "renewMDMProfile"
     let description = "Renew the MDM profile on a Mac. Use when the device has lost MDM trust or shows as 'MDM profile expired'. Requires the serial number."
     let cli: any CLIRunning
 
@@ -620,6 +739,7 @@ struct RenewMDMProfileTool: Tool {
 
 @available(macOS 26, *)
 struct RedeployFrameworkTool: Tool {
+    let name = "redeployFramework"
     let description = "Redeploy the Jamf Pro management framework on a Mac. Use when the Jamf binary is missing or corrupted. Requires the serial number."
     let cli: any CLIRunning
 
@@ -646,6 +766,7 @@ struct RedeployFrameworkTool: Tool {
 
 @available(macOS 26, *)
 struct FlushFailedCommandsTool: Tool {
+    let name = "flushFailedCommands"
     let description = "Flush all failed MDM commands from the queue for a specific Mac. Use when a device is stuck processing failed commands. Requires the serial number."
     let cli: any CLIRunning
 
@@ -672,6 +793,7 @@ struct FlushFailedCommandsTool: Tool {
 
 @available(macOS 26, *)
 struct RestartDeviceTool: Tool {
+    let name = "restartDevice"
     let description = "Remotely restart a Mac via MDM. The device will restart immediately. Requires the serial number."
     let cli: any CLIRunning
 
@@ -698,6 +820,7 @@ struct RestartDeviceTool: Tool {
 
 @available(macOS 26, *)
 struct ExecutePolicyTool: Tool {
+    let name = "executePolicy"
     let description = "Trigger a Jamf Pro policy to run on a specific Mac by policy name and serial number. Use when you need to push a policy immediately rather than waiting for the next check-in."
     let cli: any CLIRunning
 
@@ -726,6 +849,7 @@ struct ExecutePolicyTool: Tool {
 
 @available(macOS 26, *)
 struct BulkEnablePoliciesTool: Tool {
+    let name = "bulkEnablePolicies"
     let description = "Enable all policies in a Jamf Pro category. For example, enable all policies in the 'Maintenance' category."
     let cli: any CLIRunning
 
@@ -752,6 +876,7 @@ struct BulkEnablePoliciesTool: Tool {
 
 @available(macOS 26, *)
 struct BulkDisablePoliciesTool: Tool {
+    let name = "bulkDisablePolicies"
     let description = "Disable all policies whose name matches a pattern. For example, disable all policies named 'Test*'."
     let cli: any CLIRunning
 
@@ -761,18 +886,51 @@ struct BulkDisablePoliciesTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
+        let pattern = arguments.namePattern.trimmingCharacters(in: .whitespaces)
+        if Self.matchesEverything(pattern) {
+            return "Refused: the pattern '\(arguments.namePattern)' would match every policy. Ask the user for a more specific name pattern."
+        }
+        let matching = await Self.matchingPolicyNames(pattern, cli: cli)
+        if let matching, matching.isEmpty {
+            return "No policies match '\(pattern)'. Nothing was disabled."
+        }
+        let countLine: String
+        if let matching {
+            let shown = matching.prefix(8).map { "• \($0)" }.joined(separator: "\n")
+            let more = matching.count > 8 ? "\n… and \(matching.count - 8) more" : ""
+            countLine = "\(matching.count) polic\(matching.count == 1 ? "y matches" : "ies match"):\n\(shown)\(more)"
+        } else {
+            countLine = "The number of matching policies could not be checked."
+        }
         let confirmed = await confirmAction(
             title: "Bulk Disable Policies",
-            message: "This will disable ALL policies matching '\(arguments.namePattern)'. This affects the entire fleet. Continue?",
+            message: "This will disable ALL policies matching '\(pattern)'. This affects the entire fleet.\n\n\(countLine)\n\nContinue?",
             confirmTitle: "Disable All"
         )
         guard confirmed else { return "Bulk disable cancelled by user." }
         do {
-            let data = try await cli.run(.bulkDisablePolicies(pattern: arguments.namePattern))
+            let data = try await cli.run(.bulkDisablePolicies(pattern: pattern))
             return String(data: data, encoding: .utf8) ?? "Policies disabled."
         } catch {
-            return "Failed to disable policies matching '\(arguments.namePattern)': \(error.localizedDescription)"
+            return "Failed to disable policies matching '\(pattern)': \(error.localizedDescription)"
         }
+    }
+
+    /// True for empty patterns and patterns made only of wildcards (`*`, `**`, `?*`).
+    static func matchesEverything(_ pattern: String) -> Bool {
+        let p = pattern.filter { !$0.isWhitespace }
+        if p.isEmpty { return true }
+        return p.contains("*") && p.allSatisfy { $0 == "*" || $0 == "?" }
+    }
+
+    /// Policy names matching the glob, from the policy list; nil when the list can't be read.
+    static func matchingPolicyNames(_ pattern: String, cli: any CLIRunning) async -> [String]? {
+        guard let data = try? await cli.run(.policies), let rows = parseArray(data) else { return nil }
+        return matchingNames(pattern, in: rows.compactMap { $0["name"] as? String })
+    }
+
+    static func matchingNames(_ pattern: String, in names: [String]) -> [String] {
+        names.filter { name in fnmatch(pattern, name, 0) == 0 }
     }
 }
 

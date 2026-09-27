@@ -32,18 +32,44 @@ struct DevicesView: View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search by name or serial…", text: $vm.searchText)
+                TextField(vm.canAskInPlainLanguage
+                          ? "Search by name or serial, or ask: “Macs on macOS 14 not seen for 2 weeks”"
+                          : "Search by name or serial…",
+                          text: $vm.searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
-                if !vm.searchText.isEmpty {
+                    .onSubmit {
+                        // Plain Return keeps filtering by name/serial; a question (several words)
+                        // is turned into filters.
+                        if vm.canAskInPlainLanguage, vm.searchText.split(separator: " ").count >= 3 {
+                            ask()
+                        }
+                    }
+                if vm.isParsingQuery {
+                    ProgressView().controlSize(.small)
+                } else if !vm.searchText.isEmpty {
                     Button { vm.searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }.buttonStyle(.plain)
+                }
+                if vm.canAskInPlainLanguage {
+                    Button { ask() } label: {
+                        Label("Ask", systemImage: "sparkles")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(vm.searchText.trimmingCharacters(in: .whitespaces).isEmpty || vm.isParsingQuery)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .help("Turn the question into filters with the on-device model (⌘↩). Nothing leaves this Mac.")
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(.regularMaterial)
+
+            if vm.fleetQuery != nil || vm.queryError != nil {
+                FleetQueryBar(vm: vm)
+            }
 
             Picker("View", selection: $selectedTab) {
                 Text("All Devices").tag(0)
@@ -107,6 +133,11 @@ struct DevicesView: View {
         } message: {
             Text(exportError ?? "")
         }
+    }
+
+    private func ask() {
+        selectedTab = 0
+        Task { await vm.askInPlainLanguage() }
     }
 
     // MARK: - All Devices
@@ -546,4 +577,57 @@ fileprivate extension Computer {
     var sortableSerial:  String { serialNumber ?? "" }
     var sortableOS:      String { osVersion ?? "" }
     var sortableContact: Int    { daysSinceContact ?? Int.max }
+}
+
+
+// MARK: - Plain-language query chips
+
+private struct FleetQueryBar: View {
+    @Bindable var vm: DevicesViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let query = vm.fleetQuery {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles").foregroundStyle(.purple)
+                        .accessibilityHidden(true)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(query.chips, id: \.field) { chip in
+                                Button { vm.removeQueryFilter(chip.field) } label: {
+                                    HStack(spacing: 4) {
+                                        Text(chip.label)
+                                        Image(systemName: "xmark").font(.caption2.weight(.bold))
+                                    }
+                                    .font(.caption)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Color.purple.opacity(0.15), in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Remove this filter")
+                                .accessibilityLabel("Remove filter: \(chip.label)")
+                            }
+                        }
+                    }
+                    Text("\(vm.filtered.count) match\(vm.filtered.count == 1 ? "" : "es")")
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    Button("Clear") { vm.clearFleetQuery() }
+                        .buttonStyle(.borderless).controlSize(.small)
+                }
+                if !query.unsupported.isEmpty {
+                    Label("Not filtered — the device list has no \(query.unsupported.joined(separator: ", ")).",
+                          systemImage: "info.circle")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let error = vm.queryError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+    }
 }

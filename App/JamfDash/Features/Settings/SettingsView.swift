@@ -745,23 +745,6 @@ private struct BrandingTab: View {
 
 // MARK: - AI Assistant
 
-/// Opt-in Private Cloud Compute model for Dashie (macOS 27+). Off by default.
-@available(macOS 27, *)
-private struct PrivateCloudComputeSection: View {
-    @AppStorage(AIAssistantSettings.privateCloudComputeKey) private var usePCC = false
-
-    var body: some View {
-        Section {
-            Toggle("Use Private Cloud Compute", isOn: $usePCC)
-        } header: {
-            Text("Model")
-        } footer: {
-            Text("When on, Dashie uses Apple's Private Cloud Compute model, which has a larger context window. Requests — including fleet data returned by tools — leave this Mac and are processed on Apple silicon servers under Apple's Private Cloud Compute privacy guarantees. Off by default; Dashie falls back to the on-device model when Private Cloud Compute is unavailable. Takes effect on the next New Chat.")
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
 private struct AITab: View {
     @Binding var isEnabled: Bool
 
@@ -774,10 +757,6 @@ private struct AITab: View {
             } footer: {
                 Text("Powered by Apple Intelligence — on-device, private, and requires macOS 26.")
                     .foregroundStyle(.secondary)
-            }
-
-            if #available(macOS 27, *) {
-                PrivateCloudComputeSection()
             }
 
             if #available(macOS 26, *) {
@@ -874,17 +853,19 @@ private struct AIStatusSection: View {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Device not eligible for Apple Intelligence")
-                    Text("Apple Intelligence requires a Mac with Apple silicon and macOS 26.")
+                    Text("Apple Intelligence requires a Mac with Apple silicon (M1 or later) and macOS 26.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
         case .appleIntelligenceNotEnabled:
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Apple Intelligence is not enabled")
-                    Text("Go to System Settings → Apple Intelligence & Siri to turn it on.")
+                    Text("Turn it on in System Settings → Apple Intelligence & Siri. Dashie shows a step-by-step guide until it's ready.")
                         .font(.caption).foregroundStyle(.secondary)
+                    Button("Open Apple Intelligence Settings") { AppleIntelligenceStatus.openSettings() }
+                        .controlSize(.small)
                 }
             }
         case .modelNotReady:

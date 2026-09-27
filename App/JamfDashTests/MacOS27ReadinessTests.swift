@@ -267,3 +267,351 @@ final class MacOS27ReadinessTests: XCTestCase {
         XCTAssertEqual(summary.softwareUpdate.failureCount, 2)
     }
 }
+
+// MARK: - Dashie
+
+#if canImport(FoundationModels)
+import FoundationModels
+
+private struct NoCLI: CLIRunning {
+    func run(_ command: CLICommand) async throws -> Data { Data() }
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data { Data() }
+}
+
+@available(macOS 26, *)
+final class DashieToolTests: XCTestCase {
+
+    @MainActor
+    func testToolNamesAreUniqueAndMatchSystemPrompt() {
+        let names = AIAssistantViewModel.tools(cli: NoCLI()).map(\.name)
+        let prompt = AIAssistantViewModel.systemPrompt
+        XCTAssertEqual(Set(names).count, names.count, "tool names must be unique")
+        for name in names {
+            XCTAssertTrue(prompt.contains(name), "system prompt doesn't mention \(name)")
+        }
+    }
+
+    private let computers = Data("""
+        {"totalCount": 3, "results": [
+          {"general": {"name": "Finance-MBP-01", "lastContactTime": "2026-09-26T10:00:00Z"},
+           "hardware": {"serialNumber": "AAA111"}, "operatingSystem": {"version": "15.6"}},
+          {"general": {"name": "Design-iMac", "lastContactTime": "2026-08-01T10:00:00Z"},
+           "hardware": {"serialNumber": "BBB222"}, "operatingSystem": {"version": "14.7.1"}},
+          {"general": {"name": "finance-mini"},
+           "hardware": {"serialNumber": "CCC333"}, "operatingSystem": {"version": "150.1"}}
+        ]}
+        """.utf8)
+
+    private let now = ISO8601DateFormatter().date(from: "2026-09-27T12:00:00Z")!
+
+    func testListComputersFilters() {
+        let byName = ListComputersTool.summarize(computers, filter: .init(nameContains: "finance"), now: now)
+        XCTAssertTrue(byName.contains("AAA111") && byName.contains("CCC333"))
+        XCTAssertFalse(byName.contains("BBB222"))
+
+        // "15" matches 15.6 but not 150.1.
+        let byOS = ListComputersTool.summarize(computers, filter: .init(osVersion: "15"), now: now)
+        XCTAssertTrue(byOS.contains("AAA111"))
+        XCTAssertFalse(byOS.contains("CCC333"))
+
+        // Stale: last seen 57 days ago, or never seen.
+        let stale = ListComputersTool.summarize(computers, filter: .init(notSeenForDays: 30), now: now)
+        XCTAssertTrue(stale.contains("BBB222") && stale.contains("CCC333"))
+        XCTAssertFalse(stale.contains("AAA111"))
+        XCTAssertTrue(stale.contains("Matching not seen for 30+ days: 2."))
+    }
+
+    func testListComputersUnfilteredListsAll() {
+        let all = ListComputersTool.summarize(computers, now: now)
+        XCTAssertTrue(all.hasPrefix("Total: 3 managed Macs."))
+        XCTAssertFalse(all.contains("Matching"))
+    }
+
+    func testBulkDisableRejectsMatchAllPatterns() {
+        for p in ["", "  ", "*", "**", "?*", "* "] {
+            XCTAssertTrue(BulkDisablePoliciesTool.matchesEverything(p), "\(p) should be refused")
+        }
+        for p in ["Test*", "*Legacy*", "?"] {
+            XCTAssertFalse(BulkDisablePoliciesTool.matchesEverything(p), "\(p) should be allowed")
+        }
+    }
+
+    func testBulkDisableMatchesGlob() {
+        let names = ["Test Install", "Test Remove", "Prod Install", "Contest"]
+        XCTAssertEqual(BulkDisablePoliciesTool.matchingNames("Test*", in: names), ["Test Install", "Test Remove"])
+        XCTAssertEqual(BulkDisablePoliciesTool.matchingNames("*Install", in: names), ["Test Install", "Prod Install"])
+    }
+
+    func testBulkDisableUsesNamePatternFlag() {
+        XCTAssertEqual(CLICommand.bulkDisablePolicies(pattern: "Test*").baseArguments,
+                       ["pro", "bulk", "disable-policies", "--name-pattern", "Test*", "--yes"])
+    }
+}
+#endif
+
+final class DigestTests: XCTestCase {
+    func testStripBullet() {
+        XCTAssertEqual(DigestEntry.stripBullet("• 12 Macs lack FileVault"), "12 Macs lack FileVault")
+        XCTAssertEqual(DigestEntry.stripBullet("- * point"), "point")
+        XCTAssertEqual(DigestEntry.stripBullet("plain"), "plain")
+    }
+
+    @MainActor
+    func testContextIsReadableTextNotTruncatedJSON() {
+        let overview = Data(#"[{"section":"Devices","resource":"Computers","value":"42"}]"#.utf8)
+        let context = DigestService.buildContext(overview: overview, security: nil, patch: nil)
+        XCTAssertTrue(context.contains("Computers: 42"))
+        XCTAssertTrue(DigestService.buildContext(overview: nil, security: nil, patch: nil).isEmpty)
+    }
+}
+
+#if canImport(FoundationModels)
+/// Returns small canned JSON for any command so tool calls succeed.
+private struct CannedCLI: CLIRunning {
+    func run(_ command: CLICommand) async throws -> Data {
+        Data("""
+            {"totalCount": 2, "results": [
+              {"id": "1", "general": {"name": "BE-ONE", "lastContactTime": "2026-09-26T10:00:00Z"},
+               "hardware": {"serialNumber": "AAA111"}, "operatingSystem": {"version": "26.0"}},
+              {"id": "2", "general": {"name": "BE-TWO", "lastContactTime": "2026-08-01T10:00:00Z"},
+               "hardware": {"serialNumber": "BBB222"}, "operatingSystem": {"version": "15.6"}}
+            ]}
+            """.utf8)
+    }
+    func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data { try await run(command) }
+}
+
+/// Sends real questions through Dashie with the on-device model; skipped without Apple Intelligence.
+@available(macOS 26, *)
+final class DashieLiveTests: XCTestCase {
+    @MainActor
+    func testAskQuestionWithToolCall() async throws {
+        guard case .available = SystemLanguageModel.default.availability else { throw XCTSkip("model unavailable") }
+        let vm = AIAssistantViewModel(cli: CannedCLI())
+        vm.inputText = "Which Macs haven't checked in for 30 days?"
+        await vm.send()
+        for m in vm.messages { print("DASHIE \(m.role): \(m.content)") }
+        XCTAssertEqual(vm.messages.first?.role, .user)
+        XCTAssertGreaterThan(vm.messages.count, 1)
+        // Give FoundationModels' background session cleanup time to run (the app crashed there).
+        try await Task.sleep(for: .seconds(8))
+    }
+
+    @MainActor
+    func testFollowUpQuestion() async throws {
+        guard case .available = SystemLanguageModel.default.availability else { throw XCTSkip("model unavailable") }
+        let vm = AIAssistantViewModel(cli: CannedCLI())
+        vm.inputText = "How many Macs do I have?"
+        await vm.send()
+        vm.inputText = "And which one is on macOS 15?"
+        await vm.send()
+        for m in vm.messages { print("DASHIE \(m.role): \(m.content)") }
+        try await Task.sleep(for: .seconds(5))
+    }
+
+    @MainActor
+    func testDigest() async throws {
+        guard case .available = SystemLanguageModel.default.availability else { throw XCTSkip("model unavailable") }
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("digest-test-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        let service = DigestService(cli: CannedCLI(), storageURL: file, notifies: false)
+        let before = service.entries.count
+        await service.run()
+        print("DIGEST entries \(before) → \(service.entries.count): \(service.entries.last?.bullets ?? [])")
+        try await Task.sleep(for: .seconds(5))
+    }
+}
+#endif
+
+#if canImport(FoundationModels)
+/// Tool-routing evaluation: real questions through Dashie with the on-device model, checking
+/// which tools it calls. Actions are auto-cancelled, so nothing runs. Skipped without Apple
+/// Intelligence. The pass rate is printed per case and must stay above a threshold, because a
+/// small model is never 100% consistent.
+@available(macOS 26, *)
+final class DashieToolRoutingEvals: XCTestCase {
+    private struct Case {
+        let question: String
+        /// Any of these tools counts as correct.
+        let expected: Set<String>
+    }
+
+    private let cases: [Case] = [
+        Case(question: "How many Macs do we manage?", expected: ["getOverview", "listComputers", "getInventorySummary"]),
+        Case(question: "Which Macs haven't checked in for 30 days?", expected: ["listComputers"]),
+        Case(question: "List the Macs still on macOS 14", expected: ["listComputers"]),
+        Case(question: "Show me the hardware of the Mac with serial AAA111", expected: ["getComputerDetail"]),
+        Case(question: "How much RAM does AAA111 have?", expected: ["getComputerDetail"]),
+        Case(question: "What apps are installed on BBB222?", expected: ["getInstalledApps"]),
+        Case(question: "Which Mac models do we have in the fleet?", expected: ["getInventorySummary"]),
+        Case(question: "How many Macs don't have FileVault enabled?", expected: ["getSecurityReport"]),
+        Case(question: "Is the firewall on across the fleet?", expected: ["getSecurityReport"]),
+        Case(question: "Which devices are non-compliant?", expected: ["getCompliance"]),
+        Case(question: "Which software titles are out of date?", expected: ["getPatchStatus"]),
+        Case(question: "List our policies", expected: ["getPolicies"]),
+        Case(question: "Which policies are disabled?", expected: ["getPolicies"]),
+        Case(question: "What smart groups exist?", expected: ["getSmartGroups"]),
+        Case(question: "Restart the Mac with serial AAA111", expected: ["restartDevice"]),
+        Case(question: "Send a blank push to BBB222", expected: ["blankPush"]),
+        Case(question: "Renew the MDM profile on AAA111", expected: ["renewMDMProfile"]),
+        Case(question: "Flush the failed MDM commands on BBB222", expected: ["flushFailedCommands"]),
+        Case(question: "Disable all policies named Test*", expected: ["bulkDisablePolicies"]),
+        Case(question: "Give me a health overview of the Jamf Pro instance", expected: ["getOverview"]),
+        Case(question: "What do we have for FileVault?", expected: ["searchFleetKnowledge"]),
+        Case(question: "What did the daily digest say about patches?", expected: ["searchFleetKnowledge"]),
+    ]
+
+    /// Minimum share of cases where the model picks an expected tool.
+    private let requiredPassRate = 0.85
+
+    @MainActor
+    func testToolRouting() async throws {
+        guard case .available = SystemLanguageModel.default.availability else { throw XCTSkip("model unavailable") }
+        var confirmations: [String] = []
+        DashieToolConfirmation.testOverride = { title in confirmations.append(title); return false }
+        defer { DashieToolConfirmation.testOverride = nil }
+
+        var passed = 0
+        var report: [String] = []
+        for c in cases {
+            let vm = AIAssistantViewModel(cli: CannedCLI())
+            vm.inputText = c.question
+            await vm.send()
+            let called = Self.toolNames(in: vm)
+            let ok = !called.isDisjoint(with: c.expected)
+            if ok { passed += 1 }
+            report.append("\(ok ? "PASS" : "FAIL")  \(c.question)  → \(called.isEmpty ? "(no tool)" : called.sorted().joined(separator: ", "))  expected \(c.expected.sorted().joined(separator: "|"))")
+            if !ok, let reply = vm.messages.last(where: { $0.role == .assistant })?.content {
+                report.append("      reply: \(reply.replacingOccurrences(of: "\n", with: " ").prefix(160))")
+            }
+        }
+        let rate = Double(passed) / Double(cases.count)
+        print("DASHIE-EVAL tool routing \(passed)/\(cases.count) (\(Int(rate * 100))%)")
+        report.forEach { print("DASHIE-EVAL \($0)") }
+        print("DASHIE-EVAL confirmations shown (all cancelled): \(confirmations)")
+        XCTAssertGreaterThanOrEqual(rate, requiredPassRate, "Tool routing dropped below \(Int(requiredPassRate * 100))%")
+    }
+
+    @MainActor
+    private static func toolNames(in vm: AIAssistantViewModel) -> Set<String> {
+        guard let session = vm._session as? LanguageModelSession else { return [] }
+        var names: Set<String> = []
+        for entry in session.transcript {
+            if case .toolCalls(let calls) = entry {
+                for call in calls { names.insert(call.toolName) }
+            }
+        }
+        return names
+    }
+}
+#endif
+
+#if canImport(FoundationModels)
+/// Prints what this Mac's on-device model offers on macOS 27 (variant, context, capabilities).
+@available(macOS 27, *)
+final class OnDeviceModelProbe: XCTestCase {
+    func testProbe() async throws {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else { throw XCTSkip("model unavailable") }
+        let caps = model.capabilities
+        print("PROBE variant=\(model.variant.displayName) core3=\(model.variant == .core3) advanced=\(model.variant == .coreAdvanced3)")
+        print("PROBE contextSize=\(model.contextSize)")
+        print("PROBE reasoning=\(caps.contains(.reasoning)) vision=\(caps.contains(.vision)) tools=\(caps.contains(.toolCalling)) guided=\(caps.contains(.guidedGeneration))")
+        let session = LanguageModelSession(model: model)
+        let start = Date()
+        do {
+            let r = try await session.respond(to: "A fleet has 13 Macs; 11 never reported compliance results and 2 score 90%. What is the average score over all 13? Answer with the number.",
+                                              contextOptions: ContextOptions(reasoningLevel: .moderate))
+            print("PROBE reasoning answer (\(String(format: "%.1f", Date().timeIntervalSince(start)))s): \(r.content.prefix(200))")
+        } catch {
+            print("PROBE reasoning error: \(error)")
+        }
+    }
+
+    /// A fake screenshot with an error message, rendered in memory.
+    private func errorScreenshot() -> CGImage {
+        let size = NSSize(width: 640, height: 200)
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.white.setFill(); rect.fill()
+            let title = "Jamf Pro — Computer inventory" as NSString
+            title.draw(at: NSPoint(x: 20, y: 150), withAttributes: [.font: NSFont.boldSystemFont(ofSize: 22)])
+            let msg = "Error: MDM profile expired on BE-ZJ4J3D7CPL. Last check-in 41 days ago." as NSString
+            msg.draw(at: NSPoint(x: 20, y: 90), withAttributes: [.font: NSFont.systemFont(ofSize: 18), .foregroundColor: NSColor.systemRed])
+            return true
+        }
+        return image.cgImage(forProposedRect: nil, context: nil, hints: nil)!
+    }
+
+    func testHistoryTrimShortensOnlyOlderToolOutput() {
+        func output(_ id: String, _ text: String) -> Transcript.Entry {
+            .toolOutput(Transcript.ToolOutput(id: id, toolName: "listComputers",
+                                              segments: [.text(Transcript.TextSegment(content: text))]))
+        }
+        let long = String(repeating: "x", count: 1_000)
+        let entries = [output("1", long), output("2", long), output("3", long), output("4", "short")]
+        let trimmed = DashieHistory.trim(entries)
+        func text(_ e: Transcript.Entry) -> String {
+            guard case .toolOutput(let o) = e, case .text(let t) = o.segments.first else { return "" }
+            return t.content
+        }
+        XCTAssertTrue(text(trimmed[0]).hasSuffix("call the tool again for details)"))
+        XCTAssertLessThan(text(trimmed[0]).count, 400)
+        XCTAssertTrue(text(trimmed[1]).count < 400)          // 3rd-newest output: shortened
+        XCTAssertEqual(text(trimmed[2]).count, 1_000)          // 2 newest kept in full
+        XCTAssertEqual(text(trimmed[3]), "short")
+    }
+
+    @MainActor
+    func testDashieReadsAttachedImage() async throws {
+        guard AIAssistantViewModel.supportsImages else { throw XCTSkip("no vision") }
+        let vm = AIAssistantViewModel(cli: CannedCLI())
+        let rep = NSBitmapImageRep(cgImage: errorScreenshot())
+        vm.pendingImage = ImageAttachmentLoader.png(from: rep.representation(using: .png, properties: [:])!)
+        vm.inputText = "What's wrong here?"
+        await vm.send()
+        let reply = vm.messages.last(where: { $0.role == .assistant })?.content ?? ""
+        print("PROBE dashie-vision: \(reply.prefix(300))")
+        XCTAssertNotNil(vm.messages.first?.imageData)
+        XCTAssertNil(vm.pendingImage)
+        XCTAssertTrue(reply.localizedCaseInsensitiveContains("MDM") || reply.localizedCaseInsensitiveContains("expired"))
+    }
+
+    func testVision() async throws {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability, model.capabilities.contains(.vision) else { throw XCTSkip("no vision") }
+        let session = LanguageModelSession(model: model)
+        let image = errorScreenshot()
+        let r = try await session.respond(to: Prompt {
+            "What problem does this screenshot show, and which device?"
+            Attachment(image)
+        })
+        print("PROBE vision: \(r.content.prefix(300))")
+    }
+
+    func testProfileSessionWithHooks() async throws {
+        let model = SystemLanguageModel.default
+        guard case .available = model.availability else { throw XCTSkip("model unavailable") }
+        final class Recorder: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _calls: [String] = []
+            private var _transforms = 0
+            func call(_ n: String) { lock.withLock { _calls.append(n) } }
+            func transform() { lock.withLock { _transforms += 1 } }
+            var calls: [String] { lock.withLock { _calls } }
+            var transforms: Int { lock.withLock { _transforms } }
+        }
+        let rec = Recorder()
+        let tools = await AIAssistantViewModel.tools(cli: CannedCLI())
+        let session = LanguageModelSession(profile: LanguageModelSession.Profile {
+            Instructions("You are Dashie. Use tools to answer questions about Macs.")
+            tools
+        }
+        .temperature(0.2)
+        .historyTransform { entries in rec.transform(); return entries }
+        .onToolCall { call in rec.call(call.toolName) })
+        let r = try await session.respond(to: "How many Macs haven't checked in for 30 days?")
+        let toolCalls = rec.calls, transformed = rec.transforms
+        print("PROBE profile: tools=\(toolCalls) historyTransforms=\(transformed) answer=\(r.content.prefix(160))")
+    }
+}
+#endif

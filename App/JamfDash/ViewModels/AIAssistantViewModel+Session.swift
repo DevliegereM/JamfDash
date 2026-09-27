@@ -1,6 +1,8 @@
 #if canImport(FoundationModels)
+import CoreGraphics
 import Foundation
 import FoundationModels
+import ImageIO
 import OSLog
 
 private let sessionLogger = Logger(subsystem: "com.jamfdash", category: "AIAssistant")
@@ -12,30 +14,67 @@ extension AIAssistantViewModel {
 
     private var languageModelSession: LanguageModelSession {
         if let existing = _session as? LanguageModelSession { return existing }
-        let session = makeSession(instructions: Self.systemPrompt)
+        let session = makeSession(instructions: currentInstructions)
         _session = session
         return session
     }
 
-    /// Creates the chat session. On macOS 27+ with the opt-in setting on (default off) and
-    /// Private Cloud Compute available, uses the PCC model; otherwise the on-device model
-    /// exactly as on macOS 26.
-    private func makeSession(instructions: String, allowPrivateCloudCompute: Bool = true) -> LanguageModelSession {
-        let tools = Self.tools(cli: cli)
-        if #available(macOS 27, *), allowPrivateCloudCompute, AIAssistantSettings.usePrivateCloudCompute {
-            let pcc = PrivateCloudComputeLanguageModel()
-            if pcc.isAvailable {
-                usesPrivateCloudCompute = true
-                return LanguageModelSession(model: pcc, tools: tools, instructions: instructions)
-            }
+    /// Creates the chat session on the on-device model. On macOS 27 it uses a session profile:
+    /// older tool output is shortened before each turn (so long chats fit the context), and
+    /// tool calls are reported to the UI as they happen.
+    private func makeSession(instructions: String) -> LanguageModelSession {
+        if #available(macOS 27, *) {
+            return Self.makeProfileSession(
+                instructions: instructions, cli: cli,
+                onToolCall: { [weak self] name in await self?.toolStarted(name) },
+                onToolOutput: { [weak self] in await self?.toolFinished() })
         }
-        usesPrivateCloudCompute = false
-        return LanguageModelSession(model: .default, tools: tools, instructions: instructions)
+        return LanguageModelSession(model: .default, tools: Self.tools(cli: cli), instructions: instructions)
+    }
+
+    /// Built outside the main actor so the profile (tools + hooks) can be handed to the session.
+    @available(macOS 27, *)
+    nonisolated private static func makeProfileSession(
+        instructions: String,
+        cli: any CLIRunning,
+        onToolCall: @escaping @Sendable (String) async -> Void,
+        onToolOutput: @escaping @Sendable () async -> Void
+    ) -> LanguageModelSession {
+        let tools = toolList(cli: cli)
+        return LanguageModelSession(profile: LanguageModelSession.Profile {
+            Instructions(instructions)
+            tools
+        }
+        .historyTransform(DashieHistory.trim)
+        .onToolCall { call in await onToolCall(call.toolName) }
+        .onToolOutput { _, _ in await onToolOutput() })
+    }
+
+    private func toolStarted(_ name: String) {
+        activeToolName = name
+        if state != .talking { state = .tool }
+    }
+
+    private func toolFinished() {
+        activeToolName = nil
+        if state == .tool { state = .thinking }
+    }
+
+    /// True when the on-device model can read images (macOS 27 vision capability).
+    static var supportsImages: Bool {
+        if #available(macOS 27, *) {
+            let model = SystemLanguageModel.default
+            guard case .available = model.availability else { return false }
+            return model.capabilities.contains(.vision)
+        }
+        return false
     }
 
     // Tools are a static factory so the availability-guarded types stay out of the
     // stored-property requirement on the ViewModel.
-    private static func tools(cli: any CLIRunning) -> [any Tool] {
+    static func tools(cli: any CLIRunning) -> [any Tool] { toolList(cli: cli) }
+
+    nonisolated static func toolList(cli: any CLIRunning) -> [any Tool] {
         [
             // Read
             ListComputersTool(cli: cli),
@@ -48,6 +87,7 @@ extension AIAssistantViewModel {
             GetPoliciesTool(cli: cli),
             GetSmartGroupsTool(cli: cli),
             GetInventorySummaryTool(cli: cli),
+            SearchFleetKnowledgeTool(),
             // Actions
             BlankPushTool(cli: cli),
             RenewMDMProfileTool(cli: cli),
@@ -62,7 +102,8 @@ extension AIAssistantViewModel {
 
     // MARK: - Send
 
-    func sendWithFoundationModels(prompt: String) async {
+    func sendWithFoundationModels(prompt: String, imageData: Data? = nil) async {
+        let generation = chatGeneration
         // Verify the model is ready before even creating a session.
         switch SystemLanguageModel.default.availability {
         case .available:
@@ -86,35 +127,46 @@ extension AIAssistantViewModel {
         }
 
         await compactContextIfNeeded(prompt: prompt)
-        await stream(prompt: prompt, retrying: false)
+        guard generation == chatGeneration else { return }
+        await stream(prompt: prompt, image: imageData.flatMap(Self.cgImage), retrying: false)
+    }
+
+    private static func cgImage(from data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
+    /// Text, plus the image when one is attached and the model can read it.
+    private func makePrompt(_ text: String, image: CGImage?) -> Prompt {
+        if #available(macOS 27, *), let image, Self.supportsImages {
+            return Prompt {
+                text
+                Attachment(image)
+            }
+        }
+        return Prompt(text)
     }
 
     // Lower temperature → more factual, deterministic answers for fleet management.
     private static let generationOptions = GenerationOptions(temperature: 0.4)
 
-    /// If a reply fails while Private Cloud Compute is in use, switches this chat to the
-    /// on-device model and asks again once. Returns true when it did so.
-    private func fallBackToOnDevice(prompt: String, error: Error, assistantIdx: Int?) async -> Bool {
-        guard usesPrivateCloudCompute else { return false }
-        let ns = error as NSError
-        sessionLogger.error("Private Cloud Compute request failed — \(String(describing: error), privacy: .public) [domain \(ns.domain, privacy: .public), code \(ns.code, privacy: .public), userInfo \(String(describing: ns.userInfo), privacy: .private)] — falling back to the on-device model")
-        if let idx = assistantIdx { messages.remove(at: idx) }
-        _session = makeSession(instructions: Self.systemPrompt, allowPrivateCloudCompute: false)
-        messages.append(Message(role: .assistant,
-            content: "Private Cloud Compute didn't respond, so this chat now uses the on-device model."))
-        await stream(prompt: prompt, retrying: true)
-        return true
-    }
-
-    private func stream(prompt: String, retrying: Bool) async {
+    private func stream(prompt: String, image: CGImage? = nil, retrying: Bool) async {
         var assistantIdx: Int? = nil
+        // Held for the whole reply: "New Chat" clears `_session`, and a session released
+        // while generating trips an assertion in FoundationModels.
+        let session = languageModelSession
+        let generation = chatGeneration
+        var isCurrentChat: Bool { generation == chatGeneration }
 
         do {
-            let stream = languageModelSession.streamResponse(
-                to: prompt,
+            let stream = session.streamResponse(
+                to: makePrompt(prompt, image: image),
                 options: Self.generationOptions
             )
             for try await snapshot in stream {
+                // Drain a reply from a cleared chat without showing it; breaking out of the
+                // loop would cancel generation mid-flight.
+                guard isCurrentChat else { continue }
                 if assistantIdx == nil {
                     messages.append(Message(role: .assistant, content: snapshot.content))
                     assistantIdx = messages.count - 1
@@ -124,29 +176,28 @@ extension AIAssistantViewModel {
                     messages[assistantIdx!].content = snapshot.content
                 }
             }
+        } catch where !isCurrentChat {
+            return
         } catch where !retrying && Self.isOS27ContextOverflow(error) {
             // macOS 27 reports context overflow as LanguageModelError.contextSizeExceeded.
             if let idx = assistantIdx { messages.remove(at: idx) }
             await performContextCompaction()
-            await stream(prompt: prompt, retrying: true)
+            await stream(prompt: prompt, image: image, retrying: true)
             return
         } catch where Self.os27ErrorMessage(for: error) != nil {
-            if await fallBackToOnDevice(prompt: prompt, error: error, assistantIdx: assistantIdx) { return }
             appendError(Self.os27ErrorMessage(for: error) ?? "", at: &assistantIdx)
         } catch let error as LanguageModelSession.GenerationError {
             if case .exceededContextWindowSize = error, !retrying {
                 if let idx = assistantIdx { messages.remove(at: idx) }
                 await performContextCompaction()
-                await stream(prompt: prompt, retrying: true)
+                await stream(prompt: prompt, image: image, retrying: true)
                 return
             }
-            if await fallBackToOnDevice(prompt: prompt, error: error, assistantIdx: assistantIdx) { return }
             appendError(generationErrorMessage(error), at: &assistantIdx)
         } catch let nsError as NSError
                 where nsError.domain.contains("GenerationError") || nsError.domain.contains("FoundationModels") {
             // The framework sometimes bridges unknown error codes as NSError rather than the
             // typed Swift enum. Code -1 is a generic internal failure.
-            if await fallBackToOnDevice(prompt: prompt, error: nsError, assistantIdx: assistantIdx) { return }
             sessionLogger.error("Foundation Models error — domain \(nsError.domain, privacy: .public), code \(nsError.code, privacy: .public)")
             let text: String
             switch nsError.code {
@@ -157,13 +208,13 @@ extension AIAssistantViewModel {
             }
             appendError(text, at: &assistantIdx)
         } catch {
-            if await fallBackToOnDevice(prompt: prompt, error: error, assistantIdx: assistantIdx) { return }
             appendError("Error: \(error.localizedDescription)", at: &assistantIdx)
         }
 
-        if let idx = assistantIdx {
+        if isCurrentChat, let idx = assistantIdx, messages.indices.contains(idx) {
             messages[idx].isStreaming = false
         }
+        if isCurrentChat { activeToolName = nil }
     }
 
     private func appendError(_ text: String, at idx: inout Int?) {
@@ -189,7 +240,7 @@ extension AIAssistantViewModel {
                 return
             }
         }
-        let totalChars = messages.reduce(0) { $0 + $1.content.count }
+        let totalChars = messages.dropFirst(compactedMessageCount).reduce(0) { $0 + $1.content.count }
         guard totalChars > Self.contextCharacterThreshold else { return }
         await performContextCompaction()
     }
@@ -206,10 +257,7 @@ extension AIAssistantViewModel {
         do {
             let used = try await model.tokenCount(for: session.transcript)
             let next = try await model.tokenCount(for: prompt)
-            var contextSize = model.contextSize
-            if usesPrivateCloudCompute, let pccSize = try? await PrivateCloudComputeLanguageModel().contextSize {
-                contextSize = pccSize
-            }
+            let contextSize = model.contextSize
             guard contextSize > 0 else { return nil }
             return Double(used + next) > Double(contextSize) * Self.contextFillRatio
         } catch {
@@ -247,103 +295,148 @@ extension AIAssistantViewModel {
                 return "The model couldn't handle this request (\(e.localizedDescription)). Try rephrasing or starting a new chat."
             }
         }
-        if let e = error as? PrivateCloudComputeLanguageModel.Error {
-            switch e {
-            case .quotaLimitReached:
-                return "The Private Cloud Compute quota has been reached. Turn off Private Cloud Compute in Settings › AI Assistant to keep using the on-device model."
-            case .networkFailure, .serviceUnavailable:
-                return "Private Cloud Compute is unreachable right now. Try again, or turn it off in Settings › AI Assistant."
-            @unknown default:
-                return "Private Cloud Compute returned an error. Turn it off in Settings › AI Assistant to use the on-device model."
-            }
-        }
         return nil
     }
 
-    func performContextCompaction() async {
-        let transcript = messages.map { msg -> String in
-            let role = msg.role == .user ? "User" : "Assistant"
-            return "\(role): \(msg.content)"
-        }.joined(separator: "\n\n")
-
-        let summarySession = LanguageModelSession(model: .default)
-        let summaryPrompt = """
-            Summarize this Jamf fleet management conversation as compact JSON. \
-            Return ONLY valid JSON with no other text, using this exact structure:
-            {
-              "totalMessages": <int>,
-              "keyTopics": [<string>],
-              "devicesDiscussed": [<string>],
-              "actionsPerformed": [<string>],
-              "importantFindings": [<string with numbers where relevant>],
-              "lastContext": "<brief description of the last discussion topic>"
-            }
-
-            Conversation:
-            \(transcript)
-            """
-
-        var summaryContent = ""
-        do {
-            let stream = summarySession.streamResponse(to: summaryPrompt)
-            for try await snapshot in stream {
-                summaryContent = snapshot.content
-            }
-        } catch {
-            // Summarisation failed — just reset the session without history.
-            _session = nil
-            messages = [Message(role: .assistant, content: "*(Conversation cleared to free up context window.)*")]
-            return
-        }
-
-        let savedPath = saveConversationSummary(summaryContent)
-
-        let enrichedInstructions = Self.systemPrompt
-            + "\n\n## Previous conversation summary\n\(summaryContent)"
-        _session = makeSession(instructions: enrichedInstructions)
-
-        let notice: String
-        if let path = savedPath {
-            notice = "*(Conversation history compacted and saved to `\(path)`. Continuing with full context.)*"
-        } else {
-            notice = "*(Conversation history compacted. Continuing with full context.)*"
-        }
-        messages = [Message(role: .assistant, content: notice)]
+    /// Instructions for a new session: the system prompt plus the summary of earlier turns.
+    private var currentInstructions: String {
+        guard let summary = conversationSummary, !summary.isEmpty else { return Self.systemPrompt }
+        return Self.systemPrompt + "\n\n## Earlier in this conversation\n" + summary
     }
 
-    @discardableResult
-    private func saveConversationSummary(_ json: String) -> String? {
-        let fm = FileManager.default
-        guard let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
-        let dir = support.appendingPathComponent("JamfDash", isDirectory: true)
-        guard (try? fm.createDirectory(at: dir, withIntermediateDirectories: true)) != nil else { return nil }
-        let formatter = ISO8601DateFormatter()
-        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let file = dir.appendingPathComponent("conversation-summary-\(timestamp).json")
-        guard let data = json.data(using: .utf8), (try? data.write(to: file)) != nil else { return nil }
-        return file.path
+    /// Transcript text handed to the summariser. Kept well inside the on-device context
+    /// (≈ 2 000 tokens) so summarising a long chat can't overflow the summariser itself.
+    private static var summaryInputCharacterBudget: Int { DashieBudget.characters(7_000) }
+    /// Tool output is the data the model actually used; keep a slice of each one.
+    private static let toolOutputCharacterLimit = 500
+
+    /// Replaces the session with a fresh one whose instructions carry a summary of the chat
+    /// so far. The visible messages stay; a notice marks where the model's memory was compacted.
+    func performContextCompaction() async {
+        let generation = chatGeneration
+        let recent = transcriptText(budget: Self.summaryInputCharacterBudget)
+        var summary: String?
+        if !recent.isEmpty {
+            summary = await summarize(recent)
+        }
+        // "New Chat" was pressed while summarising: leave the new chat alone.
+        guard generation == chatGeneration else { return }
+
+        let notice: String
+        if let summary {
+            conversationSummary = summary
+            notice = "*(Earlier messages were summarised to free up the model's memory. Dashie keeps the key facts.)*"
+        } else {
+            // The summariser failed: carry the last exchange over verbatim so the next
+            // answer still has the immediate context.
+            let tail = String(recent.suffix(1_500))
+            let carried = [conversationSummary, tail.isEmpty ? nil : "Most recent exchange:\n\(tail)"]
+                .compactMap { $0 }.joined(separator: "\n\n")
+            conversationSummary = String(carried.suffix(3_000))
+            notice = "*(The model's memory was full, so Dashie kept only the most recent exchange.)*"
+        }
+        _session = makeSession(instructions: currentInstructions)
+        messages.append(Message(role: .assistant, content: notice))
+        compactedMessageCount = messages.count
+    }
+
+    /// The conversation as plain text, newest entries kept when over budget. Uses the session
+    /// transcript (so tool output is included); falls back to the visible messages.
+    private func transcriptText(budget: Int) -> String {
+        var lines: [String] = []
+        if let session = _session as? LanguageModelSession {
+            for entry in session.transcript {
+                switch entry {
+                case .prompt(let p):
+                    lines.append("User: " + Self.text(of: p.segments))
+                case .response(let r):
+                    lines.append("Assistant: " + Self.text(of: r.segments))
+                case .toolOutput(let o):
+                    let out = Self.text(of: o.segments)
+                    let clipped = out.count > Self.toolOutputCharacterLimit
+                        ? String(out.prefix(Self.toolOutputCharacterLimit)) + " …" : out
+                    lines.append("Tool \(o.toolName) returned: " + clipped)
+                default:
+                    continue
+                }
+            }
+        }
+        if lines.isEmpty {
+            lines = messages.dropFirst(compactedMessageCount).map {
+                ($0.role == .user ? "User: " : "Assistant: ") + $0.content
+            }
+        }
+        // Keep the newest lines that fit.
+        var kept: [String] = []
+        var used = 0
+        for line in lines.reversed() {
+            let cost = line.count + 2
+            if used + cost > budget {
+                if kept.isEmpty { kept.append(String(line.suffix(budget))) }
+                break
+            }
+            kept.append(line)
+            used += cost
+        }
+        return kept.reversed().joined(separator: "\n\n")
+    }
+
+    private static func text(of segments: [Transcript.Segment]) -> String {
+        segments.compactMap { segment -> String? in
+            if case .text(let t) = segment { return t.content }
+            return nil
+        }.joined(separator: " ")
+    }
+
+    /// Summarises with the on-device model into a typed structure; nil on failure.
+    private func summarize(_ transcript: String) async -> String? {
+        let session = LanguageModelSession(
+            model: .default,
+            instructions: "You summarise Jamf fleet management chats so the assistant can continue them. Keep names, serial numbers and numbers exact."
+        )
+        let previous = conversationSummary.map { "Summary of the chat before this part:\n\($0)\n\n" } ?? ""
+        do {
+            let response = try await session.respond(
+                to: "\(previous)Conversation:\n\(transcript)",
+                generating: ConversationSummary.self
+            )
+            return response.content.rendered
+        } catch {
+            sessionLogger.error("Conversation summary failed — \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
     // MARK: - System prompt
 
-    private static let systemPrompt = """
+    static let systemPrompt = """
         You are Dashie, an AI assistant for Jamf Dash (Jamf Pro fleet management). \
         Help admins manage their fleet. You cannot create/update/delete Jamf Pro objects — \
         tell the user to do that in Jamf Pro instead.
 
         Tool routing:
-        • Single-device hardware (CPU, RAM, disk, model, make): getComputerDetail
-        • Single-device apps: getInstalledApps
-        • Fleet-wide hardware breakdown (model counts, RAM distribution, disk sizes): getInventorySummary
-        • Per-device filtering by OS, serial, or name: listComputers
-        • Fleet-wide health/stats: getOverview
+        • One Mac's hardware, security or details: getComputerDetail (needs the serial)
+        • One Mac's installed apps: getInstalledApps (needs the serial)
+        • Find Macs by name, macOS version or days since check-in: listComputers with its filters
+        • Fleet hardware breakdown (models, RAM, disks): getInventorySummary
+        • Fleet health and stats: getOverview
         • Patch status: getPatchStatus
         • Security posture: getSecurityReport
         • Compliance: getCompliance
+        • Policies: getPolicies — Smart groups: getSmartGroups
+        • Find anything by name or keyword (policies, profiles, scripts, packages, groups, Macs, \
+        blueprints, compliance rules, past digests), e.g. "what do we have for FileVault?": \
+        searchFleetKnowledge
+        • Actions, only when the user asks for them: blankPush, renewMDMProfile, \
+        redeployFramework, flushFailedCommands, restartDevice, executePolicy, \
+        bulkEnablePolicies, bulkDisablePolicies
 
-        Rules: call tools only when needed; one tool per response. \
-        Before any action tool, state exactly what you will do and ask "Shall I proceed?" — \
-        only act after the user confirms.
+        Rules: call tools only when needed, at most two per answer — for example \
+        listComputers with nameContains to find a serial, then getComputerDetail. \
+        When the user gives a serial number, use it as given; never ask them to confirm it. \
+        When the user asks for an action, call the action tool straight away — do not ask \
+        "shall I proceed" yourself: the app shows its own confirmation dialog before anything \
+        runs. Then report what the tool returned, including when the user cancelled.
 
         When a tool returns data, present the actual values — names, serials, \
         model names, CPU specs, RAM, disk sizes — as a bullet list. \
@@ -371,6 +464,72 @@ extension AIAssistantViewModel {
         default:
             return "The model returned an unexpected error. Try rephrasing or starting a new chat."
         }
+    }
+}
+
+// MARK: - History trimming (macOS 27)
+
+/// Keeps long chats inside the on-device context: before each turn, tool output older than
+/// the most recent few is shortened. The data was already used for earlier answers; the
+/// model only needs a reminder of it.
+@available(macOS 27, *)
+enum DashieHistory {
+    static let fullToolOutputsKept = 2
+    static let shortenedLength = 300
+
+    static func trim(_ entries: [Transcript.Entry]) -> [Transcript.Entry] {
+        let outputIndices = entries.indices.filter {
+            if case .toolOutput = entries[$0] { return true }
+            return false
+        }
+        let keep = Set(outputIndices.suffix(fullToolOutputsKept))
+        return entries.enumerated().map { index, entry in
+            guard case .toolOutput(let output) = entry, !keep.contains(index) else { return entry }
+            let text = output.segments.compactMap { segment -> String? in
+                if case .text(let t) = segment { return t.content }
+                return nil
+            }.joined(separator: " ")
+            guard text.count > shortenedLength else { return entry }
+            let short = String(text.prefix(shortenedLength)) + " …(older result shortened — call the tool again for details)"
+            return .toolOutput(Transcript.ToolOutput(id: output.id, toolName: output.toolName,
+                                                     segments: [.text(Transcript.TextSegment(content: short))]))
+        }
+    }
+}
+
+// MARK: - Conversation summary
+
+@available(macOS 26, *)
+@Generable
+struct ConversationSummary {
+    @Guide(description: "Main topics discussed, oldest first", .maximumCount(6))
+    let keyTopics: [String]
+    @Guide(description: "Mac names or serial numbers discussed", .maximumCount(10))
+    let devicesDiscussed: [String]
+    @Guide(description: "Actions performed or requested, with their outcome", .maximumCount(6))
+    let actionsPerformed: [String]
+    @Guide(description: "Important facts found, with exact numbers, e.g. '12 Macs lack FileVault'", .maximumCount(8))
+    let importantFindings: [String]
+    @Guide(description: "One sentence on what the user was working on last")
+    let lastContext: String
+}
+
+@available(macOS 26, *)
+extension ConversationSummary {
+    /// Plain text for the next session's instructions.
+    var rendered: String {
+        var parts: [String] = []
+        func section(_ title: String, _ items: [String]) {
+            let items = items.filter { !$0.isEmpty }
+            guard !items.isEmpty else { return }
+            parts.append("\(title):\n" + items.map { "- \($0)" }.joined(separator: "\n"))
+        }
+        section("Topics", keyTopics)
+        section("Devices", devicesDiscussed)
+        section("Actions", actionsPerformed)
+        section("Findings", importantFindings)
+        if !lastContext.isEmpty { parts.append("Last topic: \(lastContext)") }
+        return parts.joined(separator: "\n")
     }
 }
 

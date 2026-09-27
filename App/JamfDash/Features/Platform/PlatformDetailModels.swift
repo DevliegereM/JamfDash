@@ -170,13 +170,23 @@ func makeBlueprintDecoder() -> JSONDecoder {
 struct BenchmarkDetail: Decodable {
     let id: String?
     let name: String?
+    /// The Platform API names the benchmark `title`.
+    let title: String?
     let description: String?
     let version: String?
     let framework: String?
     let status: String?
+    let syncState: String?
+    let updateAvailable: Bool?
     let scope: BenchmarkScope?
+    /// The Platform API puts the assigned device groups under `target`.
+    let target: BenchmarkScope?
     let controls: [BenchmarkControl]?
     let rules: [BenchmarkRule]?
+
+    var displayName: String? { name ?? title }
+    var resolvedScope: BenchmarkScope? { scope ?? target }
+    var displayStatus: String? { status ?? syncState }
 }
 
 /// Which devices / groups the benchmark is deployed to.

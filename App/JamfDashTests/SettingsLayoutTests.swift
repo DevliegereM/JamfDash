@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import XCTest
+import FoundationModels
 @testable import JamfDash
 
 /// Renders the Add Connection sheet the way AppKit sizes a sheet (its fitting size) and
@@ -67,6 +68,25 @@ final class SettingsLayoutTests: XCTestCase {
                 .write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
         }
         return host
+    }
+
+    @available(macOS 26, *)
+    func testAppleIntelligenceSetupStatesRender() {
+        let states: [(AppleIntelligenceStatus.State, String)] = [
+            (.notEnabled, "ai-setup-not-enabled"), (.downloading, "ai-setup-downloading"),
+            (.unsupportedLanguage, "ai-setup-language"), (.notEligible, "ai-setup-not-eligible"),
+        ]
+        for (state, name) in states {
+            let host = snapshot(AppleIntelligenceSetupView(status: AppleIntelligenceStatus(pinnedState: state)),
+                                size: NSSize(width: 900, height: 620), name: name)
+            XCTAssertLessThanOrEqual(host.fittingSize.width, 900, "\(name) wider than the window")
+        }
+    }
+
+    @available(macOS 26, *)
+    func testLocaleProbe() {
+        let model = SystemLanguageModel.default
+        print("LOCALE current=\(Locale.current.identifier) preferred=\(Locale.preferredLanguages) supportsCurrent=\(model.supportsLocale()) state=\(AppleIntelligenceStatus.current())")
     }
 
     func testDDMStatusItemsViewRenders() {

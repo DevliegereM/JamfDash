@@ -49,7 +49,7 @@ private struct DigestEntryRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             ForEach(entry.bullets, id: \.self) { bullet in
-                Text(bullet)
+                Text("• " + DigestEntry.stripBullet(bullet))
                     .font(.body)
             }
         }

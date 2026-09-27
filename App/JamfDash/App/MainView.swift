@@ -134,6 +134,11 @@ struct MainView: View {
                 selection = SidebarItem.items(for: env.currentProduct).first
             }
         }
+        .onChange(of: env.requestedSection) { _, requested in
+            guard let requested else { return }
+            selection = requested
+            env.requestedSection = nil
+        }
         .onChange(of: env.currentProduct) { _, newProduct in
             selection = SidebarItem.items(for: newProduct).first
         }

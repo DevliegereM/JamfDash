@@ -80,6 +80,15 @@ final class AppEnvironment {
     let platformVM: PlatformViewModel
     let aiAssistantVM: AIAssistantViewModel
     let settingsInspectorVM: SettingsInspectorViewModel
+
+    /// Set by a view to switch the sidebar to another section; MainView applies and clears it.
+    var requestedSection: SidebarItem?
+
+    /// Opens Device Lookup and searches for a device name or serial number.
+    func showInDeviceLookup(_ query: String) {
+        deviceSearchVM.lookUp(query)
+        requestedSection = .deviceSearch
+    }
     let digestService: DigestService
     let driftVM: DriftViewModel
     let correlationVM: CorrelationViewModel
@@ -239,6 +248,24 @@ final class AppEnvironment {
 
     // MARK: - Load / Refresh
 
+    /// Rebuilds Dashie's local search index from data already in memory (no extra CLI calls).
+    func rebuildFleetIndex() {
+        var s = FleetKnowledgeIndex.Sources()
+        s.computers = devicesVM.allComputers
+        s.policies = fleetVM.policiesState.value ?? []
+        s.policyCategories = fleetVM.policyCategoryMap
+        s.configProfiles = fleetVM.configProfilesState.value ?? []
+        s.profileCategories = fleetVM.configProfileCategoryMap
+        s.scripts = fleetVM.scriptsState.value ?? []
+        s.packages = fleetVM.packagesState.value ?? []
+        s.smartGroups = fleetVM.groupsState.value ?? []
+        s.blueprints = Array(platformVM.blueprintStatuses.values)
+        s.complianceRules = platformVM.benchmarkResultsState.value?.rules ?? []
+        s.digests = digestService.entries
+        let index = FleetKnowledgeIndex.build(profile: profileService.selectedProfile.name, from: s)
+        FleetKnowledgeStore.shared.replace(with: index, persist: !isDemoMode)
+    }
+
     func loadMainData() {
         // Cancel any in-flight load so stale results from a previous profile don't land.
         currentLoadTask?.cancel()
@@ -300,7 +327,11 @@ final class AppEnvironment {
                 // Start enrichment and digest only after the main sync completes so they
                 // don't add concurrent CLI processes on top of the 10 sync tasks.
                 self.fleetVM.startPostSyncEnrichment()
-                Task { await self.digestService.runIfNeeded() }
+                self.rebuildFleetIndex()
+                Task {
+                    await self.digestService.runIfNeeded()
+                    self.rebuildFleetIndex()   // include today's digest
+                }
             }
         case .protect:
             syncStepLabels = ["Overview", "Computers", "Plans", "Analytics", "Analytic Sets", "Exception Sets"]
@@ -518,6 +549,8 @@ final class AppEnvironment {
             do {
                 try await cliManager.verifyConnection()
                 Self.logger.info("Instance switch verified — loading data for \(profileName, privacy: .private)")
+                // Another Jamf instance: don't let Dashie search the previous one's data.
+                FleetKnowledgeStore.shared.clear()
                 loadMainData()
                 profileSwitchCount += 1
             } catch {
