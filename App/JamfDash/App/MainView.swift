@@ -158,7 +158,7 @@ struct MainView: View {
                   SidebarItem.items(for: env.currentProduct).contains(item) else { return }
             selection = item
             NSApp.activate()
-            NSApp.windows.first { $0.identifier?.rawValue.hasPrefix("AppWindow") == true }?
+            NSApp.windows.first { $0.title != "Jamf Dash Help" && $0.isVisible && $0.canBecomeMain }?
                 .makeKeyAndOrderFront(nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToSidebarItem)) { notification in

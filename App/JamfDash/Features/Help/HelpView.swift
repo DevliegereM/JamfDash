@@ -66,12 +66,43 @@ struct HelpView: View {
     @State private var tab: HelpTab = .getStarted
     @State private var selection: String?
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
     private let navigator = HelpNavigator.shared
 
     private var searchResults: [HelpTopic] { HelpSearch.search(query) }
     private var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
+        VStack(spacing: 0) {
+            tabBar
+            Divider()
+            splitView
+        }
+        .navigationTitle("Jamf Dash Help")
+        .frame(minWidth: 820, minHeight: 520)
+        // ⌘F is the app-wide "Focus Search" command; in the Help window it searches Help.
+        .onReceive(NotificationCenter.default.publisher(for: .focusSearch)) { _ in
+            if NSApp.keyWindow?.title == "Jamf Dash Help" { searchFocused = true }
+        }
+    }
+
+    /// Tabs across the full window width so all five always fit (a toolbar picker would
+    /// overflow into the » menu at narrow widths).
+    private var tabBar: some View {
+        Picker("Help section", selection: $tab) {
+            ForEach(HelpTab.allCases) { t in
+                Text(t.title).tag(t)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+    }
+
+    private var splitView: some View {
         NavigationSplitView {
             sidebar
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
@@ -84,20 +115,7 @@ struct HelpView: View {
             }
         }
         .searchable(text: $query, placement: .sidebar, prompt: "Search Help")
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Help section", selection: $tab) {
-                    ForEach(HelpTab.allCases) { t in
-                        Label(t.title, systemImage: t.symbol).tag(t)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelStyle(.titleOnly)
-                .help("Help sections")
-            }
-        }
-        .navigationTitle("Jamf Dash Help")
-        .frame(minWidth: 820, minHeight: 520)
+        .modifier(SearchFocusModifier(focused: $searchFocused))
         .onAppear {
             applyRequest()
             if selection == nil { selection = HelpLibrary.sections(in: tab).first?.topics.first?.id }
@@ -216,6 +234,7 @@ struct HelpTopicView: View {
                         Label("Open \(item.title)", systemImage: "arrow.up.forward.app")
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityLabel("Open \(item.title)")
                 }
 
                 if !related.isEmpty {
@@ -225,6 +244,7 @@ struct HelpTopicView: View {
                         ForEach(related) { other in
                             Button(other.title) { select(other.id) }
                                 .buttonStyle(.link)
+                                .accessibilityLabel(other.title)
                         }
                     }
                 }
@@ -233,7 +253,6 @@ struct HelpTopicView: View {
             .frame(maxWidth: 680, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .textSelection(.enabled)
     }
 }
 
@@ -245,6 +264,7 @@ private struct HelpBlockView: View {
         case .text(let s):
             Text(LocalizedStringKey(s))
                 .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         case .steps(let steps):
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
@@ -264,6 +284,7 @@ private struct HelpBlockView: View {
         case .note(let s):
             Label {
                 Text(LocalizedStringKey(s)).fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
             } icon: {
                 Image(systemName: "info.circle").foregroundStyle(.blue)
             }
@@ -282,6 +303,20 @@ private struct HelpBlockView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+
+/// `searchFocused` needs macOS 15; on macOS 14 ⌘F simply doesn't move focus.
+private struct SearchFocusModifier: ViewModifier {
+    var focused: FocusState<Bool>.Binding
+
+    func body(content: Content) -> some View {
+        if #available(macOS 15, *) {
+            content.searchFocused(focused)
+        } else {
+            content
         }
     }
 }
