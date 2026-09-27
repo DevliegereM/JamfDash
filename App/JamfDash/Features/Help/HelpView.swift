@@ -102,20 +102,27 @@ struct HelpView: View {
         .background(.bar)
     }
 
+    /// Sidebar and topic page side by side. A plain split (not NavigationSplitView) so no
+    /// column reserves a hidden toolbar area under the tab bar and covers the page's title.
     private var splitView: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 340)
-        } detail: {
-            if let id = selection, let topic = HelpLibrary.topic(id: id) {
-                HelpTopicView(topic: topic) { selection = $0 }
-            } else {
-                ContentUnavailableView("Choose a Topic", systemImage: "questionmark.circle",
-                                       description: Text("Pick a topic in the sidebar or search Help."))
+        HSplitView {
+            VStack(spacing: 0) {
+                searchField
+                sidebar
             }
+            .frame(minWidth: 220, idealWidth: 260, maxWidth: 340)
+
+            Group {
+                if let id = selection, let topic = HelpLibrary.topic(id: id) {
+                    HelpTopicView(topic: topic) { selection = $0 }
+                } else {
+                    ContentUnavailableView("Choose a Topic", systemImage: "questionmark.circle",
+                                           description: Text("Pick a topic in the sidebar or search Help."))
+                }
+            }
+            .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.001))
         }
-        .searchable(text: $query, placement: .sidebar, prompt: "Search Help")
-        .modifier(SearchFocusModifier(focused: $searchFocused))
         .onAppear {
             applyRequest()
             if selection == nil { selection = HelpLibrary.sections(in: tab).first?.topics.first?.id }
@@ -132,6 +139,30 @@ struct HelpView: View {
         }
     }
 
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Search Help", text: $query)
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+                .onSubmit {
+                    if let first = searchResults.first { selection = first.id }
+                }
+            if !query.isEmpty {
+                Button { query = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 7))
+        .padding(10)
+    }
+
     private func applyRequest() {
         if let q = navigator.requestedQuery, !q.isEmpty {
             query = q
@@ -144,12 +175,17 @@ struct HelpView: View {
         }
     }
 
-    @ViewBuilder
     private var sidebar: some View {
+        sidebarContent.listStyle(.sidebar)
+    }
+
+    @ViewBuilder
+    private var sidebarContent: some View {
         if isSearching {
             let results = searchResults
             if results.isEmpty {
                 ContentUnavailableView.search(text: query)
+                    .frame(maxHeight: .infinity)
             } else {
                 List(selection: $selection) {
                     ForEach(HelpTab.allCases) { t in
@@ -303,20 +339,6 @@ private struct HelpBlockView: View {
                     }
                 }
             }
-        }
-    }
-}
-
-
-/// `searchFocused` needs macOS 15; on macOS 14 ⌘F simply doesn't move focus.
-private struct SearchFocusModifier: ViewModifier {
-    var focused: FocusState<Bool>.Binding
-
-    func body(content: Content) -> some View {
-        if #available(macOS 15, *) {
-            content.searchFocused(focused)
-        } else {
-            content
         }
     }
 }
