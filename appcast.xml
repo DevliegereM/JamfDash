@@ -9,6 +9,48 @@
     <language>en</language>
 
     <item>
+            <title>0.9</title>
+            <pubDate>Sun, 27 Sep 2026 23:01:28 +0200</pubDate>
+            <sparkle:version>20260927.7</sparkle:version>
+            <sparkle:shortVersionString>0.9</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Enrollment: see what happens when a Mac enrolls
+
+The **Enrollment** section now shows how new Macs are set up, step by step. It has three tabs in the title bar: **Recent Enrollments**, **Flow** and **Tokens & PreStages**.
+
+- **Recent Enrollments** — the Macs that enrolled in the last 7, 30 or 90 days, each with a status badge. Select a Mac to see its timeline: every MDM command, configuration profile, policy and app install since enrollment, in order, with the time after enrollment. Routine inventory commands are hidden unless you turn them on.
+- **Needs Attention** — failed commands and policies, and commands that are **stuck** (pending 4 hours or more while the Mac has checked in since), at the top of each Mac. **Send Blank Push…** asks a stuck Mac to check in.
+- **Profiles** — compares the profiles a Mac should have (from its PreStage and profile scopes) with what's installed: installed, failed, pending, missing, not scoped, or installed without being scoped.
+- **Policies & Apps** — the Mac's policy logs, enrollment policies that haven't run yet, and app and package installs.
+- **Flow** — pick a PreStage to see what a new Mac gets: ADE assignment, Setup Assistant panes, MDM enrollment, PreStage profiles and packages, configuration profiles, enrollment policies, App Installers and the first inventory. Each item is marked **certain** (in the PreStage or scoped to All Computers) or **conditional** (depends on smart group membership).
+- **Jamf Setup Manager** — when a profile configures Setup Manager, its steps appear in the Flow with the policies each trigger runs, and on each Mac with the result from its policy logs. With several Setup Manager profiles, choose one in **Settings → Enrollment**.
+- **From Device Lookup** — **Enrollment Timeline** in a Mac's MDM Command History opens its timeline.
+- If Jamf Pro has already removed early history (Log Flushing), the timeline says so.
+
+Everything in this section is read-only and kept in memory; nothing is stored on disk.
+
+## Dashie
+
+- **New: explain an enrollment** — ask "What happened when C02XA001 enrolled?" or "Why didn't Wi-Fi install on the new Mac?" and Dashie summarises the Mac's enrollment, failures and stuck commands.
+- Bulk enabling and disabling policies is now one action (enable a category, or disable by name pattern), so Dashie keeps the same number of tools.
+
+## Improvements & Fixes
+
+- **Device Lookup** by serial number failed on current Jamf Pro versions ("Invalid value of request parameter: section") because it asked for sections Jamf Pro no longer has. Fixed; this also fixes Dashie's Mac details and installed apps. User & Location now reads the current field names.
+- jamf-cli errors show the actual error instead of a deprecation warning printed before it.
+
+## Requirements
+
+macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.31.1 or later. The enrollment timeline needs read access to computer inventory, MDM commands and computer history; the Flow needs read access to PreStages, policies and configuration profiles.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash_v0.9.zip" length="9615002" type="application/octet-stream" sparkle:edSignature="gTmKt/Tr9isivqCByX1+sbY/W/zFjMjDvMQAYwAiU5CBqnyvFz8zyE1/thS9eoZWIQBtjYnK5Ge4hgNE9vgzBg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.5.delta" sparkle:deltaFrom="20260927.5" length="1734046" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="kmoEx9cce0HsG3FTfbxUW2Ta7G/R5Z3G0lZ1g9PF/X0p2L+j5DhFAAZ6NPljhw5ehT+GFrTVOiT/bARrcaKVBg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="1872270" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="79Xamrz39FHyR1GSXvg3eeNIjkJ8fBSvVpLvnAi6giQPnc+rClYnav4SxX84X4h2JAbJ9gEWhknxQZpnwkdTDw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="1947946" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="5Ojmax+lWT0y0wakHo1Ft2g1sr7bwaV8IlLKABZ+py/ok1QUapXohSfr7bLBWE09HzJKq/5AkkhWk9bOM2+uCA=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.8.2</title>
             <pubDate>Sun, 27 Sep 2026 16:46:57 +0200</pubDate>
             <sparkle:version>20260927.5</sparkle:version>
