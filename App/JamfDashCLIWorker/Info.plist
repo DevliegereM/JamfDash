@@ -22,6 +22,10 @@
 	<dict>
 		<key>ServiceType</key>
 		<string>Application</string>
+		<!-- Run in the app's security session: jamf-cli reads its credentials from the
+		     login keychain, which a fresh session can't reach (errSecInteractionNotAllowed). -->
+		<key>JoinExistingSession</key>
+		<true/>
 	</dict>
 </dict>
 </plist>
