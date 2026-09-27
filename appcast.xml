@@ -9,6 +9,33 @@
     <language>en</language>
 
     <item>
+            <title>0.8.1</title>
+            <pubDate>Sun, 27 Sep 2026 13:28:14 +0200</pubDate>
+            <sparkle:version>20260927.2</sparkle:version>
+            <sparkle:shortVersionString>0.8.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[## Automatic updates
+
+- **Settings → Updates** — choose whether Jamf Dash checks for new versions automatically. When on (the default), it checks once a day and asks before installing. Turn on **Download and install updates automatically** to have updates downloaded in the background and installed when you quit Jamf Dash. **Check for Updates Now** and the last check time are there too.
+- Previously Jamf Dash only checked when you chose **Check for Updates…** unless you had accepted Sparkle's one-time prompt.
+
+## Overview — Health & Alerts
+
+- **Identical alerts are grouped** — instead of the same line repeated for every alert, you see it once with a count, for example "Patch extension attribute issue ×5".
+- **What each alert is about and how to fix it** — below the table, Jamf Pro's alerts are grouped by kind, with the affected items when Jamf Pro names them (such as the patch software titles) and the steps to resolve them. For "Patch extension attribute issue": in Jamf Pro, open Settings → Computer management → Patch Management, select each affected software title and accept its extension attribute.
+
+## Fixes
+
+- **Settings → Developer** is laid out like the other tabs: section headers and descriptions no longer run into each other or get cut off, and the Terminal commands and Console instructions are tucked into collapsible sections.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash_v0.8.1.zip" length="8782112" type="application/octet-stream" sparkle:edSignature="IVDjL430AM7juGDUrEW8hUKKt8Q82nOWtlONeqRpYVekV/0h5zzD4cTnwyujiJAC3KN7afgjwGafP0kVMhh5DA=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="883110" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="cdtPUG08BM+roF93PnKF8IX9KBq8tAgm67bxxkGT7ChGgLty8nlCAsRxTLru70qbntHER2lHT7aWkun4O/9WBg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1648954" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="oSrjPQEOHVf0YZkyq1O0WYjRP9tRq0/lM8+gmfzboJchePsM097wejEK/H9csN9317JAWKQfeT7Obmn4dSeoBQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="1664474" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YM/MLxo2Cizz7n2W4KgclYswq/I9glEzLadklbGYL0bpZzfUYOM/ioeTADLFjZQG20bh04NGuds7ychlxS5GBw=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.8</title>
             <pubDate>Sun, 27 Sep 2026 13:02:39 +0200</pubDate>
             <sparkle:version>20260927.1</sparkle:version>
