@@ -37,6 +37,8 @@
 	<string>https://github.com/DevliegereM/JamfDash/releases/latest/download/appcast.xml</string>
 	<key>SURequireSignedFeed</key>
 	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>SUPublicEDKey</key>
 	<string>NyVmezEHuA07O6hVYV64fvpQ0RCF8A6yiSdFsxO+Log=</string>
 </dict>

@@ -47,6 +47,7 @@ targets:
         NSHumanReadableCopyright: "Copyright © 2026 Michiel Devliegere"
         SUFeedURL: "https://github.com/DevliegereM/JamfDash/releases/latest/download/appcast.xml"
         SURequireSignedFeed: true
+        SUVerifyUpdateBeforeExtraction: true
         SUPublicEDKey: "NyVmezEHuA07O6hVYV64fvpQ0RCF8A6yiSdFsxO+Log="
     entitlements:
       path: JamfDash/JamfDash.entitlements
