@@ -489,9 +489,20 @@ sudo tee /Library/Preferences/Logging/Subsystems/com.jamfdash.plist > /dev/null 
 EOF
 ```
 
-Remove it when done — it applies to all users on the machine. For fleet-managed Macs, install the included `JamfDash-Debug-Logging.mobileconfig` instead; it scopes the same setting to an MDM enrollment and can be removed remotely.
+Remove it when done — it applies to all users on the machine, and while it's installed every private value in Jamf Dash's logs (server addresses, serials, names) is readable by anyone who can read the log. The included `JamfDash-Debug-Logging.mobileconfig` only turns on debug-level messages for fleet-managed Macs; it keeps private values hidden.
 
 ---
+
+## Privacy, security and problem reports
+
+- Jamf Dash has no analytics or tracking. See [PRIVACY.md](PRIVACY.md) for what's stored and which servers the app talks to.
+- Report security problems privately: see [SECURITY.md](SECURITY.md).
+- Report other problems with **Help → Report a Problem…** in the app. You review every file (with server addresses, serials and names replaced) before sending it by email or opening a GitHub issue.
+- Jamf Dash is available in English only.
+
+## Not affiliated with Jamf
+
+Jamf Dash is an independent project. It isn't made, endorsed or supported by Jamf. Jamf, Jamf Pro, Jamf Protect and Jamf School are trademarks of JAMF Software, LLC. Jamf Dash uses [jamf-cli](https://github.com/Jamf-Concepts/jamf-cli) and [Sparkle](https://sparkle-project.org); see **Jamf Dash → About Jamf Dash** for acknowledgements.
 
 ## License
 

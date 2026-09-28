@@ -19,6 +19,8 @@ struct SettingsInspectorView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
+                .help("Refresh")
+                .accessibilityLabel("Refresh")
                 .disabled(vm.selfServiceState.isLoading || vm.checkInState.isLoading)
             }
         }
@@ -80,6 +82,7 @@ private struct InspectorKeyValueTable: View {
                     }
                     .buttonStyle(.borderless)
                     .help("Copy value")
+                    .accessibilityLabel("Copy \(pair.key)")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)

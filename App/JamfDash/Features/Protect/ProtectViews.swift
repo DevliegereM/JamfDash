@@ -246,6 +246,7 @@ struct ProtectInsightsView: View {
                     TableColumn("Managed") { item in
                         Image(systemName: item.managed == true ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(item.managed == true ? .green : .secondary)
+                            .accessibilityLabel(item.managed == true ? "Managed" : "Not managed")
                     }
                 }
                 .onChange(of: selectedID) { _, newID in
@@ -408,7 +409,7 @@ private struct AnalyticDetailSheet: View {
 
             case .failed(let msg):
                 VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange).accessibilityHidden(true)
                     Text("Could not load details").font(.headline)
                     Text(msg).font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center).frame(maxWidth: 300)
@@ -487,7 +488,7 @@ private struct ExceptionSetDetailSheet: View {
             case .failed(let msg):
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 36)).foregroundStyle(.orange)
+                        .font(.system(size: 36)).foregroundStyle(.orange).accessibilityHidden(true)
                     Text("Could not load details").font(.headline)
                     Text(msg).font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center).frame(maxWidth: 300)
@@ -546,7 +547,7 @@ private struct ULFDetailSheet: View {
 
             case .failed(let msg):
                 VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange)
+                    Image(systemName: "exclamationmark.triangle").font(.system(size: 36)).foregroundStyle(.orange).accessibilityHidden(true)
                     Text("Could not load details").font(.headline)
                     Text(msg).font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center).frame(maxWidth: 300)
@@ -609,7 +610,7 @@ private struct ProtectComputerDetailSheet: View {
             case .failed(let msg):
                 VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 36)).foregroundStyle(.orange)
+                        .font(.system(size: 36)).foregroundStyle(.orange).accessibilityHidden(true)
                     Text("Could not load details").font(.headline)
                     Text(msg).font(.caption).foregroundStyle(.secondary)
                         .multilineTextAlignment(.center).frame(maxWidth: 300)
@@ -745,6 +746,7 @@ private func protectEmptyState(icon: String, label: String) -> some View {
         Image(systemName: icon)
             .font(.system(size: 36))
             .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
         Text(label)
             .foregroundStyle(.secondary)
             .multilineTextAlignment(.center)
@@ -788,6 +790,7 @@ struct ProtectUnifiedLoggingView: View {
                         if let enabled = entry.enabled {
                             Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(enabled ? .green : .secondary)
+                                .accessibilityLabel(enabled ? "Enabled" : "Disabled")
                         } else {
                             Text("—").foregroundStyle(.secondary)
                         }
@@ -969,6 +972,7 @@ private func protectNamedEntryList(state: LoadState<[ProtectNamedEntry]>,
                     if let enabled = entry.enabled {
                         Image(systemName: enabled ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(enabled ? .green : .secondary)
+                            .accessibilityLabel(enabled ? "Enabled" : "Disabled")
                     } else {
                         Text("—").foregroundStyle(.secondary)
                     }

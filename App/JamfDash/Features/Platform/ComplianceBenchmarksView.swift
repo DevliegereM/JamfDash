@@ -789,6 +789,7 @@ private struct BenchmarkRuleRow: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(expanded ? "Hide details" : "Show details")
                 }
             }
 

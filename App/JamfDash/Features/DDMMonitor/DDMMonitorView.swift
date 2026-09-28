@@ -300,6 +300,9 @@ struct DDMDeviceStatusTableView: View {
                         .frame(maxWidth: 200)
                     Text("\(vm.deviceStatusProgress.done) of \(vm.deviceStatusProgress.total) devices")
                         .font(.caption).foregroundStyle(.secondary)
+                } else if vm.statusScanSkipped > 0 {
+                    Text("Showing the first \(DDMMonitorViewModel.statusScanLimit) devices; \(vm.statusScanSkipped) more not scanned. Use Per Device for the others.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
             }

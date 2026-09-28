@@ -1270,6 +1270,7 @@ private struct DeveloperTab: View {
                         }
                         .buttonStyle(.plain)
                         .help("Copy path to clipboard")
+                        .accessibilityLabel("Copy config file path")
                     }
                 }
             } header: {
@@ -1458,6 +1459,7 @@ private struct DeveloperTab: View {
                 }
                 .buttonStyle(.plain)
                 .help("Copy to clipboard")
+                .accessibilityLabel("Copy command")
             }
             .padding(8)
             .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))

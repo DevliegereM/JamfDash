@@ -64,6 +64,7 @@ struct JamfSecurityView: View {
                     Image(systemName: "sidebar.right")
                 }
                 .help(showInspector ? "Hide inspector" : "Show device detail")
+                .accessibilityLabel(showInspector ? "Hide inspector" : "Show device detail")
                 .disabled(selectedDevice == nil)
 
                 refreshToolbarItem
@@ -187,6 +188,7 @@ struct JamfSecurityView: View {
             Image(systemName: "arrow.clockwise")
         }
         .help("Refresh Security Cloud data")
+        .accessibilityLabel("Refresh")
     }
 }
 

@@ -59,6 +59,7 @@ struct DevicesView: View {
                     Button { vm.searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }.buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
                 if vm.canAskInPlainLanguage {
                     Button { ask() } label: {
@@ -418,6 +419,7 @@ struct DevicesView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.plain)
+                                .accessibilityLabel("Close OS version filter")
                             }
                             .padding(.horizontal, 16).padding(.vertical, 10)
                             .background(Color.primary.opacity(0.04))

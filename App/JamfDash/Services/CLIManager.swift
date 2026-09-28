@@ -249,7 +249,8 @@ enum CLICommand: Sendable {
 
         // DDM Monitor
         case .ddmStatusItems(let managementId): return ["pro", "ddm-status", "status-items", "-o", "json", "--", managementId]
-        case .ddmComputers: return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "-o", "json"]
+        // Same request as .computers, so a sync that loads both downloads the inventory once.
+        case .ddmComputers: return CLICommand.computers.baseArguments
 
         // Blueprints
         case .blueprints:                          return ["pro", "bp", "list", "-o", "json"]
@@ -411,7 +412,7 @@ enum CLICommand: Sendable {
 
         // Enrollment flow & timeline (appended)
         case .recentEnrollments:
-            return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "-o", "json"]
+            return CLICommand.computers.baseArguments
         case .enrollmentInventory(let s):
             return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s),
                     "--section", "GENERAL", "--section", "HARDWARE", "--section", "USER_AND_LOCATION",
@@ -976,8 +977,20 @@ actor CLIManager: CLIRunning {
             logger.fault("Refused an unconfirmed action: \(command.risk.rawValue, privacy: .public)")
             throw CLIError.actionNotConfirmed
         }
-        return try await runJamfCLI(command.baseArguments, timeout: command.timeout)
+        // Identical reads running at the same time (e.g. the inventory for Devices, DDM and
+        // Enrollment during a sync) share one jamf-cli run.
+        let profile = profileService.selectedProfile
+        let key = ([profile.name] + command.baseArguments).joined(separator: "\u{1F}")
+        if let running = inFlightReads[key] { return try await running.value }
+        let args = command.baseArguments
+        let timeout = command.timeout
+        let task = Task { try await self.runJamfCLI(args, timeout: timeout, profile: profile) }
+        inFlightReads[key] = task
+        defer { inFlightReads[key] = nil }
+        return try await task.value
     }
+
+    private var inFlightReads: [String: Task<Data, Error>] = [:]
 
     func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
         guard isBinaryInstalled else { throw CLIError.binaryMissing }

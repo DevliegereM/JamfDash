@@ -107,6 +107,7 @@ struct AIAssistantInnerView: View {
             }
             .buttonStyle(.plain)
             .help("Prompting tips")
+            .accessibilityLabel("Prompting tips")
             .popover(isPresented: $showingHelp, arrowEdge: .top) {
                 HelpPopover()
             }

@@ -29,6 +29,7 @@ struct MobileDevicesView: View {
                     Button { vm.searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }.buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 12)
@@ -259,6 +260,7 @@ struct MobileDevicesView: View {
                                 Button { selectedOSVersion = nil } label: {
                                     Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                                 }.buttonStyle(.plain)
+                                .accessibilityLabel("Close \(version) devices")
                             }
                             .padding(.horizontal, 16).padding(.vertical, 10)
                             .background(Color.primary.opacity(0.04))

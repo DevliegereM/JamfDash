@@ -84,15 +84,16 @@ struct JamfDashApp: App {
             }
 
             CommandMenu("Navigate") {
-                ForEach(1...9, id: \.self) { index in
-                    Button("Item \(index)") {
+                let items = Array(SidebarItem.items(for: env.currentProduct).prefix(9).enumerated())
+                ForEach(items, id: \.offset) { index, item in
+                    Button(item.title) {
                         NotificationCenter.default.post(
                             name: .navigateToSidebarItem,
                             object: nil,
-                            userInfo: ["index": index - 1]
+                            userInfo: ["index": index]
                         )
                     }
-                    .keyboardShortcut(KeyEquivalent(Character(String(index))), modifiers: .command)
+                    .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
                 }
             }
 

@@ -30,7 +30,7 @@
 		<false/>
 	</dict>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 Jamf Dash</string>
+	<string>Copyright © 2026 Michiel Devliegere</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>

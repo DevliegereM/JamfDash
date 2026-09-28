@@ -44,7 +44,7 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
         LSApplicationCategoryType: "public.app-category.utilities"
-        NSHumanReadableCopyright: "Copyright © 2026 Jamf Dash"
+        NSHumanReadableCopyright: "Copyright © 2026 Michiel Devliegere"
         SUFeedURL: "https://github.com/DevliegereM/JamfDash/releases/latest/download/appcast.xml"
         SURequireSignedFeed: true
         SUPublicEDKey: "NyVmezEHuA07O6hVYV64fvpQ0RCF8A6yiSdFsxO+Log="

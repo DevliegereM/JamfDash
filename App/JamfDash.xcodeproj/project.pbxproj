@@ -125,6 +125,7 @@
 		D621CF428DDC1E3FCF0300DB /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C12273E515071ACE087C7BF /* MainView.swift */; };
 		D7955D8F525F31204E80EE05 /* ProtectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD9E1C7BDF2FE95296B6228 /* ProtectViewModel.swift */; };
 		D882F91D3C6CBEE8AA2E6211 /* DDMModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7FB80ABB94D6A8BD9C86799 /* DDMModels.swift */; };
+		D97BE2CFEBB9F8BEDA0D7313 /* Credits.html in Resources */ = {isa = PBXBuildFile; fileRef = 8E7FF2FC166D82633A01DEF0 /* Credits.html */; };
 		D9C8693AC9FD1FD5D4D73FAB /* CorrelationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F32EF194DD97E394ACA8B55 /* CorrelationView.swift */; };
 		DB2FE90347DCC6051EC79147 /* UpdateReadinessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5540969548238B221C48B1B /* UpdateReadinessView.swift */; };
 		DC7E4B155F66E1FBDFF83F0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB8B40B6D7FB2B01CCB191F7 /* SettingsView.swift */; };
@@ -259,6 +260,7 @@
 		8BE7D76996F833E0E179A7B9 /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
 		8BEF82B756863B2E4A0892B3 /* EnrollmentTimelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EnrollmentTimelineTests.swift; sourceTree = "<group>"; };
 		8D62B4AB84EBA1823F7502C7 /* JamfSecurityViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfSecurityViewModel.swift; sourceTree = "<group>"; };
+		8E7FF2FC166D82633A01DEF0 /* Credits.html */ = {isa = PBXFileReference; includeInIndex = 1; path = Credits.html; sourceTree = "<group>"; };
 		8F9A6C85EB10ABC52D4CDAD4 /* JamfDashCLIWorker.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = JamfDashCLIWorker.entitlements; sourceTree = "<group>"; };
 		8FC3CDE86DBB84D39F9FF3BD /* FleetKnowledgeIndex.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FleetKnowledgeIndex.swift; sourceTree = "<group>"; };
 		906EBC992866D89B797DECBD /* AIAssistantView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIAssistantView.swift; sourceTree = "<group>"; };
@@ -496,6 +498,7 @@
 				2F2BF3A6FDFD2DC1A173B613 /* Services */,
 				B32BD77625B75C114CB70043 /* UI */,
 				069341E99477BB0B5F61922C /* ViewModels */,
+				8E7FF2FC166D82633A01DEF0 /* Credits.html */,
 			);
 			path = JamfDash;
 			sourceTree = "<group>";
@@ -918,6 +921,7 @@
 				1219FBA89D26E321BE583D67 /* Assets.xcassets in Resources */,
 				21F25C265070C14A1DBF120F /* PrivacyInfo.xcprivacy in Resources */,
 				CC33A94530162F5A001378C2 /* JamfDash.icon in Resources */,
+				D97BE2CFEBB9F8BEDA0D7313 /* Credits.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

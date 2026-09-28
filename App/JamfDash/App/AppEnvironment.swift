@@ -220,6 +220,7 @@ final class AppEnvironment {
         self.currentProduct = profileService.currentProduct
         IntentCLIProvider.current = cliManager
         refreshActiveProfileAuth()
+        fleetVM.categoryCacheURL = instanceDir.appendingPathComponent("categories.json")
     }
 
     // MARK: - Demo init
@@ -642,6 +643,7 @@ final class AppEnvironment {
     private func useInstanceStorage(for profileName: String) {
         let dir = InstanceStorage.directory(forProfile: profileName)
         digestService.use(storageURL: dir.appendingPathComponent("digests.json"))
+        fleetVM.categoryCacheURL = dir.appendingPathComponent("categories.json")
         driftVM.use(store: .forProfile(profileName))
         correlationVM.reset()
     }

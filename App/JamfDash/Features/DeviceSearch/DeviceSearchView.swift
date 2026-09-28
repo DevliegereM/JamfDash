@@ -54,6 +54,7 @@ struct DeviceSearchView: View {
                     Button { vm.clearSearch() } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }.buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 12)
@@ -1051,6 +1052,7 @@ struct CopyButton: View {
         }
         .buttonStyle(.plain)
         .help("Copy to clipboard")
+        .accessibilityLabel(copied ? "Copied" : "Copy")
     }
 }
 

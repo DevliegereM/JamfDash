@@ -51,6 +51,7 @@ struct SchoolDevicesView: View {
                     if let managed = $0.managed {
                         Image(systemName: managed ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .foregroundStyle(managed ? .green : .red)
+                            .accessibilityLabel(managed ? "Managed" : "Not managed")
                     } else {
                         Text("—").foregroundStyle(.secondary)
                     }

@@ -103,6 +103,10 @@ final class DDMMonitorViewModel {
 
     private let cli: any CLIRunning
     private static let statusScanConcurrency = 6
+    /// The status scan makes one jamf-cli call per device, so large fleets are capped.
+    static let statusScanLimit = 500
+    /// Devices left out of the last status scan because of `statusScanLimit`.
+    private(set) var statusScanSkipped = 0
 
     init(cli: any CLIRunning, deprecationScanner: ProfileDeprecationScanner? = nil) {
         self.cli = cli
@@ -213,10 +217,14 @@ final class DDMMonitorViewModel {
         guard force || deviceStatusState.value == nil else { return }
         guard !deviceStatusState.isLoading else { return }
         if devicesState.value == nil { await load() }
-        guard let devices = devicesState.value else {
+        guard let allDevices = devicesState.value else {
             deviceStatusState = .failed(devicesState.errorMessage ?? "No DDM devices loaded")
             return
         }
+        // Macs with DDM turned off report no status items; skip them, then cap the rest.
+        let candidates = allDevices.filter { $0.ddmEnabled != false }
+        let devices = Array(candidates.prefix(Self.statusScanLimit))
+        statusScanSkipped = candidates.count - devices.count
         deviceStatusState = .loading
         deviceStatusProgress = (0, devices.count)
         let cli = self.cli

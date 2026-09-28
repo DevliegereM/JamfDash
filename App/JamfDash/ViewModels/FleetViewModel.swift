@@ -46,12 +46,21 @@ final class FleetViewModel {
 
     private let repository: FleetRepository
 
+    /// Where category lookups are cached for the current instance; nil keeps them in
+    /// memory only (demo mode).
+    var categoryCacheURL: URL? {
+        didSet { categoryCache = CategoryCache.load(from: categoryCacheURL) }
+    }
+    private var categoryCache = CategoryCache()
+
     init(repository: FleetRepository) {
         self.repository = repository
     }
 
     func loadAll(force: Bool = false) async {
         let start = Date()
+        // A forced refresh looks up every category again.
+        if force { categoryCache = CategoryCache() }
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.loadPolicies(force: force, suppressEnrichment: true) }
             group.addTask { await self.loadGroups(force: force) }
@@ -66,24 +75,45 @@ final class FleetViewModel {
 
     /// Triggers category back-fill for policies and config profiles using already-loaded state.
     /// Called after a sync group completes so enrichment doesn't race with the main data load.
+    ///
+    /// Categories looked up in the last day are reused, so a sync only fetches details for
+    /// new policies and profiles instead of one per item every time.
     func startPostSyncEnrichment() {
+        if !categoryCache.isFresh { categoryCache = CategoryCache() }
         if let policies = policiesState.value {
             let uncategorized = policies.filter { $0.category == nil }
             if !uncategorized.isEmpty {
+                let cached = categoryCache.policies.filter { id, _ in uncategorized.contains { $0.id == id } }
+                let missing = uncategorized.filter { cached[$0.id] == nil }
+                policyCategoryMap = cached
                 policyCategoryTask?.cancel()
                 policyCategoryTask = Task {
-                    let map = await repository.fetchPolicyCategoryMap(for: uncategorized)
-                    if !Task.isCancelled { policyCategoryMap = map }
+                    let fetched = missing.isEmpty ? [:] : await repository.fetchPolicyCategoryMap(for: missing)
+                    guard !Task.isCancelled else { return }
+                    policyCategoryMap = cached.merging(fetched) { _, new in new }
+                    categoryCache.policies = policyCategoryMap
+                    saveCategoryCache()
                 }
             }
         }
         if let profiles = configProfilesState.value {
+            let cached = categoryCache.profiles.filter { id, _ in profiles.contains { $0.id == id } }
+            let missing = profiles.filter { cached[$0.id] == nil }
+            configProfileCategoryMap = cached
             profileCategoryTask?.cancel()
             profileCategoryTask = Task {
-                let map = await repository.fetchConfigProfileCategoryMap(for: profiles)
-                if !Task.isCancelled { configProfileCategoryMap = map }
+                let fetched = missing.isEmpty ? [:] : await repository.fetchConfigProfileCategoryMap(for: missing)
+                guard !Task.isCancelled else { return }
+                configProfileCategoryMap = cached.merging(fetched) { _, new in new }
+                categoryCache.profiles = configProfileCategoryMap
+                saveCategoryCache()
             }
         }
+    }
+
+    private func saveCategoryCache() {
+        if categoryCache.savedAt == .distantPast { categoryCache.savedAt = Date() }
+        categoryCache.save(to: categoryCacheURL)
     }
 
     func loadPolicies(force: Bool = false, suppressEnrichment: Bool = false) async {
@@ -653,5 +683,26 @@ private extension Array {
         return stride(from: 0, to: count, by: size).map {
             Array(self[$0 ..< Swift.min($0 + size, count)])
         }
+    }
+}
+
+/// Policy and profile categories looked up from their details, kept for a day.
+struct CategoryCache: Codable {
+    var savedAt = Date.distantPast
+    var policies: [Int: String] = [:]
+    var profiles: [Int: String] = [:]
+
+    var isFresh: Bool { Date().timeIntervalSince(savedAt) < 86_400 }
+
+    static func load(from url: URL?) -> CategoryCache {
+        guard let url, let data = try? Data(contentsOf: url),
+              let cache = try? JSONDecoder().decode(CategoryCache.self, from: data), cache.isFresh
+        else { return CategoryCache() }
+        return cache
+    }
+
+    func save(to url: URL?) {
+        guard let url, let data = try? JSONEncoder().encode(self) else { return }
+        try? data.write(to: url, options: .atomic)
     }
 }

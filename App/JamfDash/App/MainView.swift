@@ -193,6 +193,7 @@ struct MainView: View {
                             .symbolEffect(.bounce, value: env.notificationCount)
                     }
                     .help("\(env.notificationCount) system notification(s)")
+                    .accessibilityLabel("\(env.notificationCount) system notifications")
                     .popover(isPresented: $showNotificationPopover) {
                         NotificationPanelView(notifications: env.notificationsState.value ?? [])
                     }
