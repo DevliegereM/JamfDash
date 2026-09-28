@@ -42,7 +42,7 @@ actor XPCCLIExecutor: CLIExecuting {
             return try await fallback.execute(binary: binary, arguments: arguments, environment: environment,
                                               stdinData: stdinData, timeout: timeout)
         }
-        return try await call { proxy, reply in
+        return try await call(deadline: timeout + 15) { proxy, reply in
             proxy.execute(
                 binaryPath: binary.path,
                 arguments: arguments,
@@ -65,7 +65,7 @@ actor XPCCLIExecutor: CLIExecuting {
             return try await fallback.executeScripted(binary: binary, arguments: arguments, environment: environment,
                                                       rules: rules, timeout: timeout)
         }
-        return try await call { proxy, reply in
+        return try await call(deadline: timeout + 15) { proxy, reply in
             proxy.executeScripted(
                 binaryPath: binary.path,
                 arguments: arguments,
@@ -95,7 +95,7 @@ actor XPCCLIExecutor: CLIExecuting {
 
     private func ping() async -> Bool {
         do {
-            let data = try await call { proxy, reply in
+            let data = try await call(deadline: 5) { proxy, reply in
                 proxy.ping { ok in reply(ok ? Data([1]) : nil, nil) }
             }
             return data == Data([1])
@@ -109,12 +109,20 @@ actor XPCCLIExecutor: CLIExecuting {
     /// Obtains a proxy whose error handler fails the call, then hands it to `body` with a
     /// reply block. A once-flag guarantees the continuation is resumed exactly once, even
     /// when the service crashes mid-call and both the error handler and reply fire.
+    /// `deadline` covers a worker that never replies: the call then fails with a timeout
+    /// and the connection is dropped (the worker's own timeout stops jamf-cli).
     private func call(
+        deadline: TimeInterval,
         body: (any CLIWorkerXPCProtocol, @escaping @Sendable (Data?, NSError?) -> Void) -> Void
     ) async throws -> Data {
         let conn = try validConnection()
         return try await withCheckedThrowingContinuation { continuation in
             let once = OnceFlag()
+            DispatchQueue.global().asyncAfter(deadline: .now() + deadline) { [weak self] in
+                guard once.claim() else { return }
+                continuation.resume(throwing: CLIError.timeout)
+                Task { await self?.invalidate() }
+            }
             let proxy = conn.remoteObjectProxyWithErrorHandler { [weak self] error in
                 if once.claim() {
                     continuation.resume(throwing: CLIError.launchFailed(

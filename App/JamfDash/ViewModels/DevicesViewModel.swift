@@ -401,22 +401,31 @@ final class DevicesViewModel {
         actionName: String,
         devices: [(name: String, serial: String)]
     ) async {
+        guard !isBulkRunning else { return }
         isBulkRunning = true
         var results: [BulkActionResult] = []
+        let cli = self.cli
+        // At most this many jamf-cli processes at once.
+        let limit = 4
         await withTaskGroup(of: BulkActionResult.self) { group in
-            for device in devices {
-                let serial = device.serial
-                let name   = device.name
+            var pending = devices[...]
+            func addNext() {
+                guard let device = pending.popFirst() else { return }
                 group.addTask {
                     do {
-                        _ = try await self.cli.run(makeCommand(serial))
-                        return BulkActionResult(deviceName: name, serial: serial, success: true, message: "Success")
+                        _ = try await cli.runConfirmed(makeCommand(device.serial))
+                        return BulkActionResult(deviceName: device.name, serial: device.serial, success: true, message: "Success")
                     } catch {
-                        return BulkActionResult(deviceName: name, serial: serial, success: false, message: error.localizedDescription)
+                        return BulkActionResult(deviceName: device.name, serial: device.serial, success: false,
+                                                message: ErrorMessageFormatter.message(for: error))
                     }
                 }
             }
-            for await result in group { results.append(result) }
+            for _ in 0..<limit { addNext() }
+            for await result in group {
+                results.append(result)
+                addNext()
+            }
         }
         results.sort { $0.deviceName < $1.deviceName }
         isBulkRunning = false

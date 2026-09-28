@@ -34,7 +34,9 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/DevliegereM/JamfDash/main/appcast.xml</string>
+	<string>https://github.com/DevliegereM/JamfDash/releases/latest/download/appcast.xml</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
 	<key>SUPublicEDKey</key>
 	<string>NyVmezEHuA07O6hVYV64fvpQ0RCF8A6yiSdFsxO+Log=</string>
 </dict>

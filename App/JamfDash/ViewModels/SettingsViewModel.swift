@@ -70,6 +70,17 @@ final class SettingsViewModel {
     // MARK: - Callbacks wired by AppEnvironment.makeSettingsVM()
 
     var onProfilesChanged: (() -> Void)?
+    /// Called after a connection's permission for destructive actions changes.
+    var onActionPermissionChanged: (() -> Void)?
+
+    func allowsDestructiveActions(for profile: String) -> Bool {
+        profileService.allowsDestructiveActions(for: profile)
+    }
+
+    func setAllowsDestructiveActions(_ allowed: Bool, for profile: String) {
+        profileService.setAllowsDestructiveActions(allowed, for: profile)
+        onActionPermissionChanged?()
+    }
     var onProfileSwitched: ((String) -> Void)?
 
     private let cliManager: CLIManager

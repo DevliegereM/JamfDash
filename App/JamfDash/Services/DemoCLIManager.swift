@@ -2,7 +2,7 @@ import Foundation
 
 /// A mock implementation of CLIRunning that returns realistic-looking demo data
 /// without requiring a real Jamf instance or a jamf-cli binary.
-struct DemoCLIManager: CLIRunning, Sendable {
+struct DemoCLIManager: SimulatedCLI, Sendable {
 
     func run(_ command: CLICommand) async throws -> Data {
         // Brief simulated latency so loading states are visible
@@ -113,6 +113,9 @@ struct DemoCLIManager: CLIRunning, Sendable {
         case .softwareUpdateStatuses:    return softwareUpdateStatusesJSON
         case .computersUpdateReadiness:  return computersUpdateReadinessJSON
         case .installedApps:             return installedAppsJSON
+        case .deviceIdentity(let serial):
+            let clean = CLICommand.sanitizedSerial(serial)
+            return #"{"totalCount":1,"results":[{"id":"1","general":{"name":"Demo Mac \#(clean)","lastContactTime":"2026-09-27T08:12:00Z"},"hardware":{"model":"MacBook Pro (14-inch, 2024)","serialNumber":"\#(clean)"}}]}"#
         case .blueprints:                return blueprintsJSON
         case .complianceBenchmarks:      return complianceBenchmarksJSON
         case .buildings:                 return buildingsJSON

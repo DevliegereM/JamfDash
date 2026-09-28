@@ -165,7 +165,7 @@ final class EnrollmentFlowViewModel {
             }
             prefetchBadges(list)
         } catch {
-            Self.logger.error("Recent enrollments failed: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Recent enrollments failed: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)")
             recentState = .failed(EnrollmentRepository.message(for: error))
         }
     }
@@ -308,7 +308,7 @@ final class EnrollmentFlowViewModel {
     func blankPush() async {
         guard let serial = timelineState.value?.device.serial else { return }
         do {
-            _ = try await repository.cli.run(.blankPush(serial: serial))
+            _ = try await repository.cli.runConfirmed(.blankPush(serial: serial))
             actionMessage = "Blank push sent to \(serial). Reload the timeline after the Mac checks in."
         } catch {
             actionMessage = "Blank push failed: \(EnrollmentRepository.message(for: error))"

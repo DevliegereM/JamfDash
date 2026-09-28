@@ -273,7 +273,7 @@ final class MacOS27ReadinessTests: XCTestCase {
 #if canImport(FoundationModels)
 import FoundationModels
 
-private struct NoCLI: CLIRunning {
+private struct NoCLI: SimulatedCLI {
     func run(_ command: CLICommand) async throws -> Data { Data() }
     func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data { Data() }
 }
@@ -283,8 +283,8 @@ final class DashieToolTests: XCTestCase {
 
     @MainActor
     func testToolNamesAreUniqueAndMatchSystemPrompt() {
-        let names = AIAssistantViewModel.tools(cli: NoCLI()).map(\.name)
-        let prompt = AIAssistantViewModel.systemPrompt
+        let names = AIAssistantViewModel.tools(cli: NoCLI(), actionsEnabled: true).map(\.name)
+        let prompt = AIAssistantViewModel.prompt(actionsEnabled: true)
         XCTAssertEqual(Set(names).count, names.count, "tool names must be unique")
         for name in names {
             XCTAssertTrue(prompt.contains(name), "system prompt doesn't mention \(name)")
@@ -367,7 +367,7 @@ final class DigestTests: XCTestCase {
 
 #if canImport(FoundationModels)
 /// Returns small canned JSON for any command so tool calls succeed.
-private struct CannedCLI: CLIRunning {
+private struct CannedCLI: SimulatedCLI {
     func run(_ command: CLICommand) async throws -> Data {
         Data("""
             {"totalCount": 2, "results": [
@@ -487,6 +487,9 @@ final class DashieToolRoutingEvals: XCTestCase {
         var confirmations: [String] = []
         DashieToolConfirmation.testOverride = { title in confirmations.append(title); return false }
         defer { DashieToolConfirmation.testOverride = nil }
+        let actionsWereEnabled = UserDefaults.standard.bool(forKey: DashieActions.enabledKey)
+        UserDefaults.standard.set(true, forKey: DashieActions.enabledKey)
+        defer { UserDefaults.standard.set(actionsWereEnabled, forKey: DashieActions.enabledKey) }
 
         var passed = 0
         var report: [String] = []
@@ -618,7 +621,7 @@ final class OnDeviceModelProbe: XCTestCase {
             var transforms: Int { lock.withLock { _transforms } }
         }
         let rec = Recorder()
-        let tools = await AIAssistantViewModel.tools(cli: CannedCLI())
+        let tools = await AIAssistantViewModel.tools(cli: CannedCLI(), actionsEnabled: true)
         let session = LanguageModelSession(profile: LanguageModelSession.Profile {
             Instructions("You are Dashie. Use tools to answer questions about Macs.")
             tools

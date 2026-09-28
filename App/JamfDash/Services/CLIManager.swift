@@ -22,6 +22,8 @@ enum CLICommand: Sendable {
     case computers
     case computerDetail(serial: String)
     case computerDetailById(id: String)
+    /// Name, model and last check-in of the Macs with this serial, to confirm an action.
+    case deviceIdentity(serial: String)
     /// One Mac's installed applications (inventory APPLICATIONS section).
     case installedApps(serial: String)
     case smartGroupDetail(id: String)
@@ -241,6 +243,7 @@ enum CLICommand: Sendable {
         case .computers:                          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "-o", "json"]
         case .computerDetail(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "STORAGE", "--section", "DISK_ENCRYPTION", "--section", "SECURITY", "--section", "USER_AND_LOCATION", "--section", "PURCHASING", "--section", "GROUP_MEMBERSHIPS", "--section", "LOCAL_USER_ACCOUNTS", "--section", "SOFTWARE_UPDATES", "--section", "CONFIGURATION_PROFILES", "--section", "EXTENSION_ATTRIBUTES", "-o", "json"]
         case .computerDetailById(let id):         return ["pro", "computers-inventory", "get", "-o", "json", "--", id]
+        case .deviceIdentity(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "-o", "json"]
         case .installedApps(let s):               return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "APPLICATIONS", "-o", "json"]
         case .smartGroupDetail(let id):           return ["pro", "smart-computer-groups", "get", "-o", "json", "--", id]
 
@@ -525,8 +528,36 @@ extension CLICommand {
 
 
 protocol CLIRunning: Sendable {
+    /// Runs a read command. Commands that change something need `run(_:confirmation:)`.
     func run(_ command: CLICommand) async throws -> Data
     func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data
+    /// Records that the person confirmed this exact action on the current connection.
+    /// Call it only from the handler of a confirmation the person answered. Throws when
+    /// the connection doesn't allow the action.
+    func confirm(_ command: CLICommand) async throws -> ActionConfirmation
+    /// Runs an action confirmed with `confirm(_:)`. Each confirmation works once, for the
+    /// same command and connection, within two minutes.
+    func run(_ command: CLICommand, confirmation: ActionConfirmation) async throws -> Data
+}
+
+/// Demo mode and test doubles: they send nothing to Jamf, so confirmations are accepted
+/// as given. `CLIManager` doesn't adopt this and enforces them itself.
+protocol SimulatedCLI: CLIRunning {}
+
+extension SimulatedCLI {
+    func confirm(_ command: CLICommand) async throws -> ActionConfirmation {
+        ActionConfirmation(id: UUID())
+    }
+
+    func run(_ command: CLICommand, confirmation: ActionConfirmation) async throws -> Data {
+        try await run(command)
+    }
+}
+
+/// Proof that the person confirmed one action. Only `CLIManager` can redeem it: it keeps
+/// the list of confirmations it handed out.
+struct ActionConfirmation: Sendable, Hashable {
+    let id: UUID
 }
 
 // MARK: - CLIManager Actor
@@ -566,11 +597,16 @@ actor CLIManager: CLIRunning {
     /// otherwise in-process. `defaults write be.devliegere.JamfDash UseInProcessCLI -bool YES`
     /// forces in-process execution for troubleshooting.
     static func defaultExecutor() -> any CLIExecuting {
-        if XPCCLIExecutor.isWorkerEmbedded && !UserDefaults.standard.bool(forKey: "UseInProcessCLI") {
+        #if DEBUG
+        let forceInProcess = UserDefaults.standard.bool(forKey: "UseInProcessCLI")
+        #else
+        let forceInProcess = false
+        #endif
+        if XPCCLIExecutor.isWorkerEmbedded && !forceInProcess {
             Logger(subsystem: "com.jamfdash", category: "CLIManager").info("Using CLI worker XPC service")
-            return XPCCLIExecutor(fallback: CLIExecutor())
+            return XPCCLIExecutor(fallback: CLIExecutor(runningCheck: CodeSignatureVerifier.verifyRunningJamfCLI))
         }
-        return CLIExecutor()
+        return CLIExecutor(runningCheck: CodeSignatureVerifier.verifyRunningJamfCLI)
     }
 
     // MARK: - Minimum jamf-cli version
@@ -887,7 +923,7 @@ actor CLIManager: CLIRunning {
         let result = try await body()
         if let previous {
             do { try config.setDefaultProfile(previous) }
-            catch { logger.error("Could not restore jamf-cli default profile: \(error.localizedDescription, privacy: .public)") }
+            catch { logger.error("Could not restore jamf-cli default profile: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)") }
         }
         return result
     }
@@ -936,15 +972,75 @@ actor CLIManager: CLIRunning {
 
     func run(_ command: CLICommand) async throws -> Data {
         guard isBinaryInstalled else { throw CLIError.binaryMissing }
-        if case .lock(let serial, let pin) = command {
-            return try await lockComputer(serial: serial, pin: pin)
+        guard command.risk == .read else {
+            logger.fault("Refused an unconfirmed action: \(command.risk.rawValue, privacy: .public)")
+            throw CLIError.actionNotConfirmed
         }
         return try await runJamfCLI(command.baseArguments, timeout: command.timeout)
     }
 
     func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
         guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        guard command.risk == .read else { throw CLIError.actionNotConfirmed }
         return try await runJamfCLI(command.arguments(outputFormat: outputFormat), timeout: command.timeout)
+    }
+
+    // MARK: - Confirmed actions
+
+    private struct PendingAction {
+        let arguments: [String]
+        let profile: JamfProfile
+        let expires: Date
+    }
+    private var pendingActions: [UUID: PendingAction] = [:]
+
+    func confirm(_ command: CLICommand) async throws -> ActionConfirmation {
+        let profile = profileService.selectedProfile
+        try checkAllowed(command, profile: profile)
+        let now = Date()
+        pendingActions = pendingActions.filter { $0.value.expires > now }
+        let id = UUID()
+        pendingActions[id] = PendingAction(arguments: command.baseArguments, profile: profile,
+                                           expires: now.addingTimeInterval(120))
+        return ActionConfirmation(id: id)
+    }
+
+    func run(_ command: CLICommand, confirmation: ActionConfirmation) async throws -> Data {
+        guard isBinaryInstalled else { throw CLIError.binaryMissing }
+        guard let pending = pendingActions.removeValue(forKey: confirmation.id),
+              pending.expires > Date(),
+              pending.arguments == command.baseArguments else {
+            throw CLIError.actionNotConfirmed
+        }
+        // The action goes to the connection it was confirmed on, or nowhere.
+        guard pending.profile == profileService.selectedProfile else { throw CLIError.instanceChanged }
+        try checkAllowed(command, profile: pending.profile)
+        logger.notice("Running a confirmed \(String(describing: command.risk), privacy: .public) action")
+        if case .lock(let serial, let pin) = command {
+            return try await lockComputer(serial: serial, pin: pin, profile: pending.profile)
+        }
+        // jamf-cli picks a record by serial; with duplicates it's unclear which one an erase
+        // would hit, so destructive Mac actions need exactly one match.
+        switch command {
+        case .erase(let serial), .removeMDM(let serial), .clearRecoveryLock(let serial):
+            let lookup = try await runJamfCLI(CLICommand.deviceIdentity(serial: serial).baseArguments,
+                                              timeout: 60, profile: pending.profile)
+            let count = Self.recordCount(in: lookup)
+            guard count == 1 else {
+                throw CLIError.nonZeroExit(code: -1, stderr: count == 0
+                    ? "No computer with serial \(serial) was found. Nothing was sent."
+                    : "\(count) computers have serial \(serial), so nothing was sent. Use Jamf Pro for this one.")
+            }
+        default:
+            break
+        }
+        return try await runJamfCLI(command.baseArguments, timeout: command.timeout, profile: pending.profile)
+    }
+
+    private func checkAllowed(_ command: CLICommand, profile: JamfProfile) throws {
+        if command.risk == .destructive, !profileService.allowsDestructiveActions(for: profile.name) {
+            throw CLIError.actionNotAllowed
+        }
     }
 
     /// Runs jamf-cli with the selected profile. If the profile still points at the retired
@@ -952,10 +1048,11 @@ actor CLIManager: CLIRunning {
     private func runJamfCLI(
         _ commandArgs: [String],
         timeout: TimeInterval,
+        profile fixedProfile: JamfProfile? = nil,
         allowGatewayFix: Bool = true,
         allowTokenRefresh: Bool = true
     ) async throws -> Data {
-        let profile = profileService.selectedProfile
+        let profile = fixedProfile ?? profileService.selectedProfile
         let args = profile.isDefault ? commandArgs : ["--profile", profile.name] + commandArgs
         logger.debug("Running: jamf-cli \(args.joined(separator: " "), privacy: .private)")
         do {
@@ -975,7 +1072,7 @@ actor CLIManager: CLIRunning {
             guard (try? migrateRetiredGateway(profile: profile, to: newURL)) == true else {
                 throw CLIError.nonZeroExit(code: code, stderr: message)
             }
-            return try await runJamfCLI(commandArgs, timeout: timeout, allowGatewayFix: false,
+            return try await runJamfCLI(commandArgs, timeout: timeout, profile: profile, allowGatewayFix: false,
                                         allowTokenRefresh: allowTokenRefresh)
         } catch CLIError.nonZeroExit(let code, let message)
             where allowTokenRefresh && JamfCLIErrorPayload(output: message)?.isPermissionDenied == true {
@@ -984,10 +1081,10 @@ actor CLIManager: CLIRunning {
             guard await refreshPlatformToken(profile: profile) else {
                 throw CLIError.nonZeroExit(code: code, stderr: message)
             }
-            return try await runJamfCLI(commandArgs, timeout: timeout, allowGatewayFix: false,
+            return try await runJamfCLI(commandArgs, timeout: timeout, profile: profile, allowGatewayFix: false,
                                         allowTokenRefresh: false)
         } catch {
-            logger.error("jamf-cli failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("jamf-cli failed: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)")
             throw error
         }
     }
@@ -1024,11 +1121,10 @@ actor CLIManager: CLIRunning {
 
     /// Locks a Mac with the user's PIN. Resolves the device's management ID from its
     /// serial, then queues a DEVICE_LOCK command with the PIN in the request body.
-    private func lockComputer(serial: String, pin: String) async throws -> Data {
+    private func lockComputer(serial: String, pin: String, profile: JamfProfile) async throws -> Data {
         guard pin.count == 6, pin.allSatisfy(\.isASCII), pin.allSatisfy(\.isNumber) else {
             throw CLIError.nonZeroExit(code: -1, stderr: "The lock PIN must be exactly 6 digits.")
         }
-        let profile = profileService.selectedProfile
         let profileArgs = profile.isDefault ? [] : ["--profile", profile.name]
 
         let lookup = try await executor.execute(
@@ -1058,6 +1154,12 @@ actor CLIManager: CLIRunning {
             stdinData: bodyData,
             timeout: CLICommand.lock(serial: serial, pin: pin).timeout
         )
+    }
+
+    /// Number of records in a `computers-inventory list` response (bare array or `results`).
+    static func recordCount(in data: Data) -> Int {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        return ((json as? [Any]) ?? ((json as? [String: Any])?["results"] as? [Any]) ?? []).count
     }
 
     /// Extracts `general.managementId` from a `computers-inventory list` response,
@@ -1103,7 +1205,7 @@ actor CLIManager: CLIRunning {
         }
         // Jamf Dash manages jamf-cli updates itself.
         result["JAMF_CLI_NO_UPDATE_CHECK"] = "1"
-        return result
+        return CLIExecutor.allowedEnvironment(result)
     }
 
     private func createDirectoriesIfNeeded() throws {
@@ -1131,5 +1233,11 @@ extension CLIRunning {
     func run(_ command: CLICommand, outputFormat: ReportOutputFormat) async throws -> Data {
         // Default implementation: ignore format, return same as JSON
         return try await run(command)
+    }
+
+    /// Confirms and runs in one step, for handlers of a confirmation the person answered.
+    func runConfirmed(_ command: CLICommand) async throws -> Data {
+        let confirmation = try await confirm(command)
+        return try await run(command, confirmation: confirmation)
     }
 }

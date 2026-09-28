@@ -12,6 +12,8 @@ struct JamfDashApp: App {
     @State private var appState: AppState
 
     init() {
+        // A jamf-cli that exits before reading stdin must not kill the app.
+        signal(SIGPIPE, SIG_IGN)
         // Apply debug logging before ANY other initialisation so that the very
         // first log message in this init() is already captured at debug level.
         // Supports three activation paths:

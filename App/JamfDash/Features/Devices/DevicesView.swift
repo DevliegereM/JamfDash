@@ -7,6 +7,14 @@ struct DevicesView: View {
     @State private var selectedTab = 0
     @State private var selectedOSVersion: String? = nil
     @State private var selectedDeviceIDs: Set<Computer.ID> = []
+    @State private var pendingBulk: PendingBulkAction?
+
+    private struct PendingBulkAction: Identifiable {
+        let id = UUID()
+        let name: String
+        let makeCommand: @Sendable (String) -> CLICommand
+        let devices: [(name: String, serial: String)]
+    }
     @State private var sortOrder: [KeyPathComparator<Computer>] = []
     @State private var exportError: String? = nil
     @State private var refreshTask: Task<Void, Never>? = nil
@@ -214,6 +222,16 @@ struct DevicesView: View {
                 bulkActionBar
             }
         }
+        .alert(pendingBulk.map { "\($0.name) on \($0.devices.count) Mac\($0.devices.count == 1 ? "" : "s")?" } ?? "",
+               isPresented: Binding(get: { pendingBulk != nil }, set: { if !$0 { pendingBulk = nil } }),
+               presenting: pendingBulk) { action in
+            Button(action.name) { runPendingBulk(action) }
+            Button("Cancel", role: .cancel) {}
+        } message: { action in
+            let names = action.devices.prefix(5).map(\.name).joined(separator: ", ")
+            let more = action.devices.count > 5 ? " and \(action.devices.count - 5) more" : ""
+            Text("This sends \(action.name) to \(names)\(more).")
+        }
         .sheet(item: $vm.bulkActionSummary) { summary in
             BulkActionResultSheet(summary: summary)
                 .onDisappear { vm.clearBulkActionSummary() }
@@ -261,8 +279,13 @@ struct DevicesView: View {
                 guard let s = d.serialNumber, !s.isEmpty else { return nil }
                 return (name: d.name, serial: s)
             }
+        guard !devices.isEmpty else { return }
+        pendingBulk = PendingBulkAction(name: name, makeCommand: makeCmd, devices: devices)
+    }
+
+    private func runPendingBulk(_ action: PendingBulkAction) {
         Task {
-            await vm.runBulkAction(makeCmd, actionName: name, devices: devices)
+            await vm.runBulkAction(action.makeCommand, actionName: action.name, devices: action.devices)
             selectedDeviceIDs = []
         }
     }

@@ -47,7 +47,7 @@ final class AppState {
                 try await env.cliManager.ensureMinimumVersion()
             } catch {
                 // Onboarding's install step updates jamf-cli and shows the error if it fails again.
-                Self.logger.error("jamf-cli below \(CLIManager.minimumCLIVersion, privacy: .public) and update failed: \(error.localizedDescription, privacy: .public)")
+                Self.logger.error("jamf-cli below \(CLIManager.minimumCLIVersion, privacy: .public) and update failed: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)")
                 updateError = error.localizedDescription
                 phase = .onboarding
                 return

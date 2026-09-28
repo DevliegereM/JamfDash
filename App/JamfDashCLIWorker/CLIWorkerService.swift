@@ -8,7 +8,7 @@ import Security
 /// itself holds no mutable state of its own.
 @objc final class CLIWorkerService: NSObject, CLIWorkerXPCProtocol, @unchecked Sendable {
 
-    private let executor = CLIExecutor()
+    private let executor = CLIExecutor(runningCheck: CodeSignatureVerifier.verifyRunningJamfCLI)
 
     // NSXPCConnection delivers reply blocks on an arbitrary thread and is internally
     // thread-safe, so lifting them into a Sendable context is safe.
@@ -104,6 +104,8 @@ import Security
             reply(nil, CLIWorkerError.nsError(code: .untrustedBinary, description: error.localizedDescription))
             return
         }
+        // Only the variables jamf-cli needs, whatever the app sent.
+        let environment = CLIExecutor.allowedEnvironment(environment)
         do {
             let output: Data
             switch mode {

@@ -587,7 +587,11 @@ private struct MarkdownText: View {
         let opts = AttributedString.MarkdownParsingOptions(
             interpretedSyntax: .inlineOnlyPreservingWhitespace
         )
-        let attr = (try? AttributedString(markdown: s, options: opts)) ?? AttributedString(s)
+        var attr = (try? AttributedString(markdown: s, options: opts)) ?? AttributedString(s)
+        // Answers can repeat names from Jamf Pro, so links aren't clickable; the text stays.
+        for run in attr.runs where run.link != nil {
+            attr[run.range].link = nil
+        }
         return Text(attr)
     }
 

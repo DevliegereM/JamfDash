@@ -27,6 +27,7 @@ final class ServiceDelegate: NSObject, NSXPCListenerDelegate {
     }
 }
 
+signal(SIGPIPE, SIG_IGN)
 let delegate = ServiceDelegate()
 let listener = NSXPCListener.service()
 listener.delegate = delegate

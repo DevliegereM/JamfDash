@@ -6,7 +6,7 @@ struct DeviceSearchView: View {
     @FocusState private var isSearchFocused: Bool
 
     private var isDestructiveAllowed: Bool {
-        env.currentScope == .fullAdmin
+        env.allowsDestructiveActions
     }
 
     var body: some View {
@@ -699,7 +699,7 @@ struct DeviceActionsPanel: View {
                     }
                 }
 
-                // Destructive actions — Full Admin only, locked behind explicit unlock
+                // Destructive actions — only when the connection allows them, behind an explicit unlock
                 if isDestructiveAllowed {
                     if destructiveUnlocked {
                         HStack(spacing: 8) {

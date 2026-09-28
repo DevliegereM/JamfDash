@@ -29,6 +29,32 @@ actor CLIVersionStore {
         supportDirectory.appendingPathComponent("bin/jamf-cli")
     }
 
+    /// Release tags look like `v1.31.1` or `1.31.1-beta.2`. Anything else (for example a
+    /// tag with `/` or `..`) is refused, because tags become folder names.
+    static func isValidTag(_ tag: String) -> Bool {
+        tag.range(of: #"^v?[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z0-9.]{1,32})?$"#,
+                  options: .regularExpression) != nil
+    }
+
+    /// Replaces `destination` with a copy of `source` in one step: the copy is made next to
+    /// the destination and renamed over it, so a failure never leaves a missing or
+    /// half-written binary.
+    static func installAtomically(from source: URL, to destination: URL) throws {
+        let fm = FileManager.default
+        let temp = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(destination.lastPathComponent).\(UUID().uuidString).tmp")
+        try fm.copyItem(at: source, to: temp)
+        do {
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: temp.path)
+            guard rename(temp.path, destination.path) == 0 else {
+                throw CLIError.downloadFailed("Couldn't install jamf-cli: \(String(cString: strerror(errno)))")
+            }
+        } catch {
+            try? fm.removeItem(at: temp)
+            throw error
+        }
+    }
+
     private var versionsDirectory: URL {
         supportDirectory.appendingPathComponent("bin/versions", isDirectory: true)
     }
@@ -47,7 +73,7 @@ actor CLIVersionStore {
             return []
         }
         return items
-            .filter { !$0.hasPrefix(".") }
+            .filter { !$0.hasPrefix(".") && Self.isValidTag($0) }
             .sorted { lhs, rhs in
                 let l = lhs.hasPrefix("v") ? String(lhs.dropFirst()) : lhs
                 let r = rhs.hasPrefix("v") ? String(rhs.dropFirst()) : rhs
@@ -81,27 +107,23 @@ actor CLIVersionStore {
 
     /// Copies the active binary into the versioned slot. Called after a fresh download.
     func install(version: String) throws {
+        guard Self.isValidTag(version) else { throw CLIError.versionNotFound(version) }
         let fm = FileManager.default
         let dest = versionBinaryURL(version)
         try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if fm.fileExists(atPath: dest.path) { try fm.removeItem(at: dest) }
-        try fm.copyItem(at: activeBinaryURL, to: dest)
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+        try Self.installAtomically(from: activeBinaryURL, to: dest)
         logger.info("Stored jamf-cli \(version) in version archive")
     }
 
     /// Overwrites the active binary from a versioned slot.
     func activate(version: String) throws {
+        guard Self.isValidTag(version) else { throw CLIError.versionNotFound(version) }
         let src = versionBinaryURL(version)
         guard FileManager.default.fileExists(atPath: src.path) else {
             throw CLIError.versionNotFound(version)
         }
         try CodeSignatureVerifier.verifyJamfCLI(at: src)
-        let fm = FileManager.default
-        let active = activeBinaryURL
-        if fm.fileExists(atPath: active.path) { try fm.removeItem(at: active) }
-        try fm.copyItem(at: src, to: active)
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: active.path)
+        try Self.installAtomically(from: src, to: activeBinaryURL)
         logger.info("Activated jamf-cli \(version)")
     }
 

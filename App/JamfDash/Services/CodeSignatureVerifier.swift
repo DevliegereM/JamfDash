@@ -25,6 +25,27 @@ enum CodeSignatureVerifier {
         try verify(at: url, requirement: jamfCLIRequirement)
     }
 
+    /// Checks the running process `pid` — the code the kernel actually loaded — against
+    /// `jamfCLIRequirement`. Run before anything is sent to the process, so a binary
+    /// replaced between the file check and the launch never receives input.
+    static func verifyRunningJamfCLI(pid: pid_t) throws {
+        var code: SecCode?
+        let attributes = [kSecGuestAttributePid: NSNumber(value: pid)] as CFDictionary
+        var status = SecCodeCopyGuestWithAttributes(nil, attributes, [], &code)
+        guard status == errSecSuccess, let code else {
+            throw CLIError.untrustedBinary(message(for: status, fallback: "cannot read the running jamf-cli"))
+        }
+        var requirement: SecRequirement?
+        status = SecRequirementCreateWithString(jamfCLIRequirement as CFString, [], &requirement)
+        guard status == errSecSuccess, let requirement else {
+            throw CLIError.untrustedBinary(message(for: status, fallback: "invalid signing requirement"))
+        }
+        status = SecCodeCheckValidity(code, [], requirement)
+        guard status == errSecSuccess else {
+            throw CLIError.untrustedBinary(message(for: status, fallback: "the running jamf-cli isn't signed by Jamf"))
+        }
+    }
+
     static func verify(at url: URL, requirement requirementText: String) throws {
         var staticCode: SecStaticCode?
         var status = SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode)

@@ -348,6 +348,7 @@ struct MobileDeviceDetailSheet: View {
     let device: MobileDevice
     @Bindable var vm: MobileDevicesViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppEnvironment.self) private var env
     @State private var confirmAction: ConfirmableAction? = nil
     @State private var showConfirm = false
     @State private var lostModeSerial: LostModeTarget? = nil
@@ -478,18 +479,23 @@ struct MobileDeviceDetailSheet: View {
                 ForEach(moderateActions, id: \.0) { label, cmd in
                     actionButton(label: label, cmd: cmd, tint: .orange, isDestructive: false)
                 }
-                Button("Enable Lost Mode…") { lostModeSerial = LostModeTarget(serial: serial) }
-                    .buttonStyle(.bordered)
-                    .tint(.orange)
-                    .controlSize(.small)
-                    .disabled(vm.isActionRunning)
             }
 
             Text("Destructive").font(.caption.weight(.semibold)).foregroundStyle(.red).padding(.top, 4)
-            HStack(spacing: 8) {
-                ForEach(destructiveActions, id: \.0) { label, cmd in
-                    actionButton(label: label, cmd: cmd, tint: .red, isDestructive: true)
+            if env.allowsDestructiveActions {
+                FlowLayout(spacing: 8) {
+                    Button("Enable Lost Mode…") { lostModeSerial = LostModeTarget(serial: serial) }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .controlSize(.small)
+                        .disabled(vm.isActionRunning)
+                    ForEach(destructiveActions, id: \.0) { label, cmd in
+                        actionButton(label: label, cmd: cmd, tint: .red, isDestructive: true)
+                    }
                 }
+            } else {
+                Text("Turned off for this connection. Turn on destructive actions in Settings → Connection.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }

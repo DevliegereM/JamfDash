@@ -19,12 +19,13 @@
             <dict>
                 <key>com.jamfdash</key>
                 <dict>
-                    <key>Enable-Private-Data</key>
-                    <true/>
-                    <key>Default-Privacy-Level</key>
-                    <string>Public</string>
-                    <key>Debug-Mode</key>
-                    <string>enable</string>
+                    <key>Level</key>
+                    <dict>
+                        <key>Enable</key>
+                        <string>Debug</string>
+                        <key>Persist</key>
+                        <string>Info</string>
+                    </dict>
                 </dict>
             </dict>
         </dict>
@@ -32,7 +33,7 @@
     <key>PayloadDisplayName</key>
     <string>JamfDash Debug Logging</string>
     <key>PayloadDescription</key>
-    <string>Enables private data visibility and debug-level messages for the com.jamfdash subsystem. Install on a Mac running JamfDash to reveal redacted log values (e.g. jamf-cli arguments) via `log stream`. Remove when debugging is complete.</string>
+    <string>Enables debug-level messages for the com.jamfdash subsystem. Private values (server addresses, serials, names, jamf-cli output) stay redacted. Remove when debugging is complete.</string>
     <key>PayloadIdentifier</key>
     <string>com.jamfdash.debug-logging</string>
     <key>PayloadOrganization</key>

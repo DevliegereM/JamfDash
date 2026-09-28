@@ -620,7 +620,7 @@ final class EnrollmentDemoTests: XCTestCase {
 /// Runs the timeline against a real Jamf Pro instance through jamf-cli (read-only commands).
 /// Skipped unless `TEST_RUNNER_JAMFDASH_LIVE_SERIAL` (and optionally `…_LIVE_PROFILE`) are set.
 final class EnrollmentLiveProbeTests: XCTestCase {
-    private struct ShellCLI: CLIRunning {
+    private struct ShellCLI: SimulatedCLI {
         let profile: String?
         func run(_ command: CLICommand) async throws -> Data {
             let binary = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

@@ -72,10 +72,12 @@ extension AIAssistantViewModel {
 
     // Tools are a static factory so the availability-guarded types stay out of the
     // stored-property requirement on the ViewModel.
-    static func tools(cli: any CLIRunning) -> [any Tool] { toolList(cli: cli) }
+    static func tools(cli: any CLIRunning, actionsEnabled: Bool = DashieActions.isEnabled) -> [any Tool] {
+        toolList(cli: cli, actionsEnabled: actionsEnabled)
+    }
 
-    nonisolated static func toolList(cli: any CLIRunning) -> [any Tool] {
-        [
+    nonisolated static func toolList(cli: any CLIRunning, actionsEnabled: Bool = DashieActions.isEnabled) -> [any Tool] {
+        let read: [any Tool] = [
             // Read
             ListComputersTool(cli: cli),
             GetComputerDetailTool(cli: cli),
@@ -90,7 +92,10 @@ extension AIAssistantViewModel {
             ExplainEnrollmentTool(cli: cli),
             SearchFleetKnowledgeTool(),
             SearchHelpTool(),
-            // Actions
+        ]
+        // Actions are only offered to the model when the person turned them on.
+        guard actionsEnabled else { return read }
+        return read + [
             BlankPushTool(cli: cli),
             RenewMDMProfileTool(cli: cli),
             RedeployFrameworkTool(cli: cli),
@@ -300,8 +305,9 @@ extension AIAssistantViewModel {
 
     /// Instructions for a new session: the system prompt plus the summary of earlier turns.
     private var currentInstructions: String {
-        guard let summary = conversationSummary, !summary.isEmpty else { return Self.systemPrompt }
-        return Self.systemPrompt + "\n\n## Earlier in this conversation\n" + summary
+        let base = Self.prompt(actionsEnabled: DashieActions.isEnabled)
+        guard let summary = conversationSummary, !summary.isEmpty else { return base }
+        return base + "\n\n## Earlier in this conversation\n" + summary
     }
 
     /// Transcript text handed to the summariser. Kept well inside the on-device context
@@ -409,6 +415,23 @@ extension AIAssistantViewModel {
 
     // MARK: - System prompt
 
+    /// The system prompt with the action tools listed, or a note that they're off.
+    static func prompt(actionsEnabled: Bool) -> String {
+        systemPrompt + "\n\n" + (actionsEnabled ? actionsPrompt : actionsOffPrompt)
+    }
+
+    static let actionsPrompt = """
+        Actions, only when the user asks for them: blankPush, renewMDMProfile, \
+        redeployFramework, flushFailedCommands, restartDevice, \
+        bulkSetPolicies (enable a category, or disable by name pattern).
+        """
+
+    static let actionsOffPrompt = """
+        Actions (blank push, restart, renew MDM, redeploy, flush commands, enabling or \
+        disabling policies) are turned off. If the user asks for one, say they can turn \
+        actions on in Settings → Dashie, or use Device Lookup.
+        """
+
     static let systemPrompt = """
         You are Dashie, an AI assistant for Jamf Dash (Jamf Pro fleet management). \
         Help admins manage their fleet. You cannot create/update/delete Jamf Pro objects — \
@@ -431,9 +454,6 @@ extension AIAssistantViewModel {
         searchFleetKnowledge
         • How to use Jamf Dash, where something is, setup, permissions or errors in the app: \
         searchHelp — answer from its result and name where to find it (e.g. Settings → Updates)
-        • Actions, only when the user asks for them: blankPush, renewMDMProfile, \
-        redeployFramework, flushFailedCommands, restartDevice, \
-        bulkSetPolicies (enable a category, or disable by name pattern)
 
         Rules: call tools only when needed, at most two per answer — for example \
         listComputers with nameContains to find a serial, then getComputerDetail. \

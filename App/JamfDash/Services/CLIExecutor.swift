@@ -5,6 +5,16 @@ import OSLog
 /// Wraps Foundation.Process; the single place in the app that spawns subprocesses.
 actor CLIExecutor {
     private let logger = Logger(subsystem: "com.jamfdash", category: "CLIExecutor")
+    /// Checks a launched process before it gets stdin or answers. The app passes
+    /// `CodeSignatureVerifier.verifyRunningJamfCLI`; tests leave it out.
+    private let runningCheck: (@Sendable (pid_t) throws -> Void)?
+
+    init(runningCheck: (@Sendable (pid_t) throws -> Void)? = nil) {
+        self.runningCheck = runningCheck
+    }
+
+    /// Output larger than this stops jamf-cli; no list the app reads comes close.
+    static let maxOutputBytes = 128 * 1024 * 1024
 
     func execute(
         binary: URL,
@@ -12,6 +22,23 @@ actor CLIExecutor {
         environment: [String: String],
         stdinData: Data? = nil,
         timeout: TimeInterval = 60
+    ) async throws -> Data {
+        let box = ProcessBox()
+        return try await withTaskCancellationHandler {
+            try await run(binary: binary, arguments: arguments, environment: environment,
+                          stdinData: stdinData, timeout: timeout, box: box)
+        } onCancel: {
+            box.cancel()
+        }
+    }
+
+    private func run(
+        binary: URL,
+        arguments: [String],
+        environment: [String: String],
+        stdinData: Data?,
+        timeout: TimeInterval,
+        box: ProcessBox
     ) async throws -> Data {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             let process = Process()
@@ -29,18 +56,23 @@ actor CLIExecutor {
             // Collect data via readabilityHandler to avoid deadlock on large output.
             let stdoutBuffer = LockedBuffer()
             let stderrBuffer = LockedBuffer()
+            let tooLarge = TimeoutFlag()
+            let rejected = RejectionBox()
+            let runningCheck = self.runningCheck
 
             stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
-                if !chunk.isEmpty {
-                    stdoutBuffer.append(chunk)
+                if !chunk.isEmpty, stdoutBuffer.append(chunk, limit: CLIExecutor.maxOutputBytes) == false {
+                    tooLarge.set()
+                    CLIExecutor.stop(process)
                 }
             }
 
             stderrPipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
-                if !chunk.isEmpty {
-                    stderrBuffer.append(chunk)
+                if !chunk.isEmpty, stderrBuffer.append(chunk, limit: 1024 * 1024) == false {
+                    tooLarge.set()
+                    CLIExecutor.stop(process)
                 }
             }
 
@@ -49,7 +81,7 @@ actor CLIExecutor {
             let timeout0 = CancellableWorkItem(DispatchWorkItem {
                 if process.isRunning {
                     timedOut.set()
-                    process.terminate()
+                    CLIExecutor.stop(process)
                 }
             })
 
@@ -64,19 +96,39 @@ actor CLIExecutor {
                 let remainingErr = (try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data()
                 stderrBuffer.append(remainingErr)
 
-                continuation.resume(with: CLIExecutor.completion(
-                    for: proc,
-                    timedOut: timedOut.isSet,
-                    stdout: stdoutBuffer.drain(),
-                    stderr: stderrBuffer.drain()
-                ))
+                if let error = rejected.error {
+                    continuation.resume(throwing: error)
+                } else if box.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                } else if tooLarge.isSet {
+                    continuation.resume(throwing: CLIError.outputTooLarge)
+                } else {
+                    continuation.resume(with: CLIExecutor.completion(
+                        for: proc,
+                        timedOut: timedOut.isSet,
+                        stdout: stdoutBuffer.drain(),
+                        stderr: stderrBuffer.drain()
+                    ))
+                }
             }
 
             do {
                 try process.run()
-                // Write stdin after launch so the process is ready to read
+                box.set(process)
+                if stdinData != nil, let runningCheck {
+                    do {
+                        try runningCheck(process.processIdentifier)
+                    } catch {
+                        rejected.set(error)
+                        CLIExecutor.stop(process)
+                        try? stdinPipe.fileHandleForWriting.close()
+                        return
+                    }
+                }
+                // Write stdin after launch so the process is ready to read. A process that
+                // already exited gives EPIPE, which is thrown here (SIGPIPE is ignored).
                 if let data = stdinData {
-                    stdinPipe.fileHandleForWriting.write(data)
+                    try? stdinPipe.fileHandleForWriting.write(contentsOf: data)
                 }
                 try? stdinPipe.fileHandleForWriting.close()
             } catch {
@@ -143,7 +195,10 @@ actor CLIExecutor {
 
             let stdoutBuffer = LockedBuffer()
             let stderrBuffer = LockedBuffer()
-            let driver = PromptDriver(rules: rules, masterFD: masterFD)
+            // Answers wait until the running process has passed `runningCheck`.
+            let driver = PromptDriver(rules: rules, masterFD: masterFD, enabled: runningCheck == nil)
+            let rejected = RejectionBox()
+            let runningCheck = self.runningCheck
 
             stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
                 let chunk = handle.availableData
@@ -158,7 +213,7 @@ actor CLIExecutor {
             let timeout0 = CancellableWorkItem(DispatchWorkItem {
                 if process.isRunning {
                     timedOut.set()
-                    process.terminate()
+                    CLIExecutor.stop(process)
                 }
             })
 
@@ -168,7 +223,7 @@ actor CLIExecutor {
             watchdog.schedule(deadline: .now() + 0.5, repeating: 0.5)
             watchdog.setEventHandler {
                 if process.isRunning, driver.isStuckAtUnansweredPrompt(grace: unansweredPromptGrace) {
-                    process.terminate()
+                    CLIExecutor.stop(process)
                 }
             }
 
@@ -180,6 +235,10 @@ actor CLIExecutor {
                 driver.close()
                 stdoutBuffer.append((try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data())
                 stderrBuffer.append((try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data())
+                if let error = rejected.error {
+                    continuation.resume(returning: .failure(error))
+                    return
+                }
 
                 if let question = driver.unansweredPrompt {
                     continuation.resume(returning: .failure(CLIError.unexpectedPrompt(question)))
@@ -195,6 +254,15 @@ actor CLIExecutor {
 
             do {
                 try process.run()
+                if let runningCheck {
+                    do {
+                        try runningCheck(process.processIdentifier)
+                        driver.enable()
+                    } catch {
+                        rejected.set(error)
+                        CLIExecutor.stop(process)
+                    }
+                }
             } catch {
                 driver.close()
                 continuation.resume(returning: .failure(CLIError.launchFailed(error.localizedDescription)))
@@ -206,6 +274,66 @@ actor CLIExecutor {
         return try Self.redacting(result, secrets: secrets).get()
     }
 
+}
+
+extension CLIExecutor {
+    /// Asks the process to stop (SIGTERM) and kills it (SIGKILL) if it's still running
+    /// five seconds later.
+    nonisolated static func stop(_ process: Process) {
+        guard process.isRunning else { return }
+        process.terminate()
+        let pid = process.processIdentifier
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+            if process.isRunning, process.processIdentifier == pid { kill(pid, SIGKILL) }
+        }
+    }
+}
+
+extension CLIExecutor {
+    /// Environment variables passed to jamf-cli. Everything else is dropped, and PATH is
+    /// fixed so nothing from the user's shell setup is picked up.
+    static func allowedEnvironment(_ env: [String: String]) -> [String: String] {
+        let keep: Set<String> = [
+            "HOME", "TMPDIR", "USER", "LOGNAME", "TERM", "LANG", "LC_ALL", "LC_CTYPE",
+            "XPC_SERVICE_NAME", "__CF_USER_TEXT_ENCODING", "JAMF_CLI_NO_UPDATE_CHECK",
+        ]
+        var result = env.filter { keep.contains($0.key) }
+        result["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
+        return result
+    }
+}
+
+/// The reason a launched process was refused, set before it's stopped.
+final class RejectionBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Error?
+    var error: Error? { lock.withLock { stored } }
+    func set(_ error: Error) { lock.withLock { stored = error } }
+}
+
+/// Holds the running process so a cancelled task can stop it.
+final class ProcessBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var process: Process?
+    private var cancelled = false
+
+    var isCancelled: Bool { lock.withLock { cancelled } }
+
+    func set(_ process: Process) {
+        let stopNow = lock.withLock { () -> Bool in
+            self.process = process
+            return cancelled
+        }
+        if stopNow { CLIExecutor.stop(process) }
+    }
+
+    func cancel() {
+        let running = lock.withLock { () -> Process? in
+            cancelled = true
+            return process
+        }
+        if let running { CLIExecutor.stop(running) }
+    }
 }
 
 extension CLIExecutor {
@@ -346,9 +474,20 @@ final class PromptDriver: @unchecked Sendable {
     private var lastOutput = Date()
     private var stuckPrompt: String?
 
-    init(rules: [PromptRule], masterFD: Int32) {
+    private var enabled: Bool
+
+    init(rules: [PromptRule], masterFD: Int32, enabled: Bool = true) {
         self.remaining = rules
         self.masterFD = masterFD
+        self.enabled = enabled
+    }
+
+    /// Starts answering, including questions already printed.
+    func enable() {
+        lock.withLock {
+            enabled = true
+            answerMatchingPrompts()
+        }
     }
 
     /// The question the process stopped at when none of the rules matched it.
@@ -382,6 +521,7 @@ final class PromptDriver: @unchecked Sendable {
     }
 
     private func answerMatchingPrompts() {
+        guard enabled else { return }
         var matched = true
         while matched, masterFD >= 0 {
             matched = false
@@ -484,6 +624,15 @@ final class LockedBuffer: @unchecked Sendable {
 
     func append(_ chunk: Data) {
         lock.withLock { storage.append(chunk) }
+    }
+
+    /// Appends unless that would pass `limit` bytes; returns false (and drops the chunk) then.
+    func append(_ chunk: Data, limit: Int) -> Bool {
+        lock.withLock {
+            guard storage.count + chunk.count <= limit else { return false }
+            storage.append(chunk)
+            return true
+        }
     }
 
     func drain() -> Data {

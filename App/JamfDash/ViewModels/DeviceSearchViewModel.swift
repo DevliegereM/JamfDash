@@ -149,7 +149,7 @@ final class DeviceSearchViewModel {
         runningActionName = name
         lastActionResult = nil
         do {
-            _ = try await cli.run(command)
+            _ = try await cli.runConfirmed(command)
             lastActionResult = .success("\(name) completed successfully.")
         } catch {
             lastActionResult = .failure(error.localizedDescription)

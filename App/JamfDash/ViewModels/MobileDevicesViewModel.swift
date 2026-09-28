@@ -167,11 +167,13 @@ final class MobileDevicesViewModel {
 
     // MARK: - Device actions
 
+    /// Call only from the handler of a confirmation the person answered.
     func runAction(_ command: CLICommand, label: String) async {
+        guard !isActionRunning else { return }
         isActionRunning = true
         defer { isActionRunning = false }
         do {
-            _ = try await cli.run(command)
+            _ = try await cli.runConfirmed(command)
             actionResult = "\(label) sent successfully."
         } catch {
             actionResult = "\(label) failed: \(error.localizedDescription)"

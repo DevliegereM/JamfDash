@@ -98,6 +98,7 @@
 		AB228A3F9AF539CD01099042 /* StatCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EF753970C444E49A60F45A9 /* StatCardView.swift */; };
 		AB85A29444EA8B6C4A2ECED6 /* OSDistributionChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6776F556AFF8D6E2DAB81DEC /* OSDistributionChart.swift */; };
 		ADB62F5FAA9EAD87A329B1DE /* JamfSecurityRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6DB8BA0D1CC0EF525ADA88 /* JamfSecurityRepository.swift */; };
+		B1075998CB0D2458B5B338C8 /* ActionConfirmationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76B12078F59A92F3DB867BCD /* ActionConfirmationTests.swift */; };
 		B33F1CE34B36B8F885A12352 /* AppleIntelligenceSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A7438B295EE84A88A76741 /* AppleIntelligenceSetupView.swift */; };
 		B61544C2012C7E4712FDB3C4 /* JamfProduct.swift in Sources */ = {isa = PBXBuildFile; fileRef = A57655D2D81B3538CDA41FAA /* JamfProduct.swift */; };
 		B66F9DC4EDECAEE439DDB434 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F296E3F2BC4F04419299C8C /* AppState.swift */; };
@@ -230,6 +231,7 @@
 		70B891128FC5CF093DFE5598 /* OverviewItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewItem.swift; sourceTree = "<group>"; };
 		72F3BAFA064517F58CAB80FF /* SettingsInspectorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsInspectorViewModel.swift; sourceTree = "<group>"; };
 		759585A030F63F374BD6FEA9 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
+		76B12078F59A92F3DB867BCD /* ActionConfirmationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActionConfirmationTests.swift; sourceTree = "<group>"; };
 		7A754F0CF54F07B6340158DE /* JamfDashApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JamfDashApp.swift; sourceTree = "<group>"; };
 		7CDB42F6E0B79436F2D43141 /* DemoCLIManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCLIManager.swift; sourceTree = "<group>"; };
 		7E7AC40E74CF98EE6D591239 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -591,6 +593,7 @@
 				8BEF82B756863B2E4A0892B3 /* EnrollmentTimelineTests.swift */,
 				56E31554062C9F2190E49390 /* CLIContractTests.swift */,
 				1B45BF3C341A8A7AFC6F8F17 /* CLIHelpContractTests.swift */,
+				76B12078F59A92F3DB867BCD /* ActionConfirmationTests.swift */,
 			);
 			path = JamfDashTests;
 			sourceTree = "<group>";
@@ -1033,6 +1036,7 @@
 				D388D56115616C644135972D /* EnrollmentTimelineTests.swift in Sources */,
 				E39EE3FAC55A6B2A7B89EFF7 /* CLIContractTests.swift in Sources */,
 				BDCA7D4C2773E2A960522BCE /* CLIHelpContractTests.swift in Sources */,
+				B1075998CB0D2458B5B338C8 /* ActionConfirmationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

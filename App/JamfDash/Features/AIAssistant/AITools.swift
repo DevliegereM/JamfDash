@@ -38,32 +38,144 @@ private func cap(_ s: String, _ limit: Int = 800) -> String {
     return String(s.prefix(limit)) + "\n…(truncated)"
 }
 
-/// Asks the user to approve a destructive action requested by the model.
-/// Shown as a sheet on the key window when available so the main thread is not blocked;
-/// falls back to an app-modal alert otherwise.
+/// Asks the person to approve an action Dashie wants to run. The text is built from what
+/// Jamf Dash looked up itself, never from the model's words. With `typed`, the person must
+/// type that exact text before the confirm button works.
+/// Shown as a sheet on the key window when there is one.
 @MainActor
-private func confirmAction(title: String, message: String, confirmTitle: String) async -> Bool {
+private func confirmAction(title: String, message: String, confirmTitle: String, typed: String? = nil) async -> Bool {
+    #if DEBUG
     if let answer = DashieToolConfirmation.testOverride { return answer(title) }
+    #endif
     let alert = NSAlert()
     alert.messageText = title
     alert.informativeText = message
     alert.alertStyle = .warning
     alert.addButton(withTitle: confirmTitle)
     alert.addButton(withTitle: "Cancel")
-    guard let window = NSApp.keyWindow ?? NSApp.mainWindow else {
-        return alert.runModal() == .alertFirstButtonReturn
-    }
-    return await withCheckedContinuation { continuation in
-        alert.beginSheetModal(for: window) { response in
-            continuation.resume(returning: response == .alertFirstButtonReturn)
+    var field: NSTextField?
+    var observer: NSObjectProtocol?
+    if let typed {
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        input.placeholderString = typed
+        alert.accessoryView = input
+        let confirm = alert.buttons[0]
+        confirm.isEnabled = false
+        observer = NotificationCenter.default.addObserver(
+            forName: NSControl.textDidChangeNotification, object: input, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { confirm.isEnabled = input.stringValue == typed }
         }
+        field = input
     }
+    defer { if let observer { NotificationCenter.default.removeObserver(observer) } }
+    let approved: Bool
+    if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+        if let field { alert.window.initialFirstResponder = field }
+        approved = await withCheckedContinuation { continuation in
+            alert.beginSheetModal(for: window) { response in
+                continuation.resume(returning: response == .alertFirstButtonReturn)
+            }
+        }
+    } else {
+        approved = alert.runModal() == .alertFirstButtonReturn
+    }
+    guard approved else { return false }
+    if let typed { return field?.stringValue == typed }
+    return true
 }
 
-/// Lets tests answer action confirmations without showing a dialog. Never set in the app.
+#if DEBUG
+/// Lets tests answer action confirmations without showing a dialog. Debug builds only.
 @MainActor
 enum DashieToolConfirmation {
     static var testOverride: ((String) -> Bool)?
+}
+#endif
+
+/// Dashie's actions are off until the person turns them on in Settings → Dashie.
+enum DashieActions {
+    static let enabledKey = "jamfDash.dashieActionsEnabled"
+    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+}
+
+/// One Mac as Jamf Pro describes it, for the confirmation text.
+struct DeviceIdentity: Sendable, Equatable {
+    let name: String
+    let model: String?
+    let serial: String
+    let lastContact: String?
+
+    enum Lookup: Sendable, Equatable {
+        case found(DeviceIdentity)
+        case notFound
+        case ambiguous(Int)
+        case failed(String)
+    }
+
+    static func lookup(serial: String, cli: any CLIRunning) async -> Lookup {
+        do {
+            return parse(try await cli.run(.deviceIdentity(serial: serial)), serial: serial)
+        } catch {
+            return .failed(ErrorMessageFormatter.message(for: error))
+        }
+    }
+
+    static func parse(_ data: Data, serial: String) -> Lookup {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        let rows = (json as? [[String: Any]]) ?? ((json as? [String: Any])?["results"] as? [[String: Any]]) ?? []
+        guard !rows.isEmpty else { return .notFound }
+        guard rows.count == 1 else { return .ambiguous(rows.count) }
+        let general = rows[0]["general"] as? [String: Any]
+        let hardware = rows[0]["hardware"] as? [String: Any]
+        let name = (general?["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Unnamed Mac"
+        return .found(DeviceIdentity(
+            name: String(name.prefix(80)),
+            model: (hardware?["model"] as? String).map { String($0.prefix(60)) },
+            serial: (hardware?["serialNumber"] as? String) ?? serial,
+            lastContact: (general?["lastContactTime"] as? String) ?? (general?["lastReportedDate"] as? String)
+        ))
+    }
+
+    var description: String {
+        var parts = ["“\(name)”"]
+        if let model { parts.append(model) }
+        parts.append("serial \(serial)")
+        if let lastContact, let date = ISO8601DateFormatter().date(from: lastContact) {
+            parts.append("last check-in \(date.formatted(.relative(presentation: .named)))")
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// Looks up the Mac, asks the person with what was found, and runs the action.
+/// Returns plain text for the model; the CLI output isn't passed back to it.
+@available(macOS 26, *)
+private func runDeviceAction(
+    _ command: CLICommand, serial: String, cli: any CLIRunning,
+    title: String, explanation: String, confirmTitle: String, done: String
+) async -> String {
+    guard DashieActions.isEnabled else {
+        return "Actions are turned off. The user can turn them on in Settings → Dashie."
+    }
+    let device: DeviceIdentity
+    switch await DeviceIdentity.lookup(serial: serial, cli: cli) {
+    case .found(let d): device = d
+    case .notFound: return "No Mac with serial \(serial) was found. Nothing was sent."
+    case .ambiguous(let n): return "\(n) Macs match serial \(serial), so nothing was sent. Use Device Lookup instead."
+    case .failed(let message): return "Couldn't look up \(serial): \(message). Nothing was sent."
+    }
+    let confirmed = await confirmAction(
+        title: title,
+        message: "\(explanation)\n\n\(device.description)",
+        confirmTitle: confirmTitle)
+    guard confirmed else { return "The user cancelled. Nothing was sent." }
+    do {
+        _ = try await cli.runConfirmed(command)
+        return "\(done) \(device.name) (\(device.serial))."
+    } catch {
+        return "Failed: \(ErrorMessageFormatter.message(for: error))"
+    }
 }
 
 // MARK: - Query tools
@@ -720,12 +832,10 @@ struct BlankPushTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
-        do {
-            let data = try await cli.run(.blankPush(serial: arguments.serialNumber))
-            return String(data: data, encoding: .utf8) ?? "Blank push sent."
-        } catch {
-            return "Failed to send blank push to \(arguments.serialNumber): \(error.localizedDescription)"
-        }
+        let serial = String(arguments.serialNumber.prefix(40))
+        return await runDeviceAction(.blankPush(serial: serial), serial: serial, cli: cli,
+                                     title: "Send Blank Push", explanation: "Dashie wants to send a blank push, which asks this Mac to check in:",
+                                     confirmTitle: "Send", done: "Blank push sent to")
     }
 }
 
@@ -741,18 +851,10 @@ struct RenewMDMProfileTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
-        let confirmed = await confirmAction(
-            title: "Renew MDM Profile",
-            message: "This will renew the MDM profile on \(arguments.serialNumber). Continue?",
-            confirmTitle: "Renew"
-        )
-        guard confirmed else { return "MDM profile renewal cancelled by user." }
-        do {
-            let data = try await cli.run(.renewMDM(serial: arguments.serialNumber))
-            return String(data: data, encoding: .utf8) ?? "MDM profile renewed."
-        } catch {
-            return "Failed to renew MDM profile on \(arguments.serialNumber): \(error.localizedDescription)"
-        }
+        let serial = String(arguments.serialNumber.prefix(40))
+        return await runDeviceAction(.renewMDM(serial: serial), serial: serial, cli: cli,
+                                     title: "Renew MDM Profile", explanation: "Dashie wants to renew the MDM profile on this Mac:",
+                                     confirmTitle: "Renew", done: "MDM profile renewal sent to")
     }
 }
 
@@ -768,18 +870,10 @@ struct RedeployFrameworkTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
-        let confirmed = await confirmAction(
-            title: "Redeploy Management Framework",
-            message: "This will redeploy the Jamf framework on \(arguments.serialNumber). Continue?",
-            confirmTitle: "Redeploy"
-        )
-        guard confirmed else { return "Redeploy cancelled by user." }
-        do {
-            let data = try await cli.run(.redeployFramework(serial: arguments.serialNumber))
-            return String(data: data, encoding: .utf8) ?? "Framework redeployed."
-        } catch {
-            return "Failed to redeploy framework on \(arguments.serialNumber): \(error.localizedDescription)"
-        }
+        let serial = String(arguments.serialNumber.prefix(40))
+        return await runDeviceAction(.redeployFramework(serial: serial), serial: serial, cli: cli,
+                                     title: "Redeploy Management Framework", explanation: "Dashie wants to redeploy the Jamf management framework on this Mac:",
+                                     confirmTitle: "Redeploy", done: "Framework redeploy sent to")
     }
 }
 
@@ -795,18 +889,10 @@ struct FlushFailedCommandsTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
-        let confirmed = await confirmAction(
-            title: "Flush Failed Commands",
-            message: "This will remove all failed MDM commands queued for \(arguments.serialNumber). Continue?",
-            confirmTitle: "Flush"
-        )
-        guard confirmed else { return "Flush cancelled by user." }
-        do {
-            let data = try await cli.run(.flushFailedCommands(serial: arguments.serialNumber))
-            return String(data: data, encoding: .utf8) ?? "Failed commands flushed."
-        } catch {
-            return "Failed to flush commands on \(arguments.serialNumber): \(error.localizedDescription)"
-        }
+        let serial = String(arguments.serialNumber.prefix(40))
+        return await runDeviceAction(.flushFailedCommands(serial: serial), serial: serial, cli: cli,
+                                     title: "Flush Failed Commands", explanation: "Dashie wants to remove all failed MDM commands queued for this Mac:",
+                                     confirmTitle: "Flush", done: "Failed commands flushed for")
     }
 }
 
@@ -822,18 +908,10 @@ struct RestartDeviceTool: Tool {
     }
 
     func call(arguments: Arguments) async throws -> String {
-        let confirmed = await confirmAction(
-            title: "Restart Device",
-            message: "This will immediately restart \(arguments.serialNumber) via MDM. Continue?",
-            confirmTitle: "Restart"
-        )
-        guard confirmed else { return "Restart cancelled by user." }
-        do {
-            let data = try await cli.run(.restart(serial: arguments.serialNumber))
-            return String(data: data, encoding: .utf8) ?? "Restart command sent."
-        } catch {
-            return "Failed to restart \(arguments.serialNumber): \(error.localizedDescription)"
-        }
+        let serial = String(arguments.serialNumber.prefix(40))
+        return await runDeviceAction(.restart(serial: serial), serial: serial, cli: cli,
+                                     title: "Restart Mac", explanation: "Dashie wants to restart this Mac immediately. Unsaved work on it may be lost:",
+                                     confirmTitle: "Restart", done: "Restart sent to")
     }
 }
 
@@ -856,48 +934,54 @@ struct BulkSetPoliciesTool: Tool {
     }
 
     private func enable(category: String) async -> String {
+        guard DashieActions.isEnabled else {
+            return "Actions are turned off. The user can turn them on in Settings → Dashie."
+        }
         guard !category.isEmpty else { return "Refused: name the policy category to enable." }
+        let category = String(category.prefix(100))
         let confirmed = await confirmAction(
-            title: "Bulk Enable Policies",
-            message: "This will enable ALL policies in category '\(category)'. This affects the entire fleet. Continue?",
-            confirmTitle: "Enable All"
+            title: "Enable Policies in a Category",
+            message: "Dashie wants to enable every policy in the category below. Enabled policies run on the Macs in their scope.\n\nType the category name to confirm:",
+            confirmTitle: "Enable Policies",
+            typed: category
         )
-        guard confirmed else { return "Bulk enable cancelled by user." }
+        guard confirmed else { return "The user cancelled. Nothing was changed." }
         do {
-            let data = try await cli.run(.bulkEnablePolicies(category: category))
-            return String(data: data, encoding: .utf8) ?? "Policies enabled."
+            _ = try await cli.runConfirmed(.bulkEnablePolicies(category: category))
+            return "Policies in category '\(category)' were enabled."
         } catch {
-            return "Failed to enable policies in category '\(category)': \(error.localizedDescription)"
+            return "Failed to enable policies in category '\(category)': \(ErrorMessageFormatter.message(for: error))"
         }
     }
 
     private func disable(pattern: String) async -> String {
+        guard DashieActions.isEnabled else {
+            return "Actions are turned off. The user can turn them on in Settings → Dashie."
+        }
+        let pattern = String(pattern.prefix(100))
         if Self.matchesEverything(pattern) {
             return "Refused: the pattern '\(pattern)' would match every policy. Ask the user for a more specific name pattern."
         }
-        let matching = await Self.matchingPolicyNames(pattern, cli: cli)
-        if let matching, matching.isEmpty {
+        guard let matching = await Self.matchingPolicyNames(pattern, cli: cli) else {
+            return "Couldn't read the policy list to check which policies match, so nothing was changed."
+        }
+        if matching.isEmpty {
             return "No policies match '\(pattern)'. Nothing was disabled."
         }
-        let countLine: String
-        if let matching {
-            let shown = matching.prefix(8).map { "• \($0)" }.joined(separator: "\n")
-            let more = matching.count > 8 ? "\n… and \(matching.count - 8) more" : ""
-            countLine = "\(matching.count) polic\(matching.count == 1 ? "y matches" : "ies match"):\n\(shown)\(more)"
-        } else {
-            countLine = "The number of matching policies could not be checked."
-        }
+        let shown = matching.prefix(8).map { "• \($0)" }.joined(separator: "\n")
+        let more = matching.count > 8 ? "\n… and \(matching.count - 8) more" : ""
         let confirmed = await confirmAction(
-            title: "Bulk Disable Policies",
-            message: "This will disable ALL policies matching '\(pattern)'. This affects the entire fleet.\n\n\(countLine)\n\nContinue?",
-            confirmTitle: "Disable All"
+            title: "Disable \(matching.count) Polic\(matching.count == 1 ? "y" : "ies")",
+            message: "Dashie wants to disable these policies:\n\n\(shown)\(more)\n\nType \(matching.count) to confirm:",
+            confirmTitle: "Disable Policies",
+            typed: String(matching.count)
         )
-        guard confirmed else { return "Bulk disable cancelled by user." }
+        guard confirmed else { return "The user cancelled. Nothing was changed." }
         do {
-            let data = try await cli.run(.bulkDisablePolicies(pattern: pattern))
-            return String(data: data, encoding: .utf8) ?? "Policies disabled."
+            _ = try await cli.runConfirmed(.bulkDisablePolicies(pattern: pattern))
+            return "\(matching.count) policies matching '\(pattern)' were disabled."
         } catch {
-            return "Failed to disable policies matching '\(pattern)': \(error.localizedDescription)"
+            return "Failed to disable policies matching '\(pattern)': \(ErrorMessageFormatter.message(for: error))"
         }
     }
 

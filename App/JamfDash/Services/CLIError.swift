@@ -15,11 +15,27 @@ enum CLIError: Error, Sendable {
     case cliTooOld(installed: String, minimum: String)
     /// Demo mode has no sample data for this command.
     case notInDemo
+    /// jamf-cli printed more than the app accepts.
+    case outputTooLarge
+    /// An action was sent without a matching confirmation.
+    case actionNotConfirmed
+    /// The connection doesn't allow destructive actions (Settings → Connection).
+    case actionNotAllowed
+    /// The instance changed between confirming and running an action.
+    case instanceChanged
 }
 
 extension CLIError: LocalizedError {
     var errorDescription: String? {
         switch self {
+        case .actionNotConfirmed:
+            return "This action wasn't confirmed, so nothing was sent. Try again."
+        case .actionNotAllowed:
+            return "Destructive actions are turned off for this connection. Turn them on in Settings → Connection."
+        case .instanceChanged:
+            return "The Jamf instance changed after you confirmed, so nothing was sent."
+        case .outputTooLarge:
+            return "jamf-cli returned more data than Jamf Dash can handle, so it was stopped."
         case .notInDemo:
             return "This isn't included in demo mode. Connect a Jamf instance to see it."
         case .binaryMissing:

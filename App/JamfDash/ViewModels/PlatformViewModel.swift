@@ -62,7 +62,7 @@ final class PlatformViewModel {
         do {
             blueprintStatuses = BlueprintStatus.byName(try await cli.run(.blueprintStatus))
         } catch {
-            Self.logger.error("Blueprint status report unavailable: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Blueprint status report unavailable: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)")
             blueprintStatuses = [:]
         }
     }
@@ -146,7 +146,7 @@ final class PlatformViewModel {
             }
             benchmarkResultsState = .loaded(BenchmarkResults(compliancePercentage: percent, rules: rules))
         case .failure(let error):
-            Self.logger.error("Benchmark report failed: \(error.localizedDescription, privacy: .public)")
+            Self.logger.error("Benchmark report failed: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)")
             benchmarkResultsState = .failed(ErrorMessageFormatter.message(for: error))
             return
         }

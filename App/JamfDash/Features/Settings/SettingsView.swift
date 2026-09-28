@@ -26,7 +26,7 @@ struct SettingsView: View {
                 .tabItem { Label("Export Lists", systemImage: "square.and.arrow.down.on.square") }
 
             AITab(isEnabled: $isAIEnabled)
-                .tabItem { Label("AI", systemImage: "brain") }
+                .tabItem { Label("Dashie", systemImage: "brain") }
 
             EnrollmentSettingsTab()
                 .tabItem { Label("Enrollment", systemImage: "person.badge.plus") }
@@ -168,9 +168,27 @@ private struct ConnectionTab: View {
     @Bindable var vm: SettingsViewModel
     @State private var showingAddSheet = false
     @State private var profileToDelete: String? = nil
+    @State private var destructiveAllowed: [String: Bool] = [:]
 
     var body: some View {
         Form {
+            if !vm.availableProfiles.isEmpty {
+                Section {
+                    ForEach(vm.availableProfiles, id: \.self) { profile in
+                        Toggle(profile, isOn: Binding(
+                            get: { destructiveAllowed[profile] ?? vm.allowsDestructiveActions(for: profile) },
+                            set: {
+                                destructiveAllowed[profile] = $0
+                                vm.setAllowsDestructiveActions($0, for: profile)
+                            }))
+                    }
+                } header: {
+                    Text("Allow Destructive Actions")
+                } footer: {
+                    Text("Erase, Lock, Remove MDM, Clear Recovery Lock, and for mobile devices Erase, Unmanage, Lock and Lost Mode. Off for every connection until you turn it on. The API client also needs the matching Jamf Pro privileges.")
+                        .foregroundStyle(.secondary)
+                }
+            }
             Section {
                 if vm.availableProfiles.isEmpty {
                     Text("No profiles configured yet.")
@@ -880,15 +898,26 @@ private struct BrandingTab: View {
 
 private struct AITab: View {
     @Binding var isEnabled: Bool
+    @AppStorage(DashieActions.enabledKey) private var actionsEnabled = false
 
     var body: some View {
         Form {
             Section {
-                Toggle("Enable AI Assistant", isOn: $isEnabled)
+                Toggle("Enable Dashie", isOn: $isEnabled)
             } header: {
-                Text("AI Assistant")
+                Text("Dashie")
             } footer: {
                 Text("Powered by Apple Intelligence — on-device, private, and requires macOS 26.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Allow Dashie to run actions", isOn: $actionsEnabled)
+                    .disabled(!isEnabled)
+            } header: {
+                Text("Actions")
+            } footer: {
+                Text("Blank push, renew MDM profile, redeploy framework, flush failed commands, restart, and enabling or disabling policies. Each action still asks you first, showing the Mac or policies Jamf Dash looked up itself. Names of devices and policies come from Jamf Pro and could contain instructions meant to mislead Dashie, so read each confirmation. Takes effect in a new chat.")
                     .foregroundStyle(.secondary)
             }
 

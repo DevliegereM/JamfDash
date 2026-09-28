@@ -67,9 +67,9 @@ final class ProfileService: @unchecked Sendable {
     // MARK: - Scope per profile (Jamf Pro local account only)
 
     func scope(for profileName: String) -> OnboardingViewModel.APIScope {
+        // Unknown (profiles added outside the app, SSO, Platform API) counts as Standard.
         let raw = defaults.integer(forKey: scopeKey(profileName))
-        guard raw != 0 else { return .fullAdmin }
-        return OnboardingViewModel.APIScope(rawValue: raw) ?? .fullAdmin
+        return OnboardingViewModel.APIScope(rawValue: raw) ?? .standard
     }
 
     func setScope(_ scope: OnboardingViewModel.APIScope, for profileName: String) {
@@ -80,6 +80,20 @@ final class ProfileService: @unchecked Sendable {
     /// Convenience: scope for the currently selected profile.
     var currentScope: OnboardingViewModel.APIScope { scope(for: selectedProfile.name) }
 
+    /// Destructive actions (erase, lock, remove MDM, clear Recovery Lock, mobile erase,
+    /// unmanage, Lost Mode) are off for every connection until turned on here.
+    func allowsDestructiveActions(for profileName: String) -> Bool {
+        defaults.bool(forKey: destructiveKey(profileName))
+    }
+
+    func setAllowsDestructiveActions(_ allowed: Bool, for profileName: String) {
+        defaults.set(allowed, forKey: destructiveKey(profileName))
+    }
+
+    private func destructiveKey(_ name: String) -> String {
+        "jamfDash.allowDestructive.\(name.isEmpty ? "_default_" : name)"
+    }
+
     private func scopeKey(_ name: String) -> String {
         "jamfDash.profileScope.\(name)"
     }
@@ -89,6 +103,7 @@ final class ProfileService: @unchecked Sendable {
         defaults.removeObject(forKey: productKey(name))
         defaults.removeObject(forKey: serverURLKey(name))
         defaults.removeObject(forKey: scopeKey(name))
+        defaults.removeObject(forKey: destructiveKey(name))
     }
 
 }

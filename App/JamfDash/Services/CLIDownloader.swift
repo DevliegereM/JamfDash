@@ -51,6 +51,7 @@ actor CLIDownloader {
                 let (data, _) = try await session.data(for: req)
                 struct R: Decodable { let tag_name: String }
                 return try JSONDecoder().decode([R].self, from: data).map { $0.tag_name }
+                    .filter(CLIVersionStore.isValidTag)
             }
         }
         return []
@@ -115,7 +116,9 @@ actor CLIDownloader {
             throw CLIError.downloadFailed("GitHub API returned non-200")
         }
         struct R: Decodable { let tag_name: String }
-        return try JSONDecoder().decode(R.self, from: data).tag_name
+        let tag = try JSONDecoder().decode(R.self, from: data).tag_name
+        guard CLIVersionStore.isValidTag(tag) else { throw CLIError.downloadFailed("Unexpected release tag") }
+        return tag
     }
 
     private func fetchRelease(repo: String, version: String?) async throws -> ReleasePayload {
@@ -132,7 +135,11 @@ actor CLIDownloader {
             }
             throw CLIError.downloadFailed("GitHub API error fetching release")
         }
-        return try JSONDecoder().decode(ReleasePayload.self, from: data)
+        let release = try JSONDecoder().decode(ReleasePayload.self, from: data)
+        guard CLIVersionStore.isValidTag(release.tag_name) else {
+            throw CLIError.downloadFailed("Unexpected release tag")
+        }
+        return release
     }
 
     // MARK: - Private: Download & verify
@@ -292,15 +299,16 @@ actor CLIDownloader {
         // Verify before touching `destination` so a bad download never replaces a good binary.
         try CodeSignatureVerifier.verifyJamfCLI(at: foundBinary)
         logger.info("Code signature verified (Team ID \(CodeSignatureVerifier.jamfTeamID))")
-        if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
-        try fm.copyItem(at: foundBinary, to: destination)
+        try CLIVersionStore.installAtomically(from: foundBinary, to: destination)
     }
 
     // MARK: - Helpers
 
     /// Ensures version strings have a "v" prefix for GitHub tags.
     private func tagify(_ version: String) -> String {
-        version.hasPrefix("v") ? version : "v\(version)"
+        let tag = version.hasPrefix("v") ? version : "v\(version)"
+        // Goes into a URL path; anything but a version number becomes a tag that can't exist.
+        return CLIVersionStore.isValidTag(tag) ? tag : "invalid"
     }
 }
 

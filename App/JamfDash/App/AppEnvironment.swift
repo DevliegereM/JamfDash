@@ -482,7 +482,16 @@ final class AppEnvironment {
     /// gateway (`auth-method: platform`). Features the gateway doesn't offer check this.
     private(set) var activeProfileUsesPlatformAPI = false
 
+    /// Whether the current connection allows destructive device actions.
+    private(set) var allowsDestructiveActions = false
+
+    func refreshActionPermission() {
+        allowsDestructiveActions = isDemoMode
+            || profileService.allowsDestructiveActions(for: profileService.selectedProfile.name)
+    }
+
     func refreshActiveProfileAuth() {
+        refreshActionPermission()
         guard !isDemoMode else {
             activeProfileUsesPlatformAPI = false
             blueprintsAccess = .available
@@ -592,6 +601,8 @@ final class AppEnvironment {
                 previousHealthScore = nil
                 NSApp.dockTile.badgeLabel = nil
                 useInstanceStorage(for: profileName)
+                // Dashie's conversation is about the previous instance.
+                aiAssistantVM.clearHistory()
                 loadMainData()
                 profileSwitchCount += 1
             } catch {
@@ -705,6 +716,9 @@ final class AppEnvironment {
         let vm = SettingsViewModel(keychain: keychain, profileService: profileService, cliManager: cliManager)
         vm.onProfilesChanged = { [weak self] in
             Task { await self?.loadProfiles() }
+        }
+        vm.onActionPermissionChanged = { [weak self] in
+            self?.refreshActionPermission()
         }
         vm.onProfileSwitched = { [weak self] name in
             self?.switchInstance(to: name)
