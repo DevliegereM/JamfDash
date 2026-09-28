@@ -105,7 +105,11 @@ final class DebugLoggingService: @unchecked Sendable {
         let outputURL = downloadsURL().appendingPathComponent(fileName)
 
         do {
-            let output = try await runLogShow(hours: hours)
+            let output = try await LogCollector.show(hours: hours, maxBytes: 64 * 1024 * 1024)
+            guard !output.isEmpty else {
+                throw NSError(domain: "JamfDash", code: 1, userInfo: [NSLocalizedDescriptionKey:
+                    "No log entries found for the last \(hours) hour(s). Enable debug logging and reproduce the issue first."])
+            }
             try output.write(to: outputURL, atomically: true, encoding: .utf8)
             // Restrict to owner-read/write only — log content may include hostnames and profile names.
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: outputURL.path)
@@ -125,42 +129,6 @@ final class DebugLoggingService: @unchecked Sendable {
     }
 
     // MARK: - Private helpers
-
-    private func runLogShow(hours: Int) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/log")
-            process.arguments = [
-                "show",
-                "--predicate", "subsystem == \"\(subsystem)\"",
-                "--last", "\(hours)h",
-                "--style", "syslog"
-            ]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError  = Pipe() // discard stderr
-
-            process.terminationHandler = { _ in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let text = String(data: data, encoding: .utf8) ?? ""
-                if text.isEmpty {
-                    continuation.resume(throwing: NSError(
-                        domain: "JamfDash",
-                        code: 1,
-                        userInfo: [NSLocalizedDescriptionKey: "No log entries found for the last \(hours) hour(s). Enable debug logging and reproduce the issue first."]
-                    ))
-                } else {
-                    continuation.resume(returning: text)
-                }
-            }
-
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
-    }
 
     private func downloadsURL() -> URL {
         FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first

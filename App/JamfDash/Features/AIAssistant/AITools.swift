@@ -818,6 +818,27 @@ struct SearchHelpTool: Tool {
     }
 }
 
+// MARK: - Report a problem
+
+@available(macOS 26, *)
+struct ReportProblemTool: Tool {
+    let name = "reportProblem"
+    let description = "Open the form to report a bug or problem with the Jamf Dash app itself to its developer, with logs the user reviews first. Use when the user wants to report a bug, send logs or give feedback about Jamf Dash."
+
+    @Generable struct Arguments {
+        @Guide(description: "A one-line summary of the problem in the user's words")
+        let summary: String
+    }
+
+    func call(arguments: Arguments) async throws -> String {
+        await MainActor.run {
+            ReportProblem.pendingSummary = arguments.summary
+            ReportProblem.open()
+        }
+        return "The Report a Problem window is open. The user describes the problem there and reviews everything before it's sent."
+    }
+}
+
 // MARK: - Device action tools
 
 @available(macOS 26, *)

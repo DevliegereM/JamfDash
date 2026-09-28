@@ -1,0 +1,51 @@
+name: Problem report
+description: Something in Jamf Dash doesn't work. Start it from Help → Report a Problem… in the app to fill this in.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository is public. Don't include server addresses, serial numbers, names or logs here.
+        To send logs, use **Help → Report a Problem… → Email** in Jamf Dash.
+  - type: input
+    id: report-id
+    attributes:
+      label: Report ID
+      description: Shown in the Report a Problem window (JD-…). Leave empty if you didn't start from the app.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - General
+        - Connections and setup
+        - Overview and Security
+        - Devices and Device Lookup
+        - Configuration, patches and reports
+        - Enrollment
+        - Jamf Protect
+        - Jamf School
+        - Dashie
+        - Updates
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions
+      description: Jamf Dash, macOS and jamf-cli versions.
+      render: text

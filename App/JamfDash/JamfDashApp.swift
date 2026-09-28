@@ -60,6 +60,10 @@ struct JamfDashApp: App {
                     NotificationCenter.default.post(name: .openHelpWindow, object: nil)
                 }
                 .keyboardShortcut("?", modifiers: .command)
+                Divider()
+                Button("Report a Problem…") {
+                    ReportProblem.open()
+                }
             }
 
             CommandGroup(after: .appVisibility) {
@@ -133,6 +137,14 @@ struct JamfDashApp: App {
                 .environment(appState)
                 .frame(minWidth: 620, minHeight: 520)
         }
+
+        Window("Report a Problem", id: "report-problem") {
+            ReportProblemView()
+                .environment(env)
+        }
+        .windowStyle(.titleBar)
+        .defaultSize(width: 760, height: 640)
+        .windowResizability(.contentMinSize)
 
         Window("Jamf Dash Help", id: "jamf-help") {
             HelpView()

@@ -6,8 +6,22 @@ struct MainView: View {
     @Environment(AppState.self) private var appState
     @State private var selection: SidebarItem?
     @State private var showNotificationPopover = false
+    @State private var showCrashBanner = false
 
     var body: some View {
+        splitView
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showCrashBanner {
+                    CrashReportBanner {
+                        CrashReports.markSeen()
+                        showCrashBanner = false
+                    }
+                }
+            }
+            .task { showCrashBanner = CrashReports.unseenCrash() != nil }
+    }
+
+    private var splitView: some View {
         NavigationSplitView {
             SidebarView(selection: $selection)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 360)

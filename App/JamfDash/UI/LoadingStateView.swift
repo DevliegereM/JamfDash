@@ -48,11 +48,16 @@ struct ErrorStateView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 400)
-            if let retry {
-                Button("Retry") {
-                    Task { await retry() }
+            HStack(spacing: 10) {
+                if let retry {
+                    Button("Retry") {
+                        Task { await retry() }
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
+                Button("Report This Problem…") {
+                    ReportProblem.open(context: message)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

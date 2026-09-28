@@ -1280,6 +1280,17 @@ private struct DeveloperTab: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Section {
+                HStack {
+                    Text("Send a problem report with logs, reviewed by you first.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Report a Problem…") { ReportProblem.open() }
+                }
+            } header: {
+                Text("Report a Problem")
+            }
+
             // MARK: Log Export
             Section {
                 Picker("Time window", selection: $exportHours) {

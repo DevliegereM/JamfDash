@@ -58,6 +58,9 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openHelpWindow)) { _ in
             openWindow(id: "jamf-help")
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openReportProblem)) { _ in
+            openWindow(id: "report-problem")
+        }
         .onAppear {
             // Help topics show up in the Help menu's search field.
             NSApp.registerUserInterfaceItemSearchHandler(HelpMenuSearch.shared)

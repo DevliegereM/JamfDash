@@ -92,6 +92,7 @@ extension AIAssistantViewModel {
             ExplainEnrollmentTool(cli: cli),
             SearchFleetKnowledgeTool(),
             SearchHelpTool(),
+            ReportProblemTool(),
         ]
         // Actions are only offered to the model when the person turned them on.
         guard actionsEnabled else { return read }
@@ -454,6 +455,7 @@ extension AIAssistantViewModel {
         searchFleetKnowledge
         • How to use Jamf Dash, where something is, setup, permissions or errors in the app: \
         searchHelp — answer from its result and name where to find it (e.g. Settings → Updates)
+        • The user wants to report a bug in Jamf Dash or send logs to its developer: reportProblem
 
         Rules: call tools only when needed, at most two per answer — for example \
         listComputers with nameContains to find a serial, then getComputerDetail. \

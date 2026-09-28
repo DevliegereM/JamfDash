@@ -1057,12 +1057,7 @@ actor CLIManager: CLIRunning {
         logger.debug("Running: jamf-cli \(args.joined(separator: " "), privacy: .private)")
         do {
             let start = Date()
-            let data = try await executor.execute(
-                binary: binaryURL,
-                arguments: args,
-                environment: Self.minimalEnvironment(),
-                timeout: timeout
-            )
+            let data = try await executeRecorded(args, timeout: timeout)
             let elapsed = String(format: "%.2f", Date().timeIntervalSince(start))
             logger.debug("jamf-cli finished in \(elapsed, privacy: .public)s — \(data.count, privacy: .public) bytes")
             return data
@@ -1085,6 +1080,23 @@ actor CLIManager: CLIRunning {
                                         allowTokenRefresh: false)
         } catch {
             logger.error("jamf-cli failed: \(ErrorMessageFormatter.logSummary(for: error), privacy: .public) \(error.localizedDescription, privacy: .private)")
+            throw error
+        }
+    }
+
+    /// Runs jamf-cli and notes the command name, result and duration for problem reports.
+    private func executeRecorded(_ args: [String], timeout: TimeInterval, stdinData: Data? = nil) async throws -> Data {
+        let start = Date()
+        do {
+            let data = try await executor.execute(binary: binaryURL, arguments: args,
+                                                  environment: Self.minimalEnvironment(),
+                                                  stdinData: stdinData, timeout: timeout)
+            DiagnosticsJournal.shared.record(arguments: args, outcome: "ok",
+                                             seconds: Date().timeIntervalSince(start))
+            return data
+        } catch {
+            DiagnosticsJournal.shared.record(arguments: args, outcome: ErrorMessageFormatter.logSummary(for: error),
+                                             seconds: Date().timeIntervalSince(start))
             throw error
         }
     }
@@ -1127,16 +1139,11 @@ actor CLIManager: CLIRunning {
         }
         let profileArgs = profile.isDefault ? [] : ["--profile", profile.name]
 
-        let lookup = try await executor.execute(
-            binary: binaryURL,
-            arguments: profileArgs + [
-                "pro", "computers-inventory", "list",
-                "--filter", CLICommand.serialFilter(serial),
-                "--section", "GENERAL", "-o", "json"
-            ],
-            environment: Self.minimalEnvironment(),
-            timeout: 60
-        )
+        let lookup = try await executeRecorded(profileArgs + [
+            "pro", "computers-inventory", "list",
+            "--filter", CLICommand.serialFilter(serial),
+            "--section", "GENERAL", "-o", "json"
+        ], timeout: 60)
         guard let managementId = Self.managementId(in: lookup) else {
             throw CLIError.nonZeroExit(code: -1, stderr: "No computer with serial \(serial) was found, or it has no management ID.")
         }
@@ -1147,13 +1154,9 @@ actor CLIManager: CLIRunning {
         ]
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         logger.debug("Sending DEVICE_LOCK for \(serial, privacy: .private)")
-        return try await executor.execute(
-            binary: binaryURL,
-            arguments: profileArgs + CLICommand.lock(serial: serial, pin: pin).baseArguments,
-            environment: Self.minimalEnvironment(),
-            stdinData: bodyData,
-            timeout: CLICommand.lock(serial: serial, pin: pin).timeout
-        )
+        return try await executeRecorded(profileArgs + CLICommand.lock(serial: serial, pin: pin).baseArguments,
+                                         timeout: CLICommand.lock(serial: serial, pin: pin).timeout,
+                                         stdinData: bodyData)
     }
 
     /// Number of records in a `computers-inventory list` response (bare array or `results`).

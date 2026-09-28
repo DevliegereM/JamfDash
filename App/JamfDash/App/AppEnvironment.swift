@@ -618,6 +618,26 @@ final class AppEnvironment {
 
     func clearSwitchError() { switchError = nil }
 
+    /// Versions and connection facts for a problem report.
+    func reportEnvironment() async -> ReportEnvironment {
+        var info = ReportEnvironment()
+        info.cliVersion = await cliManager.installedVersion?.semver
+        info.isDemo = isDemoMode
+        let product: String
+        switch currentProduct {
+        case .pro: product = activeProfileUsesPlatformAPI ? "Jamf Pro (Platform API)" : "Jamf Pro"
+        case .protect: product = "Jamf Protect"
+        case .school: product = "Jamf School"
+        }
+        info.connection = product
+        info.serverURL = isDemoMode ? nil : currentServerURL
+        info.profileNames = availableProfiles + [currentProfileName]
+        info.dashieActions = DashieActions.isEnabled
+        info.destructiveAllowed = allowsDestructiveActions
+        info.verboseLogging = DebugLoggingService.shared.isEnabled
+        return info
+    }
+
     /// Points drift history, digests and correlation at the given profile's own data.
     private func useInstanceStorage(for profileName: String) {
         let dir = InstanceStorage.directory(forProfile: profileName)
