@@ -305,7 +305,7 @@ final class ComputerDetailSectionTests: XCTestCase {
 
     func testInventoryCommandsOnlyUseValidSections() {
         let commands: [CLICommand] = [.computerDetail(serial: "A"), .computers, .securityInventory, .ddmComputers,
-                                      .computersUpdateReadiness, .recentEnrollments, .enrollmentInventory(serial: "A")]
+                                      .computersUpdateReadiness, .recentEnrollments(since: Date(timeIntervalSince1970: 0)), .enrollmentInventory(serial: "A")]
         for c in commands {
             let args = c.baseArguments
             for (i, a) in args.enumerated() where a == "--section" {
@@ -349,7 +349,7 @@ final class EnrollmentCLISafetyTests: XCTestCase {
 
     func testEnrollmentCommandsAreReadOnly() {
         let commands: [CLICommand] = [
-            .recentEnrollments, .enrollmentInventory(serial: "A"), .mdmCommandsForDevice(managementId: "a"),
+            .recentEnrollments(since: Date(timeIntervalSince1970: 0)), .enrollmentInventory(serial: "A"), .mdmCommandsForDevice(managementId: "a"),
             .computerHistory(serial: "A", subset: .policyLogs), .computerPrestageDetail(id: "1"), .logFlushingSettings,
         ]
         for c in commands {
@@ -673,3 +673,30 @@ final class EnrollmentLiveProbeTests: XCTestCase {
         }
     }
 }
+
+final class RecentEnrollmentFilterTests: XCTestCase {
+    func testFilterAsksJamfProForTheWindowOnly() {
+        let since = Date(timeIntervalSince1970: 1_790_000_000)
+        let args = CLICommand.recentEnrollments(since: since).baseArguments
+        XCTAssertEqual(Array(args.prefix(3)), ["pro", "computer-inventory", "list"])
+        let filter = args[args.firstIndex(of: "--filter")! + 1]
+        XCTAssertEqual(filter, "general.lastEnrolledDate>=\"\(ISO8601DateFormatter().string(from: since))\"")
+    }
+
+    /// Jamf Pro versions that reject the filter still get a list, from the full inventory.
+    private struct RejectingFilterCLI: SimulatedCLI {
+        func run(_ command: CLICommand) async throws -> Data {
+            if case .recentEnrollments = command {
+                throw CLIError.nonZeroExit(code: 1, stderr: #"{"error":"bad_request","exitCode":1,"message":"Invalid filter"}"#)
+            }
+            return try await DemoCLIManager().run(.recentEnrollments(since: .distantPast))
+        }
+    }
+
+    func testFallsBackToFullInventory() async throws {
+        let repo = EnrollmentRepository(cli: RejectingFilterCLI())
+        let list = try await repo.recentEnrollments(withinDays: 36_500)
+        XCTAssertFalse(list.isEmpty)
+    }
+}
+

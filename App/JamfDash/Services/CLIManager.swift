@@ -185,8 +185,8 @@ enum CLICommand: Sendable {
     case computersUpdateReadiness
 
     // MARK: Enrollment flow & timeline (appended)
-    /// Inventory with enrollment dates, method and serials for the Recent Enrollments list.
-    case recentEnrollments
+    /// Macs enrolled on or after `since`, filtered by Jamf Pro, for the Recent Enrollments list.
+    case recentEnrollments(since: Date)
     /// One Mac's inventory with the sections the timeline needs.
     case enrollmentInventory(serial: String)
     /// MDM commands for one Mac (`clientManagementId` must be a UUID).
@@ -231,7 +231,7 @@ enum CLICommand: Sendable {
         // Jamf Pro — data
         case .overview:             return ["pro", "overview", "-o", "json"]
         case .securityReport:       return ["pro", "report", "security", "-o", "json"]
-        case .securityInventory:    return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "SECURITY", "--section", "DISK_ENCRYPTION", "-o", "json"]
+        case .securityInventory:    return ["pro", "computer-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "SECURITY", "--section", "DISK_ENCRYPTION", "-o", "json"]
         case .policies:             return ["pro", "classic-policies", "list", "-o", "json"]
         case .smartComputerGroups:  return ["pro", "smart-computer-groups", "list", "-o", "json"]
         case .categories:           return ["pro", "categories", "list", "-o", "json"]
@@ -240,11 +240,11 @@ enum CLICommand: Sendable {
         case .configProfiles:                     return ["pro", "classic-macos-config-profiles", "list", "-o", "json"]
         case .policyDetail(let id):               return ["pro", "classic-policies", "get", "-o", "json", "--", "\(id)"]
         case .configProfileDetail(let id):        return ["pro", "classic-macos-config-profiles", "get", "-o", "json", "--", "\(id)"]
-        case .computers:                          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "-o", "json"]
-        case .computerDetail(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "STORAGE", "--section", "DISK_ENCRYPTION", "--section", "SECURITY", "--section", "USER_AND_LOCATION", "--section", "PURCHASING", "--section", "GROUP_MEMBERSHIPS", "--section", "LOCAL_USER_ACCOUNTS", "--section", "SOFTWARE_UPDATES", "--section", "CONFIGURATION_PROFILES", "--section", "EXTENSION_ATTRIBUTES", "-o", "json"]
-        case .computerDetailById(let id):         return ["pro", "computers-inventory", "get", "-o", "json", "--", id]
-        case .deviceIdentity(let s):              return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "-o", "json"]
-        case .installedApps(let s):               return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "APPLICATIONS", "-o", "json"]
+        case .computers:                          return ["pro", "computer-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "-o", "json"]
+        case .computerDetail(let s):              return ["pro", "computer-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "STORAGE", "--section", "DISK_ENCRYPTION", "--section", "SECURITY", "--section", "USER_AND_LOCATION", "--section", "PURCHASING", "--section", "GROUP_MEMBERSHIPS", "--section", "LOCAL_USER_ACCOUNTS", "--section", "SOFTWARE_UPDATES", "--section", "CONFIGURATION_PROFILES", "--section", "EXTENSION_ATTRIBUTES", "-o", "json"]
+        case .computerDetailById(let id):         return ["pro", "computer-inventory", "get", "-o", "json", "--", id]
+        case .deviceIdentity(let s):              return ["pro", "computer-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "HARDWARE", "-o", "json"]
+        case .installedApps(let s):               return ["pro", "computer-inventory", "list", "--filter", CLICommand.serialFilter(s), "--section", "GENERAL", "--section", "APPLICATIONS", "-o", "json"]
         case .smartGroupDetail(let id):           return ["pro", "smart-computer-groups", "get", "-o", "json", "--", id]
 
         // DDM Monitor
@@ -408,13 +408,15 @@ enum CLICommand: Sendable {
             let digits = id.filter { $0.isASCII && $0.isNumber }
             return ["pro", "managed-software-updates-plans", "list", "--filter", "device.deviceId==\(digits);device.objectType==COMPUTER", "-o", "json"]
         case .softwareUpdateStatuses:            return ["pro", "managed-software-updates", "update-statuses", "-o", "json"]
-        case .computersUpdateReadiness:          return ["pro", "computers-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "CONFIGURATION_PROFILES", "-o", "json"]
+        case .computersUpdateReadiness:          return ["pro", "computer-inventory", "list", "--all", "--section", "GENERAL", "--section", "HARDWARE", "--section", "OPERATING_SYSTEM", "--section", "CONFIGURATION_PROFILES", "-o", "json"]
 
         // Enrollment flow & timeline (appended)
-        case .recentEnrollments:
-            return CLICommand.computers.baseArguments
+        case .recentEnrollments(let since):
+            let date = ISO8601DateFormatter().string(from: since)
+            return ["pro", "computer-inventory", "list", "--filter", "general.lastEnrolledDate>=\"\(date)\"",
+                    "--section", "GENERAL", "--section", "HARDWARE", "-o", "json"]
         case .enrollmentInventory(let s):
-            return ["pro", "computers-inventory", "list", "--filter", CLICommand.serialFilter(s),
+            return ["pro", "computer-inventory", "list", "--filter", CLICommand.serialFilter(s),
                     "--section", "GENERAL", "--section", "HARDWARE", "--section", "USER_AND_LOCATION",
                     "--section", "GROUP_MEMBERSHIPS", "--section", "CONFIGURATION_PROFILES", "-o", "json"]
         case .mdmCommandsForDevice(let id):
@@ -1033,17 +1035,18 @@ actor CLIManager: CLIRunning {
             return try await lockComputer(serial: serial, pin: pin, profile: pending.profile)
         }
         // jamf-cli picks a record by serial; with duplicates it's unclear which one an erase
-        // would hit, so destructive Mac actions need exactly one match.
+        // would hit, so destructive actions need exactly one match.
         switch command {
         case .erase(let serial), .removeMDM(let serial), .clearRecoveryLock(let serial):
             let lookup = try await runJamfCLI(CLICommand.deviceIdentity(serial: serial).baseArguments,
                                               timeout: 60, profile: pending.profile)
-            let count = Self.recordCount(in: lookup)
-            guard count == 1 else {
-                throw CLIError.nonZeroExit(code: -1, stderr: count == 0
-                    ? "No computer with serial \(serial) was found. Nothing was sent."
-                    : "\(count) computers have serial \(serial), so nothing was sent. Use Jamf Pro for this one.")
-            }
+            try Self.requireOneMatch(Self.recordCount(in: lookup), kind: "computer", serial: serial)
+        case .mobileDeviceErase(let serial), .mobileDeviceLock(let serial), .mobileDeviceUnmanage(let serial),
+             .mobileDeviceEnableLostMode(let serial, _, _, _):
+            // jamf-cli can't filter mobile devices by serial, so the list is counted here.
+            let list = try await runJamfCLI(CLICommand.mobileDeviceList.baseArguments,
+                                            timeout: CLICommand.mobileDeviceList.timeout, profile: pending.profile)
+            try Self.requireOneMatch(Self.mobileSerialCount(in: list, serial: serial), kind: "mobile device", serial: serial)
         default:
             break
         }
@@ -1153,7 +1156,7 @@ actor CLIManager: CLIRunning {
         let profileArgs = profile.isDefault ? [] : ["--profile", profile.name]
 
         let lookup = try await executeRecorded(profileArgs + [
-            "pro", "computers-inventory", "list",
+            "pro", "computer-inventory", "list",
             "--filter", CLICommand.serialFilter(serial),
             "--section", "GENERAL", "-o", "json"
         ], timeout: 60)
@@ -1172,13 +1175,33 @@ actor CLIManager: CLIRunning {
                                          stdinData: bodyData)
     }
 
-    /// Number of records in a `computers-inventory list` response (bare array or `results`).
+    static func requireOneMatch(_ count: Int, kind: String, serial: String) throws {
+        guard count == 1 else {
+            throw CLIError.nonZeroExit(code: -1, stderr: count == 0
+                ? "No \(kind) with serial \(serial) was found. Nothing was sent."
+                : "\(count) \(kind)s have serial \(serial), so nothing was sent. Use Jamf Pro for this one.")
+        }
+    }
+
+    /// Mobile devices in a `md list` response whose serial matches (case-insensitive).
+    static func mobileSerialCount(in data: Data, serial: String) -> Int {
+        let json = try? JSONSerialization.jsonObject(with: data)
+        let rows = (json as? [[String: Any]]) ?? ((json as? [String: Any])?["results"] as? [[String: Any]]) ?? []
+        let wanted = CLICommand.cleanValue(serial)
+        return rows.filter { row in
+            let s = (row["serialNumber"] as? String) ?? (row["serial"] as? String)
+                ?? ((row["general"] as? [String: Any])?["serialNumber"] as? String) ?? ""
+            return s.caseInsensitiveCompare(wanted) == .orderedSame
+        }.count
+    }
+
+    /// Number of records in a `computer-inventory list` response (bare array or `results`).
     static func recordCount(in data: Data) -> Int {
         let json = try? JSONSerialization.jsonObject(with: data)
         return ((json as? [Any]) ?? ((json as? [String: Any])?["results"] as? [Any]) ?? []).count
     }
 
-    /// Extracts `general.managementId` from a `computers-inventory list` response,
+    /// Extracts `general.managementId` from a `computer-inventory list` response,
     /// which is either a bare array or wrapped in `results`.
     static func managementId(in data: Data) -> String? {
         let json = try? JSONSerialization.jsonObject(with: data)

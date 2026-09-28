@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 
 /// The last jamf-cli commands of this session, for problem reports: the command name only
-/// (e.g. `pro computers-inventory list`), never flags or values, with result and duration.
+/// (e.g. `pro computer-inventory list`), never flags or values, with result and duration.
 /// Kept in memory; nothing is written to disk.
 final class DiagnosticsJournal: @unchecked Sendable {
     static let shared = DiagnosticsJournal()

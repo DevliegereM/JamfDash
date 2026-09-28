@@ -11,6 +11,9 @@ struct JamfDashApp: App {
     @State private var env: AppEnvironment
     @State private var appState: AppState
 
+    /// True when XCTest launched the app to host the unit tests.
+    static let isTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+
     init() {
         // A jamf-cli that exits before reading stdin must not kill the app.
         signal(SIGPIPE, SIG_IGN)
@@ -29,7 +32,9 @@ struct JamfDashApp: App {
         DebugLoggingService.shared.applyOnLaunch()
         appLogger.info("JamfDash launching (debug logging: \(DebugLoggingService.shared.isEnabled, privacy: .public))")
         NSWindow.allowsAutomaticWindowTabbing = false
-        let env = AppEnvironment()
+        // As the unit tests' host the app must not sync a real Jamf instance or write to its
+        // data folder: it starts with the demo environment and skips startup.
+        let env = Self.isTestHost ? AppEnvironment.demo() : AppEnvironment()
         self._env = State(initialValue: env)
         self._appState = State(initialValue: AppState(env: env))
     }
@@ -39,8 +44,12 @@ struct JamfDashApp: App {
             RootView()
                 .environment(appState)
                 .environment(env)
-                .task { await appState.bootstrap() }
                 .task {
+                    guard !Self.isTestHost else { return }
+                    await appState.bootstrap()
+                }
+                .task {
+                    guard !Self.isTestHost else { return }
                     _ = try? await UNUserNotificationCenter.current()
                         .requestAuthorization(options: [.alert, .sound])
                 }

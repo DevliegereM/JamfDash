@@ -10,12 +10,14 @@ final class ActionConfirmationTests: XCTestCase {
         private let lock = NSLock()
         private var _calls: [[String]] = []
         var lookupResult = Data(#"{"totalCount":1,"results":[{"id":"1"}]}"#.utf8)
+        var mobileList = Data(#"[{"id":"1","serialNumber":"F9A"},{"id":"2","serialNumber":"F9B"}]"#.utf8)
         var calls: [[String]] { lock.withLock { _calls } }
 
         func execute(binary: URL, arguments: [String], environment: [String: String],
                      stdinData: Data?, timeout: TimeInterval) async throws -> Data {
             lock.withLock { _calls.append(arguments) }
-            if arguments.contains("computers-inventory") { return lookupResult }
+            if arguments.contains("computer-inventory") { return lookupResult }
+            if arguments.contains("md") && arguments.contains("list") { return mobileList }
             return Data("{}".utf8)
         }
 
@@ -112,6 +114,24 @@ final class ActionConfirmationTests: XCTestCase {
             XCTAssertTrue(message.contains("2 computers"))
         }
         XCTAssertEqual(recorder.calls.count, 1, "only the lookup ran")
+    }
+
+    func testMobileDestructiveActionNeedsExactlyOneDevice() async throws {
+        profiles.setAllowsDestructiveActions(true, for: "Test-A")
+        let token = try await cli.confirm(.mobileDeviceErase(serial: "f9a"))
+        _ = try await cli.run(.mobileDeviceErase(serial: "f9a"), confirmation: token)
+        XCTAssertTrue(recorder.calls.last?.contains("erase") == true, "one match (case-insensitive): erase sent")
+
+        recorder.mobileList = Data(#"[{"serialNumber":"F9A"},{"serialNumber":"F9A"}]"#.utf8)
+        let second = try await cli.confirm(.mobileDeviceUnmanage(serial: "F9A"))
+        let before = recorder.calls.count
+        do {
+            _ = try await cli.run(.mobileDeviceUnmanage(serial: "F9A"), confirmation: second)
+            XCTFail("expected a refusal")
+        } catch CLIError.nonZeroExit(_, let message) {
+            XCTAssertTrue(message.contains("2 mobile devices"), message)
+        }
+        XCTAssertEqual(recorder.calls.count, before + 1, "only the list ran")
     }
 
     func testUnknownScopeIsStandard() {

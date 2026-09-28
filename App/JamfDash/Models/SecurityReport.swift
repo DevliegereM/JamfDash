@@ -152,7 +152,7 @@ extension SecurityReport {
     }
 
     /// Builds the same report `jamf-cli pro report security` produces, from
-    /// `pro computers-inventory list` output (a bare array or `{"results": [...]}`).
+    /// `pro computer-inventory list` output (a bare array or `{"results": [...]}`).
     init(inventory data: Data) throws {
         let decoder = JSONDecoder()
         let computers: [InventoryComputer]

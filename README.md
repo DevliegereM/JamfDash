@@ -506,4 +506,10 @@ Jamf Dash is an independent project. It isn't made, endorsed or supported by Jam
 
 ## License
 
-This project is provided as-is. See [LICENSE](LICENSE) for details.
+Jamf Dash is free to use, including at work. The source code is licensed under the [Apache License 2.0](LICENSE) with the [Commons Clause](https://commonsclause.com):
+
+- You may use, study, change and share it.
+- You must keep the copyright notice and the [NOTICE](NOTICE) file, which credit Michiel Devliegere as the author, and say what you changed.
+- You may not sell it, or offer a product or service for a fee whose value comes entirely or substantially from Jamf Dash.
+
+Because of the Commons Clause, Jamf Dash is source-available rather than open source.

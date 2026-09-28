@@ -12,8 +12,16 @@ struct EnrollmentRepository: Sendable {
     // MARK: - Recent enrollments
 
     func recentEnrollments(withinDays days: Int, now: Date = Date()) async throws -> [RecentEnrollment] {
-        let data = try await cli.run(.recentEnrollments)
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
+        let data: Data
+        do {
+            // Jamf Pro filters by enrollment date, so only the chosen window is downloaded.
+            data = try await cli.run(.recentEnrollments(since: cutoff))
+        } catch CLIError.nonZeroExit(let code, let message) where JamfCLIErrorPayload(output: message)?.isPermissionDenied != true {
+            // A Jamf Pro version that rejects the filter: fall back to the whole inventory.
+            Self.logger.notice("Enrollment date filter failed (exit \(code, privacy: .public)); loading the full inventory")
+            data = try await cli.run(.computers)
+        }
         return EnrollmentParsing.recentEnrollments(data)
             .filter { ($0.enrolledAt ?? .distantPast) >= cutoff }
             .sorted { ($0.enrolledAt ?? .distantPast) > ($1.enrolledAt ?? .distantPast) }

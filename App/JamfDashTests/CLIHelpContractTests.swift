@@ -133,7 +133,7 @@ final class CLIHelpContractTests: XCTestCase {
         .softwareUpdatePlansForComputer(computerId: "X1"),
         .softwareUpdateStatuses,
         .computersUpdateReadiness,
-        .recentEnrollments,
+        .recentEnrollments(since: Date(timeIntervalSince1970: 0)),
         .enrollmentInventory(serial: "X1"),
         .mdmCommandsForDevice(managementId: "X1"),
         .computerHistory(serial: "X1", subset: .commands),

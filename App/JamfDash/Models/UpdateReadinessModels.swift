@@ -98,7 +98,7 @@ extension ManagedUpdateStatus: Decodable {
 
 // MARK: - Readiness computer
 
-/// Computer record from `computers-inventory list` with GENERAL, HARDWARE,
+/// Computer record from `computer-inventory list` with GENERAL, HARDWARE,
 /// OPERATING_SYSTEM and CONFIGURATION_PROFILES sections.
 struct ReadinessComputer: Sendable, Hashable, Identifiable {
     struct InstalledProfile: Sendable, Hashable {
