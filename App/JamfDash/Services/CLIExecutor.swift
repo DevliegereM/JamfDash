@@ -170,7 +170,10 @@ actor CLIExecutor {
                 continuation.resume(returning: .failure(CLIError.launchFailed("PTY setup failed")))
                 return
             }
-            let slaveFD = open(slavePath, O_RDWR)
+            // O_NOCTTY: the XPC worker is a session leader without a terminal, so without it
+            // this PTY becomes the worker's controlling terminal and closing the master
+            // afterwards sends the worker SIGHUP, killing it before it can reply.
+            let slaveFD = open(slavePath, O_RDWR | O_NOCTTY)
             guard slaveFD >= 0 else {
                 close(masterFD)
                 continuation.resume(returning: .failure(CLIError.launchFailed("open slave PTY failed")))
