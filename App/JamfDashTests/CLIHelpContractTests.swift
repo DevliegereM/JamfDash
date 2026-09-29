@@ -139,6 +139,17 @@ final class CLIHelpContractTests: XCTestCase {
         .computerHistory(serial: "X1", subset: .commands),
         .computerPrestageDetail(id: "X1"),
         .logFlushingSettings,
+        .mobileDeviceExtensionAttributes,
+        .classicComputerGroups,
+        .classicComputerGroupDetail(id: "1"),
+        .advancedComputerSearches,
+        .advancedComputerSearchDetail(id: "1"),
+        .classicMobileDeviceGroups,
+        .classicMobileDeviceGroupDetail(id: "1"),
+        .advancedMobileDeviceSearches,
+        .advancedMobileDeviceSearchDetail(id: "1"),
+        .mobileConfigProfiles,
+        .mobileConfigProfileDetail(id: "1"),
     ]
 
     private static func coverage(_ command: CLICommand) {
@@ -272,7 +283,18 @@ final class CLIHelpContractTests: XCTestCase {
              .mdmCommandsForDevice,
              .computerHistory,
              .computerPrestageDetail,
-             .logFlushingSettings:
+             .logFlushingSettings,
+             .mobileDeviceExtensionAttributes,
+             .classicComputerGroups,
+             .classicComputerGroupDetail,
+             .advancedComputerSearches,
+             .advancedComputerSearchDetail,
+             .classicMobileDeviceGroups,
+             .classicMobileDeviceGroupDetail,
+             .advancedMobileDeviceSearches,
+             .advancedMobileDeviceSearchDetail,
+             .mobileConfigProfiles,
+             .mobileConfigProfileDetail:
             break
         }
     }

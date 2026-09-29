@@ -406,9 +406,11 @@ struct ExtensionAttribute: Decodable, Sendable, Hashable, Identifiable {
     let inventoryDisplayType: String?
     let enabled: Bool?
     let scriptContents: String?
+    /// Choices of a pop-up menu attribute; empty for other input types.
+    let popupMenuChoices: [String]
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, description, dataType, inputType, inventoryDisplayType, enabled, scriptContents
+        case id, name, description, dataType, inputType, inventoryDisplayType, enabled, scriptContents, popupMenuChoices
     }
 
     init(from decoder: Decoder) throws {
@@ -422,6 +424,7 @@ struct ExtensionAttribute: Decodable, Sendable, Hashable, Identifiable {
         inventoryDisplayType = try? c.decode(String.self, forKey: .inventoryDisplayType)
         enabled              = try? c.decode(Bool.self,   forKey: .enabled)
         scriptContents       = try? c.decode(String.self, forKey: .scriptContents)
+        popupMenuChoices     = (try? c.decode([String].self, forKey: .popupMenuChoices)) ?? []
     }
 }
 

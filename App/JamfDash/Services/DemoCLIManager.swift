@@ -34,6 +34,7 @@ struct DemoCLIManager: SimulatedCLI, Sendable {
 
     private func demoJSON(for command: CLICommand) throws -> String {
         if let enrollment = DemoEnrollmentData.json(for: command) { return enrollment }
+        if let dependencies = DemoEADependencyData.json(for: command) { return dependencies }
         switch command {
         // Jamf Pro
         case .overview:              return proOverviewJSON
@@ -997,6 +998,11 @@ private let patchPolicyDetailJSON = """
     "enabled": true,
     "target_version": "124.0.6367.60",
     "patch_title": {"id": 3, "name": "Google Chrome"}
+  },
+  "scope": {
+    "all_computers": false,
+    "computer_groups": [{"id": 13, "name": "Engineering Department"}],
+    "exclusions": {"computer_groups": [{"id": 22, "name": "Beta Testers"}]}
   }
 }
 """
@@ -1030,6 +1036,11 @@ private let restrictedSoftwareDetailJSON = """
       "kill_process": false,
       "delete_executable": false,
       "display_message": ""
+    },
+    "scope": {
+      "all_computers": false,
+      "computer_groups": [{"id": 5, "name": "Security Baseline Required"}],
+      "exclusions": {"computer_groups": []}
     }
   }
 }
@@ -1280,6 +1291,7 @@ private func demoProfilePayloadsPlist(id: Int) -> String {
     switch id {
     case 3:  payload = "<dict><key>PayloadType</key><string>com.apple.security.firewall</string><key>EnableFirewall</key><true/></dict>"
     case 6:  payload = "<dict><key>PayloadType</key><string>com.apple.vpn.managed</string><key>VPNType</key><string>IKEv2</string></dict>"
+    case 7:  payload = "<dict><key>PayloadType</key><string>com.apple.loginwindow</string><key>LoginwindowText</key><string>Asset $EXTENSIONATTRIBUTE_7</string></dict>"
     case 8:  payload = "<dict><key>PayloadType</key><string>com.apple.applicationaccess.new</string><key>familyControlsEnabled</key><true/></dict>"
     case 10: payload = "<dict><key>PayloadType</key><string>com.apple.AssetCache.managed</string><key>AllowSharedCaching</key><true/></dict>"
     case 11: payload = "<dict><key>PayloadType</key><string>com.apple.applicationaccess</string><key>forceDelayedSoftwareUpdates</key><true/><key>enforcedSoftwareUpdateDelay</key><integer>30</integer></dict>"

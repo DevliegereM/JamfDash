@@ -100,6 +100,7 @@ final class AppEnvironment {
     let aiAssistantVM: AIAssistantViewModel
     let settingsInspectorVM: SettingsInspectorViewModel
     let enrollmentVM: EnrollmentFlowViewModel
+    let eaDependencyVM: EADependencyViewModel
 
     /// Set by a view to switch the sidebar to another section; MainView applies and clears it.
     var requestedSection: SidebarItem?
@@ -211,6 +212,7 @@ final class AppEnvironment {
         self.schoolVM               = SchoolViewModel(cli: cliManager)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: cliManager)
         self.enrollmentVM           = EnrollmentFlowViewModel(cli: cliManager)
+        self.eaDependencyVM         = EADependencyViewModel(cli: cliManager)
         let instanceDir = InstanceStorage.directory(forProfile: profileService.selectedProfile.name)
         self.digestService          = DigestService(cli: cliManager, storageURL: instanceDir.appendingPathComponent("digests.json"))
         self.driftVM                = DriftViewModel(cli: cliManager, store: .forProfile(profileService.selectedProfile.name))
@@ -270,6 +272,7 @@ final class AppEnvironment {
         self.aiAssistantVM          = AIAssistantViewModel(cli: demoCLI)
         self.settingsInspectorVM    = SettingsInspectorViewModel(cli: demoCLI)
         self.enrollmentVM           = EnrollmentFlowViewModel(cli: demoCLI)
+        self.eaDependencyVM         = EADependencyViewModel(cli: demoCLI)
         self.digestService          = DigestService(cli: demoCLI,
                                                     storageURL: InstanceStorage.demoDirectory.appendingPathComponent("digests.json"),
                                                     notifies: false)
@@ -598,6 +601,7 @@ final class AppEnvironment {
                 // Another Jamf instance: don't let Dashie search the previous one's data.
                 FleetKnowledgeStore.shared.clear()
                 enrollmentVM.reset()
+                eaDependencyVM.reset()
                 // Scores from another instance aren't comparable.
                 previousHealthScore = nil
                 NSApp.dockTile.badgeLabel = nil

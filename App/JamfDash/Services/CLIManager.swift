@@ -196,6 +196,19 @@ enum CLICommand: Sendable {
     case computerPrestageDetail(id: String)
     case logFlushingSettings
 
+    // MARK: Extension attribute dependencies (appended)
+    case mobileDeviceExtensionAttributes
+    case classicComputerGroups
+    case classicComputerGroupDetail(id: String)
+    case advancedComputerSearches
+    case advancedComputerSearchDetail(id: String)
+    case classicMobileDeviceGroups
+    case classicMobileDeviceGroupDetail(id: String)
+    case advancedMobileDeviceSearches
+    case advancedMobileDeviceSearchDetail(id: String)
+    case mobileConfigProfiles
+    case mobileConfigProfileDetail(id: String)
+
     enum ComputerHistorySubset: String, Sendable {
         case commands = "Commands"
         case policyLogs = "PolicyLogs"
@@ -429,6 +442,30 @@ enum CLICommand: Sendable {
             return ["pro", "computer-prestages", "get", "-o", "json", "--", id.filter { $0.isASCII && $0.isNumber }]
         case .logFlushingSettings:
             return ["pro", "log-flushing", "list", "-o", "json"]
+
+        // Extension attribute dependencies (appended)
+        case .mobileDeviceExtensionAttributes:
+            return ["pro", "mobile-device-extension-attributes", "list", "-o", "json"]
+        case .classicComputerGroups:
+            return ["pro", "classic-computer-groups", "list", "-o", "json"]
+        case .classicComputerGroupDetail(let id):
+            return ["pro", "classic-computer-groups", "get", "-o", "json", "--", CLICommand.digits(id)]
+        case .advancedComputerSearches:
+            return ["pro", "classic-advanced-computer-searches", "list", "-o", "json"]
+        case .advancedComputerSearchDetail(let id):
+            return ["pro", "classic-advanced-computer-searches", "get", "-o", "json", "--", CLICommand.digits(id)]
+        case .classicMobileDeviceGroups:
+            return ["pro", "classic-mobile-device-groups", "list", "-o", "json"]
+        case .classicMobileDeviceGroupDetail(let id):
+            return ["pro", "classic-mobile-device-groups", "get", "-o", "json", "--", CLICommand.digits(id)]
+        case .advancedMobileDeviceSearches:
+            return ["pro", "classic-advanced-mobile-device-searches", "list", "-o", "json"]
+        case .advancedMobileDeviceSearchDetail(let id):
+            return ["pro", "classic-advanced-mobile-device-searches", "get", "-o", "json", "--", CLICommand.digits(id)]
+        case .mobileConfigProfiles:
+            return ["pro", "classic-mobile-config-profiles", "list", "-o", "json"]
+        case .mobileConfigProfileDetail(let id):
+            return ["pro", "classic-mobile-config-profiles", "get", "-o", "json", "--", CLICommand.digits(id)]
         }
     }
 
@@ -448,6 +485,11 @@ enum CLICommand: Sendable {
             return 120
         default: return 60
         }
+    }
+
+    /// ASCII digits only, for Jamf object IDs.
+    static func digits(_ id: String) -> String {
+        id.filter { $0.isASCII && $0.isNumber }
     }
 
     /// RSQL filter matching one serial number. The value is quoted and `\` / `"` are

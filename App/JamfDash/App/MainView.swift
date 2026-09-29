@@ -45,7 +45,7 @@ struct MainView: View {
             case .orgBrowser:
                 OrgBrowserView(vm: env.fleetVM)
             case .extensionAttributes:
-                ExtensionAttributesView(vm: env.fleetVM)
+                ExtensionAttributesView(vm: env.eaDependencyVM)
             case .patchManagement:
                 PatchView(vm: env.fleetVM)
 
