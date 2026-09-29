@@ -1,13 +1,96 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0"
-     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
-     xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
   <channel>
     <title>Jamf Dash</title>
     <link>https://github.com/DevliegereM/JamfDash</link>
     <description>Jamf Dash releases</description>
     <language>en</language>
 
+    <item>
+            <title>0.9.1</title>
+            <pubDate>Tue, 29 Sep 2026 23:18:44 +0200</pubDate>
+            <sparkle:version>20260929.2</sparkle:version>
+            <sparkle:shortVersionString>0.9.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[**Jamf Dash 0.9.1 fixes connecting to Jamf.** In 0.9, adding a Jamf Pro or Platform API connection failed with "CLI worker unavailable: Couldn't communicate with a helper application." This release fixes that, and brings safer device actions, problem reports, Protect alerts and many other fixes. Please report anything that doesn't work with **Help → Report a Problem…**.
+
+## Fixed: connecting
+
+- **Adding a connection works again.** Jamf Dash runs jamf-cli in a separate helper, and that helper quit as soon as jamf-cli finished setting up a connection, before it could pass on the result.
+- **Check for App Updates…** now uses a signed update feed.
+
+## Report a Problem
+
+- **Help → Report a Problem…** sends a report with recent logs, the names of the jamf-cli commands that ran (never their values) and crash reports. You see every file before anything is sent, with server addresses, serial numbers, names, email and IP addresses, IDs and tokens replaced by placeholders, and you can edit or leave out anything.
+- Send it by **email** (the report is attached), open a **GitHub issue** (text only, because the repository is public), or **save it as a zip**.
+- **Report This Problem…** appears on every error message, and a banner offers it after Jamf Dash quits unexpectedly. You can also ask Dashie to report a bug.
+
+## Safer device actions
+
+- **Destructive actions are off for every connection** until you turn them on in **Settings → Connection** (erase, lock, remove MDM, clear Recovery Lock, and for mobile devices erase, unmanage, lock and Lost Mode). If you used them before, turn them on again for the connections you use them with.
+- Every action is checked before it's sent: it only goes to the connection it was confirmed on. If you switch instance in between, nothing is sent.
+- Erase, Remove MDM and Clear Recovery Lock, and for mobile devices Erase, Lock, Unmanage and Lost Mode, refuse to run when more than one device has the same serial number.
+- Actions on several selected Macs ask first, with the number of Macs, and run at most four at a time.
+- **Set Recovery Lock** is now **Clear Recovery Lock**, which is what it did. To set a password, use Jamf Pro.
+- **Enable Lost Mode** on mobile devices asks for the lock-screen message, and optionally a phone number and footnote. It failed before.
+- **Clear Passcode** is removed: it needs an unlock token that Jamf Dash doesn't have.
+
+## Dashie
+
+- **Actions are off by default.** Turn them on in **Settings → Dashie** (the AI tab is now called Dashie).
+- Each action confirmation shows the Mac or the policies Jamf Dash looked up itself, not text from the model. Disabling or enabling policies in bulk asks you to type the number of policies or the category.
+- Removed "run a policy on a Mac": jamf-cli has no command for it, so it never worked.
+- **Installed apps** now work.
+- Links in Dashie's answers are no longer clickable. The conversation resets when you switch instance.
+
+## Fixes
+
+- **Protect → Alerts** now lists Protect alerts with severity, status, analytic, host and time, with filters and search.
+- **Recent Enrollments** asks Jamf Pro for the chosen period only (7 days by default) instead of downloading every Mac.
+- **School → User Groups** and **Settings → Export Lists → Webhooks** used jamf-cli commands that don't exist and always failed.
+- **Audit Dashboard** said "All audit checks passed" when the checks couldn't run. It now lists the checks that failed.
+- The **health score** and Dock badge no longer show 0 (or an A) when security data couldn't be loaded, and no longer alert that the score "dropped" after a failed load.
+- **Configuration Drift** and daily digests are kept separately for each connection. Switching instance no longer shows another instance's changes, and demo mode never touches your data.
+- **Device Correlation** says which Jamf Pro and Jamf Protect connections it's pairing.
+- **⌘R** now reloads Protect and School sections.
+- **Settings → Backup** is now **Export Lists**, and shows which lists failed and why. The files are lists with names and IDs, not a backup that can be restored.
+- Exporting logs no longer hangs when there's a lot of output.
+- Demo mode shows sample data for more sections, and says so when a section isn't part of the demo.
+- Uses jamf-cli's current `computer-inventory` command name; the old name stops working in March 2027.
+
+## Security
+
+- jamf-cli is checked against Jamf's signature again after it starts and before anything is sent to it, and it gets a minimal environment.
+- Values such as serial numbers and names can't be read as jamf-cli options.
+- A jamf-cli that hangs is stopped, output is capped, and closing a view stops its jamf-cli run.
+- jamf-cli error messages are no longer written to the log as public text, and the debug-logging profile no longer reveals private values.
+- App updates now come from a signed update feed.
+- See SECURITY.md and PRIVACY.md in the repository.
+
+## Accessibility and performance
+
+- VoiceOver labels for icon-only buttons and status icons. The Navigate menu names its sections (⌘1–⌘9).
+- The computer inventory is downloaded once when Devices, DDM Monitor and Enrollment need it at the same time.
+- Policy and profile categories are remembered for a day instead of being looked up on every sync.
+- The DDM status-item scan skips Macs without DDM and stops at 500 Macs.
+
+## License
+
+- Jamf Dash's source code is now licensed under the Apache License 2.0 with the Commons Clause. You're free to use it, including at work, and to change and share the code, as long as you keep the credit (the NOTICE file). You may not sell it, or offer a product or service for a fee that's based on it. Earlier versions were released under the MIT License.
+- **Jamf Dash → About Jamf Dash** lists acknowledgements. Jamf Dash isn't affiliated with Jamf.
+
+## Requirements
+
+macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.31.1 or later. English only.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9.1/JamfDash_v0.9.1.zip" length="10060686" type="application/octet-stream" sparkle:edSignature="+BxkMtPsO0cpA/U7RqLsRfpc0XlVQWlLIdYpsANY8cvEm9ULlXp/vAhiQHiZtLHugRnn7u01v9FCKliw0ds8Cw=="></enclosure>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9.1/JamfDash20260929.2-20260927.7.delta" sparkle:deltaFrom="20260927.7" length="2193798" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="56RSx4u0mDGKhOppVe3YEJqxBkTHGC5sBXTkNiC9H0uNFcRkuPN1ZNzb5wlnoezX+qtLwLx+glgxAeQ/9XcrDQ=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9.1/JamfDash20260929.2-20260927.5.delta" sparkle:deltaFrom="20260927.5" length="2788442" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="OxB+zTrbeXotFHPtaDMJTPppjswRhmVZbCuCIcRHxLNqwHTf5lBkf/GQB/oxCXO69bz2iM8vxS+ABYjhoskqAw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9.1/JamfDash20260929.2-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="2876910" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="tLkhxtq3ko1ODkw9NaP4255/87PYkF+rbaAepYTp4nwKLbQcfhYO5NXzhwwDLlhTTHM24nVWHCPIuvFlKukqAQ=="></enclosure>
+            </sparkle:deltas>
+        </item>
     <item>
             <title>0.9</title>
             <pubDate>Sun, 27 Sep 2026 23:01:28 +0200</pubDate>
@@ -43,11 +126,11 @@ Everything in this section is read-only and kept in memory; nothing is stored on
 
 macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.31.1 or later. The enrollment timeline needs read access to computer inventory, MDM commands and computer history; the Flow needs read access to PreStages, policies and configuration profiles.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash_v0.9.zip" length="9615002" type="application/octet-stream" sparkle:edSignature="gTmKt/Tr9isivqCByX1+sbY/W/zFjMjDvMQAYwAiU5CBqnyvFz8zyE1/thS9eoZWIQBtjYnK5Ge4hgNE9vgzBg=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash_v0.9.zip" length="9615002" type="application/octet-stream" sparkle:edSignature="gTmKt/Tr9isivqCByX1+sbY/W/zFjMjDvMQAYwAiU5CBqnyvFz8zyE1/thS9eoZWIQBtjYnK5Ge4hgNE9vgzBg=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.5.delta" sparkle:deltaFrom="20260927.5" length="1734046" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="kmoEx9cce0HsG3FTfbxUW2Ta7G/R5Z3G0lZ1g9PF/X0p2L+j5DhFAAZ6NPljhw5ehT+GFrTVOiT/bARrcaKVBg=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="1872270" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="79Xamrz39FHyR1GSXvg3eeNIjkJ8fBSvVpLvnAi6giQPnc+rClYnav4SxX84X4h2JAbJ9gEWhknxQZpnwkdTDw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="1947946" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="5Ojmax+lWT0y0wakHo1Ft2g1sr7bwaV8IlLKABZ+py/ok1QUapXohSfr7bLBWE09HzJKq/5AkkhWk9bOM2+uCA=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.5.delta" sparkle:deltaFrom="20260927.5" length="1734046" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="kmoEx9cce0HsG3FTfbxUW2Ta7G/R5Z3G0lZ1g9PF/X0p2L+j5DhFAAZ6NPljhw5ehT+GFrTVOiT/bARrcaKVBg=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="1872270" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="79Xamrz39FHyR1GSXvg3eeNIjkJ8fBSvVpLvnAi6giQPnc+rClYnav4SxX84X4h2JAbJ9gEWhknxQZpnwkdTDw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.9/JamfDash20260927.7-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="1947946" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="5Ojmax+lWT0y0wakHo1Ft2g1sr7bwaV8IlLKABZ+py/ok1QUapXohSfr7bLBWE09HzJKq/5AkkhWk9bOM2+uCA=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -65,11 +148,11 @@ macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Ma
 - **Ask Dashie** — Dashie now answers questions about Jamf Dash itself ("How do I turn on automatic updates?", "Why are Blueprints greyed out?") from the same help, and tells you where to find things.
 - **Up to date** — the help covers everything added in 0.8 and 0.8.1 and fixes outdated descriptions.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash_v0.8.2.zip" length="8844818" type="application/octet-stream" sparkle:edSignature="U83CCGoAQLrs/aL50B7K5iyq887bvMIbltjQIBPHwzhe0Yy5Yz/BrjUpMOL0iujyODwyQJ9MHaSxfz0pau41AQ=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash_v0.8.2.zip" length="8844818" type="application/octet-stream" sparkle:edSignature="U83CCGoAQLrs/aL50B7K5iyq887bvMIbltjQIBPHwzhe0Yy5Yz/BrjUpMOL0iujyODwyQJ9MHaSxfz0pau41AQ=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="1027434" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="zzOFE/FbJWhWD0b3ql0G8O62MzsGgDe0NB2PFb67M+yY2s4hQPSxfnYrDyagi0xUi8g21DZ+6oCAaQDqlOLVBw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="1125498" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="t3MW4oV7FPHlKjbNdR2nChcZig53NlAb3ecLLWRuHr6UGBCbOX+JEXG2lI3HhXM8ZWuMx+kvDugbLYtAs1WnAg=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1787990" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ZK3gm+pHCSCclIBrQy5kvrUckzkFDq2goVLLhPYAv0+YLfRflPL0OzUXW+qAaxFjpLi1OIDuNcIWrISNJynpDg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260927.2.delta" sparkle:deltaFrom="20260927.2" length="1027434" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="zzOFE/FbJWhWD0b3ql0G8O62MzsGgDe0NB2PFb67M+yY2s4hQPSxfnYrDyagi0xUi8g21DZ+6oCAaQDqlOLVBw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="1125498" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="t3MW4oV7FPHlKjbNdR2nChcZig53NlAb3ecLLWRuHr6UGBCbOX+JEXG2lI3HhXM8ZWuMx+kvDugbLYtAs1WnAg=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.2/JamfDash20260927.5-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1787990" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ZK3gm+pHCSCclIBrQy5kvrUckzkFDq2goVLLhPYAv0+YLfRflPL0OzUXW+qAaxFjpLi1OIDuNcIWrISNJynpDg=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -92,11 +175,11 @@ macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Ma
 
 - **Settings → Developer** is laid out like the other tabs: section headers and descriptions no longer run into each other or get cut off, and the Terminal commands and Console instructions are tucked into collapsible sections.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash_v0.8.1.zip" length="8782112" type="application/octet-stream" sparkle:edSignature="IVDjL430AM7juGDUrEW8hUKKt8Q82nOWtlONeqRpYVekV/0h5zzD4cTnwyujiJAC3KN7afgjwGafP0kVMhh5DA=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash_v0.8.1.zip" length="8782112" type="application/octet-stream" sparkle:edSignature="IVDjL430AM7juGDUrEW8hUKKt8Q82nOWtlONeqRpYVekV/0h5zzD4cTnwyujiJAC3KN7afgjwGafP0kVMhh5DA=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="883110" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="cdtPUG08BM+roF93PnKF8IX9KBq8tAgm67bxxkGT7ChGgLty8nlCAsRxTLru70qbntHER2lHT7aWkun4O/9WBg=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1648954" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="oSrjPQEOHVf0YZkyq1O0WYjRP9tRq0/lM8+gmfzboJchePsM097wejEK/H9csN9317JAWKQfeT7Obmn4dSeoBQ=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="1664474" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YM/MLxo2Cizz7n2W4KgclYswq/I9glEzLadklbGYL0bpZzfUYOM/ioeTADLFjZQG20bh04NGuds7ychlxS5GBw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260927.1.delta" sparkle:deltaFrom="20260927.1" length="883110" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="cdtPUG08BM+roF93PnKF8IX9KBq8tAgm67bxxkGT7ChGgLty8nlCAsRxTLru70qbntHER2lHT7aWkun4O/9WBg=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1648954" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="oSrjPQEOHVf0YZkyq1O0WYjRP9tRq0/lM8+gmfzboJchePsM097wejEK/H9csN9317JAWKQfeT7Obmn4dSeoBQ=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8.1/JamfDash20260927.2-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="1664474" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YM/MLxo2Cizz7n2W4KgclYswq/I9glEzLadklbGYL0bpZzfUYOM/ioeTADLFjZQG20bh04NGuds7ychlxS5GBw=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -137,11 +220,11 @@ Dashie, the AI assistant, now runs entirely on Apple's on-device model and uses 
 
 macOS 14 Sonoma or later; Dashie and plain-language search need Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.31.1 or later. Compliance results and blueprint status need a Platform API connection at the platform environment level.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash_v0.8.zip" length="8738619" type="application/octet-stream" sparkle:edSignature="b7dLPeEjjsPLsr0NbE6lFGiUQWAfKSr5lK9atFjD0RFq2bBje0W7pAKZ+K0A4GlQuonyUS3eks1FB/M32pBWDQ=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash_v0.8.zip" length="8738619" type="application/octet-stream" sparkle:edSignature="b7dLPeEjjsPLsr0NbE6lFGiUQWAfKSr5lK9atFjD0RFq2bBje0W7pAKZ+K0A4GlQuonyUS3eks1FB/M32pBWDQ=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1578358" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="TGqxDazoi4PfVmYnBgU8JE3RjXaw+PPUfHGcYT7Wt46s+V2jNPTOUaq6kCNTiJ+dYOKv6dkEPmLu6WHqL8opBw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="1589082" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="QSgmxpIP5qmnmCQ/xPaSQTxN/UlTscSQNKKNR05ldG7bvF3wVJgNYXFB7Wu5UCrP9d8jrhv+x2bXLluoYnF8Bw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="1595630" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="7NvGOGJy2EhFqZPfJlGaDNhPYoHeMZPCVZpG3YfjD8lq9bI8BNrH8PFVgQ0Yam+jXlOHwBN3yrG8Vs3lrHRiDw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.6.delta" sparkle:deltaFrom="20260926.6" length="1578358" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="TGqxDazoi4PfVmYnBgU8JE3RjXaw+PPUfHGcYT7Wt46s+V2jNPTOUaq6kCNTiJ+dYOKv6dkEPmLu6WHqL8opBw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="1589082" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="QSgmxpIP5qmnmCQ/xPaSQTxN/UlTscSQNKKNR05ldG7bvF3wVJgNYXFB7Wu5UCrP9d8jrhv+x2bXLluoYnF8Bw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.8/JamfDash20260927.1-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="1595630" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="7NvGOGJy2EhFqZPfJlGaDNhPYoHeMZPCVZpG3YfjD8lq9bI8BNrH8PFVgQ0Yam+jXlOHwBN3yrG8Vs3lrHRiDw=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -155,11 +238,11 @@ macOS 14 Sonoma or later; Dashie and plain-language search need Apple Intelligen
 - **DDM Monitor → Update Readiness** — no longer stretches the window to fit every Mac. The list scrolls inside the window, and long permission notes are shortened to two lines (hover for the full text).
 - **DDM Monitor → Fleet Overview** — the summary and table start at the top instead of in the middle of the window.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash_v0.7.4.zip" length="8322322" type="application/octet-stream" sparkle:edSignature="19HKcxF8n+fpl5ckJaCdkFOZCRhD9boZnachwUzz+aypAkZqsEFvA42ogXtcN3yQYuzxSmMStZrJcm2LnbHzDA=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash_v0.7.4.zip" length="8322322" type="application/octet-stream" sparkle:edSignature="19HKcxF8n+fpl5ckJaCdkFOZCRhD9boZnachwUzz+aypAkZqsEFvA42ogXtcN3yQYuzxSmMStZrJcm2LnbHzDA=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="605298" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="lHj12qB4+VPpF+VKJ31+S5DaDj98/DBKioUmDBGs1BUZJD6/02yjT3NOW6QIICU14/tuxSb1IGPVPKggn0J0Bw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="750394" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Di1tjC6t2zdjWiecQ1NGMThrqOUbjtB0tBoM6IqvqwsTOg9a9QPPReJjOXUdKqbrN+2SFA+NxaqnYAHPaOWCDg=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="766366" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qaY8Tg+8F6/V4FuYCPQaR0B6hhz3kCKiuKRDOgG/1acPootLpnFu2hE1p7dQoVECK4Qb+DjHo4+4O44fUADSDQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.5.delta" sparkle:deltaFrom="20260926.5" length="605298" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="lHj12qB4+VPpF+VKJ31+S5DaDj98/DBKioUmDBGs1BUZJD6/02yjT3NOW6QIICU14/tuxSb1IGPVPKggn0J0Bw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="750394" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Di1tjC6t2zdjWiecQ1NGMThrqOUbjtB0tBoM6IqvqwsTOg9a9QPPReJjOXUdKqbrN+2SFA+NxaqnYAHPaOWCDg=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.4/JamfDash20260926.6-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="766366" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qaY8Tg+8F6/V4FuYCPQaR0B6hhz3kCKiuKRDOgG/1acPootLpnFu2hE1p7dQoVECK4Qb+DjHo4+4O44fUADSDQ=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -175,11 +258,11 @@ macOS 14 Sonoma or later; Dashie and plain-language search need Apple Intelligen
 - **DDM Monitor → Fleet Overview** — shows an empty state instead of a format error when there is no DDM declaration data.
 - **AI Assistant with Private Cloud Compute** — if Private Cloud Compute fails to answer, Dashie now switches that chat to the on-device model and answers anyway, instead of showing an internal error.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash_v0.7.3.zip" length="8319589" type="application/octet-stream" sparkle:edSignature="zOdB3TuugWJzirhjRhSLshAqgygGYfOv1x9t8LhDuwFwHOe2YL3jCeqoJ+K1Sg9SZlkn/rNjxXi4M/hlSf2uDg=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash_v0.7.3.zip" length="8319589" type="application/octet-stream" sparkle:edSignature="zOdB3TuugWJzirhjRhSLshAqgygGYfOv1x9t8LhDuwFwHOe2YL3jCeqoJ+K1Sg9SZlkn/rNjxXi4M/hlSf2uDg=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="723234" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="3nogfDWOks2oG1kPqy1Icku57haAXGsmw//gX5/48N8B3sifkASeQcFPYrzHShHfxsCmuL6gbGBhWVETJ51OAQ=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="739710" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="KYHNA1kUes3ilz4rdOw7zNPsXX3k4hT8d7PziflOiQNTj0PReEF+81tN13gFif0Un3Pfunhob38bK7rihi0GCA=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4569322" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="BoOCZx0cwPQL9dQdH/lYq491DDIbAHjwUT64OIqMQUGRYzHbFDMgT1fzqutWRLeTHCmtwFjLTt0SN65q76qhAA=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260926.4.delta" sparkle:deltaFrom="20260926.4" length="723234" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="3nogfDWOks2oG1kPqy1Icku57haAXGsmw//gX5/48N8B3sifkASeQcFPYrzHShHfxsCmuL6gbGBhWVETJ51OAQ=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="739710" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="KYHNA1kUes3ilz4rdOw7zNPsXX3k4hT8d7PziflOiQNTj0PReEF+81tN13gFif0Un3Pfunhob38bK7rihi0GCA=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.3/JamfDash20260926.5-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4569322" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="BoOCZx0cwPQL9dQdH/lYq491DDIbAHjwUT64OIqMQUGRYzHbFDMgT1fzqutWRLeTHCmtwFjLTt0SN65q76qhAA=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -192,11 +275,11 @@ macOS 14 Sonoma or later; Dashie and plain-language search need Apple Intelligen
 
 - **Add Connection window** — the setup sheet in **Settings → Connection** could grow much wider than the Settings window, cutting off the product choice, labels and descriptions. It now fits the window, with the descriptions wrapping as they should.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash_v0.7.2.zip" length="8308035" type="application/octet-stream" sparkle:edSignature="MeATQ6JBaoX4in8elXBkL8BV7leXtIztB0GyDLJLuJlltY/3shWXp9AeVbwYiZOwq+yPLo2gcbClj4am4rlICA=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash_v0.7.2.zip" length="8308035" type="application/octet-stream" sparkle:edSignature="MeATQ6JBaoX4in8elXBkL8BV7leXtIztB0GyDLJLuJlltY/3shWXp9AeVbwYiZOwq+yPLo2gcbClj4am4rlICA=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="470254" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="gW1F42y1EJjCltz24iyM5N5UQqP+GkxVLzf9abKzuexNaP+//KUb8h0FmIX9ygRi5Kz+jLmFftQhmPequW9nAw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4553998" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="VD2yjuOShVh9nKg4eZqpkfygUZp7Tjc+BY42qFU1Ls0T1DP/0sKPVuPPF0ZN2NLUdLeqTtLdWl3JK23qA1izDg=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260527.13.delta" sparkle:deltaFrom="20260527.13" length="4851034" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Nkorh//vt8ayH72fhmZPif7xmOj69u5EQih/HKVtI8tG/VjOCcIC73SR9TY6X/UNtiszJWTzS9nGpOtNY3U9Dw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260926.3.delta" sparkle:deltaFrom="20260926.3" length="470254" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="gW1F42y1EJjCltz24iyM5N5UQqP+GkxVLzf9abKzuexNaP+//KUb8h0FmIX9ygRi5Kz+jLmFftQhmPequW9nAw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4553998" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="VD2yjuOShVh9nKg4eZqpkfygUZp7Tjc+BY42qFU1Ls0T1DP/0sKPVuPPF0ZN2NLUdLeqTtLdWl3JK23qA1izDg=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.2/JamfDash20260926.4-20260527.13.delta" sparkle:deltaFrom="20260527.13" length="4851034" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Nkorh//vt8ayH72fhmZPif7xmOj69u5EQih/HKVtI8tG/VjOCcIC73SR9TY6X/UNtiszJWTzS9nGpOtNY3U9Dw=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -256,11 +339,11 @@ Jamf Dash now requires **jamf-cli 1.31.1** or later. An older version is updated
 
 Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contextSizeExceeded` on macOS 27; the deprecated `exceededContextWindowSize` is still handled on macOS 26. macOS 14 Sonoma remains the minimum.
 ]]></description>
-            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash_v0.7.1.zip" length="8307704" type="application/octet-stream" sparkle:edSignature="he20qcuCDS48OZavtmXGiozq9MeJ4NzpxIKjjur3bqSdjG3zlDsq3eZjDFDvGi2U+v7FwwIn9Xhhq2lNm9iICw=="/>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash_v0.7.1.zip" length="8307704" type="application/octet-stream" sparkle:edSignature="he20qcuCDS48OZavtmXGiozq9MeJ4NzpxIKjjur3bqSdjG3zlDsq3eZjDFDvGi2U+v7FwwIn9Xhhq2lNm9iICw=="></enclosure>
             <sparkle:deltas>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash20260926.3-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4555970" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="K6vqJrPiIe7K5QbheK/cx08+56sxcRR7CSNIXjbb4yAttGlHTHLhAa0IRUNg9G2H0WOyzyqMMemionqxkeB+Bw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash20260926.3-20260527.13.delta" sparkle:deltaFrom="20260527.13" length="4851918" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Di6sBnXnBAFwmHn90a5vGsrnlhrULTymYe6a4aSMxiQ3y3ufC17QtbyeT0C2dspb+iCWehniZ1UMbsWFqCRNCw=="/>
-                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash20260926.3-20260517.15.delta" sparkle:deltaFrom="20260517.15" length="4880842" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="jlKrdIFBElkQLHUsYTvPabpcpiC7v7hAR3NsbskFFnWONS8/OUuFa/IK1hQLJpCRYQOj/4zys/v6V74l6wpiCQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash20260926.3-20260614.21.delta" sparkle:deltaFrom="20260614.21" length="4555970" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="K6vqJrPiIe7K5QbheK/cx08+56sxcRR7CSNIXjbb4yAttGlHTHLhAa0IRUNg9G2H0WOyzyqMMemionqxkeB+Bw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash20260926.3-20260527.13.delta" sparkle:deltaFrom="20260527.13" length="4851918" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Di6sBnXnBAFwmHn90a5vGsrnlhrULTymYe6a4aSMxiQ3y3ufC17QtbyeT0C2dspb+iCWehniZ1UMbsWFqCRNCw=="></enclosure>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.7.1/JamfDash20260926.3-20260517.15.delta" sparkle:deltaFrom="20260517.15" length="4880842" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="jlKrdIFBElkQLHUsYTvPabpcpiC7v7hAR3NsbskFFnWONS8/OUuFa/IK1hQLJpCRYQOj/4zys/v6V74l6wpiCQ=="></enclosure>
             </sparkle:deltas>
         </item>
     <item>
@@ -270,12 +353,7 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
       <sparkle:shortVersionString>0.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Sun, 14 June 2026 00:00:00 +0000</pubDate>
-      <enclosure
-        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.6/JamfDash_v0.6.zip"
-        sparkle:edSignature="3TVQbXVs1JnY18EpBCdDI587rmJnaJS3KDCq3qAOS2rErZi/b8AiCA+i0IZSWHYkDhHsE0+wfvgjSFNqEiyVAQ=="
-        length="7474022"
-        type="application/octet-stream"
-      />
+      <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.6/JamfDash_v0.6.zip" sparkle:edSignature="3TVQbXVs1JnY18EpBCdDI587rmJnaJS3KDCq3qAOS2rErZi/b8AiCA+i0IZSWHYkDhHsE0+wfvgjSFNqEiyVAQ==" length="7474022" type="application/octet-stream"></enclosure>
     </item>
 
     <item>
@@ -285,12 +363,7 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
       <sparkle:shortVersionString>0.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Tue, 27 May 2026 00:00:00 +0000</pubDate>
-      <enclosure
-        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.5/JamfDash_v0.5.zip"
-        sparkle:edSignature="jwr9coFUuT1J35VDMnXnVG575ifUWu5Vp2zDIzJYY0uQYIvoiQXKbj/VqIX0bFyzmQ8rMcFpDIn0FIuJdqU9Bg=="
-        length="6653214"
-        type="application/octet-stream"
-      />
+      <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.5/JamfDash_v0.5.zip" sparkle:edSignature="jwr9coFUuT1J35VDMnXnVG575ifUWu5Vp2zDIzJYY0uQYIvoiQXKbj/VqIX0bFyzmQ8rMcFpDIn0FIuJdqU9Bg==" length="6653214" type="application/octet-stream"></enclosure>
     </item>
 
     <item>
@@ -300,12 +373,7 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
       <sparkle:shortVersionString>0.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Sun, 17 May 2026 00:00:00 +0000</pubDate>
-      <enclosure
-        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.4/JamfDash_v0.4.zip"
-        sparkle:edSignature="OuyP5b4XdGIMKbPFpmMxgnmNZ3Avj5nT3ZVsXKowoH2y5Sp1AvHhabALg/bVZY9JyXriocEYgc+LYg+WoaMhDQ=="
-        length="6614685"
-        type="application/octet-stream"
-      />
+      <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.4/JamfDash_v0.4.zip" sparkle:edSignature="OuyP5b4XdGIMKbPFpmMxgnmNZ3Avj5nT3ZVsXKowoH2y5Sp1AvHhabALg/bVZY9JyXriocEYgc+LYg+WoaMhDQ==" length="6614685" type="application/octet-stream"></enclosure>
     </item>
 
     <item>
@@ -315,12 +383,7 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
       <sparkle:shortVersionString>0.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Wed, 29 Apr 2026 00:00:00 +0000</pubDate>
-      <enclosure
-        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.3/JamfDash_v0.3.zip"
-        sparkle:edSignature="JESCyXuMkzz1QZ7U+ATSJR3UPG12bgpERwLXI5BV0prCn53vb4amqZAhsYma2e/iE4vDaoDGycBilAFS5GkfDQ=="
-        length="5505252"
-        type="application/octet-stream"
-      />
+      <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.3/JamfDash_v0.3.zip" sparkle:edSignature="JESCyXuMkzz1QZ7U+ATSJR3UPG12bgpERwLXI5BV0prCn53vb4amqZAhsYma2e/iE4vDaoDGycBilAFS5GkfDQ==" length="5505252" type="application/octet-stream"></enclosure>
     </item>
     <item>
       <title>Version 0.2</title>
@@ -329,13 +392,11 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
       <sparkle:shortVersionString>0.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <pubDate>Thu, 24 Apr 2026 00:00:00 +0000</pubDate>
-      <enclosure
-        url="https://github.com/DevliegereM/JamfDash/releases/download/v0.2/JamfDash_v0.2.pkg"
-        sparkle:edSignature="WqW24DPFLQqnh8l+mrkEqJtJ/pPbtnOBCeRj4KQ1La0BX7xjt6o6bTsz6sfGtS4nKFmammHyP27+SNocmInZAg=="
-        length="4643034"
-        type="application/octet-stream"
-      />
+      <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v0.2/JamfDash_v0.2.pkg" sparkle:edSignature="WqW24DPFLQqnh8l+mrkEqJtJ/pPbtnOBCeRj4KQ1La0BX7xjt6o6bTsz6sfGtS4nKFmammHyP27+SNocmInZAg==" length="4643034" type="application/octet-stream"></enclosure>
     </item>
 
   </channel>
-</rss>
+</rss><!-- sparkle-signatures:
+edSignature: lg3MR90YHRJf7mYq7/XtiDVnpV8Yiwhu+fMtZ2LJWjhz4TG3zxFDdo/ZqsXz3Ojg31G0ZWC42n4/yP8kX2nVBQ==
+length: 46644
+-->
