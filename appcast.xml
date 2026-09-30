@@ -8,6 +8,45 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <language>en</language>
 
     <item>
+            <title>1.0-rc.1</title>
+            <pubDate>Wed, 30 Sep 2026 08:38:35 +0200</pubDate>
+            <sparkle:version>20260930.1</sparkle:version>
+            <sparkle:shortVersionString>1.0-rc.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[**Release candidate 1 for Jamf Dash 1.0.** It's offered as a normal update so more people can try it before 1.0. Please report anything that doesn't work with **Help → Report a Problem…**.
+
+## New: extension attribute dependency map
+
+**Extension Attributes** now shows where every computer and mobile device extension attribute is used, so you can see what changes before you edit, disable or delete one.
+
+- Press **Map Dependencies** to read every smart group, advanced search, policy, configuration profile, restricted software entry and patch policy, and the mobile device smart groups, advanced searches and configuration profiles. A progress bar shows how far it is; you can stop it at any time.
+- Select an attribute to see its **impact** per object type and every object that depends on it, with the reason:
+  - a smart group or advanced search **criterion** that uses the value
+  - **membership of a group** that uses it, followed through nested groups ("Member of Engineering VPN Users (via Engineering Department)")
+  - a policy, profile, restricted software entry or patch policy **scoped to or excluding** such a group
+  - an advanced search that **shows it as a column**
+  - a configuration profile that inserts the value with **`$EXTENSIONATTRIBUTE_<id>`**
+- **Findings** point out:
+  - disabled attributes that are still used, so groups work with old values
+  - pop-up menu criteria looking for a value that isn't one of the menu choices, so they never match
+  - attributes used only in exclusions
+  - attributes nothing uses, including scripts that still run on every inventory update
+- Switch between **Computers** and **Mobile Devices**, search, and filter on In Use, Not Used or Needs Attention.
+- The map needs read access to the objects it reads. When some can't be read, it says which, and shows everything else.
+- Nothing is saved: the map is kept in memory for the current instance only.
+
+## Requirements
+
+macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.31.1 or later. English only.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0-rc.1/JamfDash_v1.0-rc.1.zip" length="10312207" type="application/octet-stream" sparkle:edSignature="pM8TYwhyBFVr9Cqu5lRI7gIoh5j6Jt+GSwF7dr2QRttzii8z7yKg72c3zG35LO+sI8u64Dyt3va2iBOJixSmBQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0-rc.1/JamfDash20260930.1-20260929.2.delta" sparkle:deltaFrom="20260929.2" length="1430818" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="IH5xzzRICtqGSIUu/mim7MCBNPosgBrK6FVPfF8qtXGRR3qzvby1gMqO8tTug4vnnoUWpLxtYbY0YBAQi0/7Bg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0-rc.1/JamfDash20260930.1-20260927.7.delta" sparkle:deltaFrom="20260927.7" length="2491894" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="x9/m59113bTV1staKTAer/ScJI1bdGnAovHvEGp6nYin7bANa+tX0eKzPoX2neGbkcORK90P1j/bRA7eC9SfCQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0-rc.1/JamfDash20260930.1-20260927.5.delta" sparkle:deltaFrom="20260927.5" length="3055918" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Th6LFFRUdl0aGEGqAOhwsavQxwUHClG8OMBmkBVkryEI71vbm0Bp1cyRV1NQbHXBHeuPBRyINXiAxFpitKoZBA=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>0.9.1</title>
             <pubDate>Tue, 29 Sep 2026 23:18:44 +0200</pubDate>
             <sparkle:version>20260929.2</sparkle:version>
@@ -397,6 +436,6 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
 
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: lg3MR90YHRJf7mYq7/XtiDVnpV8Yiwhu+fMtZ2LJWjhz4TG3zxFDdo/ZqsXz3Ojg31G0ZWC42n4/yP8kX2nVBQ==
-length: 46644
+edSignature: WPavr58sQRj37ChzCzR2uK9mJhj7a+qZHNEnEgpgOJj8F4DMDXnYtQqwbnGHmnsfDsQMG8eO1iZnbAu+jgNFCg==
+length: 50780
 -->
