@@ -579,6 +579,8 @@ struct DeviceActionsPanel: View {
     @State private var confirmAction: ConfirmableAction? = nil
     @State private var showLockSheet = false
     @State private var lockPIN = ""
+    @State private var showUnlockUserSheet = false
+    @State private var unlockUsername = ""
 
     enum ConfirmableAction: Identifiable {
         case removeMDM, clearRecoveryLock, erase
@@ -698,6 +700,10 @@ struct DeviceActionsPanel: View {
                     actionButton("Flush All Commands", icon: "trash") {
                         confirmAction = .flushAllCommands
                     }
+                    actionButton("Unlock User Account", icon: "person.badge.key") {
+                        unlockUsername = ""
+                        showUnlockUserSheet = true
+                    }
                 }
 
                 // Destructive actions — only when the connection allows them, behind an explicit unlock
@@ -779,6 +785,9 @@ struct DeviceActionsPanel: View {
         }
         .sheet(isPresented: $showLockSheet) {
             LockDeviceSheet(serial: serial, pin: $lockPIN, vm: vm, isPresented: $showLockSheet)
+        }
+        .sheet(isPresented: $showUnlockUserSheet) {
+            UnlockUserAccountSheet(serial: serial, username: $unlockUsername, vm: vm, isPresented: $showUnlockUserSheet)
         }
     }
 
@@ -935,6 +944,88 @@ private struct LockDeviceSheet: View {
             .padding()
         }
         .frame(minWidth: 440, minHeight: 380)
+    }
+}
+
+// MARK: - Unlock User Account Sheet
+
+private struct UnlockUserAccountSheet: View {
+    let serial: String
+    @Binding var username: String
+    @Bindable var vm: DeviceSearchViewModel
+    @Binding var isPresented: Bool
+
+    private var usernameIsValid: Bool { !username.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label("Unlock User Account", systemImage: "person.badge.key")
+                    .font(.headline)
+                Spacer()
+                Button("Cancel") { isPresented = false }
+                    .keyboardShortcut(.escape)
+            }
+            .padding()
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.blue)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Unlock a macOS user account via MDM.")
+                            .font(.callout.weight(.semibold))
+                        Text("This sends an UnlockUserAccount MDM command. The account must have been locked by Jamf Pro for this to succeed.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(14)
+                .background(Color.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.blue.opacity(0.2)))
+
+                HStack {
+                    Text("Device").foregroundStyle(.secondary)
+                    Spacer()
+                    Text(serial).font(.body.monospaced())
+                }
+                .font(.callout)
+                .padding(.horizontal, 2)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("macOS Username")
+                        .font(.callout.weight(.semibold))
+                    TextField("short username (e.g. jsmith)", text: $username)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 240)
+                    Text("Enter the short username of the account to unlock.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(20)
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Cancel") { isPresented = false }
+                Button("Unlock Account") {
+                    let trimmed = username.trimmingCharacters(in: .whitespaces)
+                    isPresented = false
+                    Task { await vm.runAction(.unlockUserAccount(serial: serial, username: trimmed), name: "Unlock User Account") }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!usernameIsValid || vm.isRunningAction)
+            }
+            .padding()
+        }
+        .frame(minWidth: 420, minHeight: 320)
     }
 }
 

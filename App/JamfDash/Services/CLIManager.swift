@@ -84,6 +84,7 @@ enum CLICommand: Sendable {
     case disableRemoteDesktop(serial: String)
     case restart(serial: String)
     case shutdown(serial: String)
+    case unlockUserAccount(serial: String, username: String)
 
     // MARK: Device actions (destructive)
     case removeMDM(serial: String)
@@ -321,6 +322,7 @@ enum CLICommand: Sendable {
         case .disableRemoteDesktop(let s): return ["pro", "computers", "disable-remote-desktop", Self.serialFlag(s), "--yes"]
         case .restart(let s):              return ["pro", "computers", "restart", Self.serialFlag(s), "--yes"]
         case .shutdown(let s):             return ["pro", "computers", "shutdown", Self.serialFlag(s), "--yes"]
+        case .unlockUserAccount(let s, let u): return ["pro", "computers", "unlock-user-account", Self.serialFlag(s), "--username=" + Self.cleanValue(u), "--yes"]
 
         // Destructive actions
         case .removeMDM(let s):       return ["pro", "computers", "remove-mdm", Self.serialFlag(s), "--yes"]
