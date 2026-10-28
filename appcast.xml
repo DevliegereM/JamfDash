@@ -8,6 +8,45 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <language>en</language>
 
     <item>
+            <title>1.0</title>
+            <pubDate>Wed, 28 Oct 2026 22:18:53 +0100</pubDate>
+            <sparkle:version>20261028.1</sparkle:version>
+            <sparkle:shortVersionString>1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[**Jamf Dash 1.0.** Thank you to everyone who tested the release candidates. Please report anything that doesn't work with **Help → Report a Problem…**.
+
+## New: Jamf Security Cloud
+
+Connect Jamf Dash to **Jamf Security Cloud** (formerly Wandera) to see a device risk dashboard alongside your Jamf Pro data.
+
+- Add your **Application ID** and **Application Secret** from the RADAR portal in **Settings → Security Cloud**. Credentials are stored in the macOS keychain and never leave your Mac except to authenticate with `api.wandera.com`.
+- Once connected, a **Security Cloud** section appears in the sidebar with a full device inventory from the Risk API.
+- The **risk summary banner** shows device counts by risk level (High, Medium, Low, Secure, Unknown). Click any level to filter.
+- The device table shows risk level, OS type, connector state, deployment state, user, and last-seen time. All columns are sortable.
+- Select a device to open the **inspector panel** with identity, device, and connectivity details.
+- Filter by OS type and search by device name, user, or email.
+- Credentials are optional: the sidebar item only appears when they are configured, and can be removed at any time.
+
+## New: Unlock User Account
+
+A new **Unlock User Account** action is available in the device actions panel. It sends the `UnlockUserAccount` MDM command to unlock a macOS user account that was locked by Jamf Pro. Enter the macOS short username in the sheet before sending. Requires jamf-cli 1.34 or later.
+
+## New: Extension Attribute Dependency Map
+
+**Extension Attributes** now shows where every computer and mobile device extension attribute is used across smart groups, advanced searches, policies, configuration profiles, restricted software entries and patch policies — so you can see what's affected before editing, disabling or deleting one. See the 1.0-rc.1 release notes for the full details.
+
+## Requirements
+
+macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.34 or later. English only.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0/JamfDash_v1.0.zip" length="10323932" type="application/octet-stream" sparkle:edSignature="B/d6KMBXGjpfufWiH83UUtU8IGrhoru+hg/VYZRUj6yywtXsJ5TMA+Va4iQveYY5kApjNaP/91yyyjbprBAoAQ=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0/JamfDash20261028.1-20260930.1.delta" sparkle:deltaFrom="20260930.1" length="886754" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="sSbuJo14ATM0z9iccH8t4icJRoHhReUSGEm8HO0DSc+Hbk2ZSWTf5gSRea3kVWcu2U/2yRT7HBRwJvYKfDG9Dw=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0/JamfDash20261028.1-20260929.2.delta" sparkle:deltaFrom="20260929.2" length="1496370" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="XSzUqWJtWoAAWvjjan9ww/a9H1Eze7WfwgIG+OwK6jOtYAzR6iGN1Yo1z8e2yX5Nt9H1tRB9OPI9wl+g4uI8Dg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.0/JamfDash20261028.1-20260927.7.delta" sparkle:deltaFrom="20260927.7" length="2533386" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Ln/mXZXKZDUfQPYpRpxtJP+0n6yHo/KzrKLetX6G9P2EHEfQOZC/bY0iKcErQ2Go+CVQU+IH85KW2iU5K5ViBQ=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>1.0-rc.1</title>
             <pubDate>Wed, 30 Sep 2026 08:38:35 +0200</pubDate>
             <sparkle:version>20260930.1</sparkle:version>
@@ -436,6 +475,6 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
 
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: WPavr58sQRj37ChzCzR2uK9mJhj7a+qZHNEnEgpgOJj8F4DMDXnYtQqwbnGHmnsfDsQMG8eO1iZnbAu+jgNFCg==
-length: 50780
+edSignature: mktoCZKLW+bn4GEjLusR64/o1r0TODlpisuGFvWxZ/j56XhjPEz1FsVfQMpHLaVwdhsLqvMWg6UAzOkFjS+UDw==
+length: 54870
 -->
