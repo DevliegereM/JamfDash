@@ -8,6 +8,34 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <language>en</language>
 
     <item>
+            <title>1.1</title>
+            <pubDate>Sun, 01 Nov 2026 13:03:05 +0100</pubDate>
+            <sparkle:version>20261101.1</sparkle:version>
+            <sparkle:shortVersionString>1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[**Jamf Dash 1.1 fixes Jamf School with jamf-cli 1.35.** Please report anything that doesn't work with **Help → Report a Problem…**.
+
+## Fixed: Jamf School
+
+jamf-cli 1.35 changed the shape of several Jamf School lists. Jamf Dash now reads both the old and the new shapes.
+
+- **Devices** load again, with their OS version and managed state. They failed with "Unrecognized JSON shape" because jamf-cli 1.35 identifies School devices by UDID instead of an ID.
+- **Classes** load again. jamf-cli 1.35 identifies classes by UUID instead of an ID.
+- **Users** show the user's full name again instead of only the username.
+- **Profiles** show each profile's identifier, platform and description. The Scope, Payloads and Status columns are gone: jamf-cli doesn't report them, so they were always empty.
+
+## Requirements
+
+macOS 14 Sonoma or later; Dashie needs Apple Intelligence (macOS 26 or later, Mac with Apple silicon). jamf-cli 1.34 or later. English only.
+]]></description>
+            <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.1/JamfDash_v1.1.zip" length="10324604" type="application/octet-stream" sparkle:edSignature="uQ2iekmTQwhFzjFks+bKoA4WkQU2IGToZt4hiNdagi1xOV0zNPe0OawLS+FGMtjhV56ORoRdNl190fGG1os0Dg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.1/JamfDash20261101.1-20261028.1.delta" sparkle:deltaFrom="20261028.1" length="778398" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="yzDNyFUFIlTXZhIkaw9lg5UlPUN0YFU9O9aF1anFgLgXLDfRbT8BTVvua6fjefJwMIzfimbkFnsMxa8AGwgoDg=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.1/JamfDash20261101.1-20260930.1.delta" sparkle:deltaFrom="20260930.1" length="965838" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="2r1AOzRwLXb8e2ECJ8pZKRAegZqh4TaL7E74Jbx4kHG+izgmir0UZkNUpSqqhhC0vmuQ7NApinusTpESrnupBQ=="/>
+                <enclosure url="https://github.com/DevliegereM/JamfDash/releases/download/v1.1/JamfDash20261101.1-20260929.2.delta" sparkle:deltaFrom="20260929.2" length="1505302" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977840" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="V8hPvYicEkSepoErsIE+njrV9W94p00tI97KNV9qoilLGWk9Hcl4yVpzifH6VYcGjOzSb414T79BtE8iEsFQCg=="/>
+            </sparkle:deltas>
+        </item>
+    <item>
             <title>1.0</title>
             <pubDate>Wed, 28 Oct 2026 22:18:53 +0100</pubDate>
             <sparkle:version>20261028.1</sparkle:version>
@@ -475,6 +503,6 @@ Built with Xcode 27 for macOS 27. Dashie uses the new `LanguageModelError.contex
 
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: mktoCZKLW+bn4GEjLusR64/o1r0TODlpisuGFvWxZ/j56XhjPEz1FsVfQMpHLaVwdhsLqvMWg6UAzOkFjS+UDw==
-length: 54870
+edSignature: 0vbwm0ojLiXXYyJW3zIqZR8S3W3+eNUPZONRJVFz10oO3njbP/G/w8FjTb1ExmkjHdanPwNGFNJtsl/i4AsgDA==
+length: 57849
 -->
