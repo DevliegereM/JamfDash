@@ -97,6 +97,9 @@ final class ModelDecodingTests: XCTestCase {
         let profile = try XCTUnwrap(items.first)
         XCTAssertEqual(profile.id, "1")
         XCTAssertEqual(profile.name, "Restrictions")
+        XCTAssertEqual(profile.identifier, "com.school.restrictions")
+        XCTAssertEqual(profile.platform, "iOS")
+        XCTAssertEqual(profile.description, "Restricts Safari")
     }
 
     // MARK: - Security

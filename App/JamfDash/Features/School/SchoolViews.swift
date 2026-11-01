@@ -178,24 +178,22 @@ struct SchoolProfilesView: View {
         AsyncContentView(state: vm.profilesState, retry: { await vm.loadProfiles(force: true) }) { profiles in
             Table(profiles) {
                 TableColumn("Name") { Text($0.displayName) }
-                TableColumn("Scope") {
-                    Text($0.displayScope)
+                TableColumn("Identifier") {
+                    Text($0.identifier ?? "—")
+                        .font(.body.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                TableColumn("Platform") {
+                    Text($0.platform ?? "—")
                         .foregroundStyle(.secondary)
                 }
-                TableColumn("Payloads") {
-                    if let count = $0.payloadCount {
-                        Text("\(count)")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("—").foregroundStyle(.secondary)
-                    }
-                }
-                .width(80)
-                TableColumn("Status") {
-                    Text($0.displayEnabled)
-                        .foregroundStyle($0.enabled == true ? .green : .secondary)
-                }
                 .width(90)
+                TableColumn("Description") {
+                    Text($0.description ?? "—")
+                        .foregroundStyle(.secondary)
+                        .help($0.description ?? "")
+                }
             }
         }
         .navigationTitle("Configuration Profiles")

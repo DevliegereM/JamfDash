@@ -1403,9 +1403,9 @@ private let webhooksJSON = """
 
 private let schoolProfilesJSON = """
 [
-  {"id":1,"name":"Classroom Wi-Fi","scope":"All Devices","payloadCount":1,"enabled":true},
-  {"id":2,"name":"Restrictions — Grade 5","scope":"Grade 5 iPads","payloadCount":3,"enabled":true},
-  {"id":3,"name":"Exam Mode","scope":"Exam Group","payloadCount":2,"enabled":false}
+  {"id":1,"name":"Classroom Wi-Fi","identifier":"com.example.school.wifi","platform":"iOS","description":"Joins the classroom network","locationId":0},
+  {"id":2,"name":"Restrictions — Grade 5","identifier":"com.example.school.restrictions.grade5","platform":"iOS","description":"App and Safari restrictions for Grade 5 iPads","locationId":0},
+  {"id":3,"name":"Exam Mode","identifier":"com.example.school.exam","platform":"iOS","description":"","locationId":0}
 ]
 """
 

@@ -91,29 +91,25 @@ struct SchoolNamedItem: Decodable, Sendable, Hashable, Identifiable {
 struct SchoolProfile: Decodable, Sendable, Hashable, Identifiable {
     let id: String
     let name: String?
-    let scope: String?
-    let payloadCount: Int?
-    let enabled: Bool?
+    let identifier: String?
+    let platform: String?
+    let description: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, scope, enabled
-        case payloadCount, payload_count
+        case id, name, identifier, platform, description
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         if let s = try? c.decode(String.self, forKey: .id) { id = s }
         else { id = String(try c.decode(Int.self, forKey: .id)) }
-        name         = try? c.decode(String.self, forKey: .name)
-        scope        = try? c.decode(String.self, forKey: .scope)
-        enabled      = try? c.decode(Bool.self, forKey: .enabled)
-        payloadCount = (try? c.decode(Int.self, forKey: .payloadCount))
-                    ?? (try? c.decode(Int.self, forKey: .payload_count))
+        name        = try? c.decode(String.self, forKey: .name)
+        identifier  = try? c.decode(String.self, forKey: .identifier)
+        platform    = try? c.decode(String.self, forKey: .platform)
+        description = (try? c.decode(String.self, forKey: .description)).flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    var displayName: String { name ?? id }
-    var displayScope: String { scope ?? "—" }
-    var displayEnabled: String { enabled.map { $0 ? "Active" : "Inactive" } ?? "—" }
+    var displayName: String { name ?? identifier ?? id }
 }
 
 struct SchoolDepDevice: Decodable, Sendable, Hashable, Identifiable {
