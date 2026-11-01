@@ -29,6 +29,76 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(ids.count, Set(ids).count, "All OverviewItem IDs should be unique")
     }
 
+    // MARK: - School
+
+    /// jamf-cli 1.35 `school dev list`: a flat array keyed by udid, with no id (report JD-6B234A).
+    func testDecodeSchoolDevicesWithoutID() throws {
+        let json = """
+        [{"inTrash": false, "isManaged": true, "isSupervised": true,
+          "lastCheckin": "2026-10-30 15:01:53", "model": "iPad (A16) Wi-Fi",
+          "name": "Student iPad", "os": "iOS 26.6.2", "serialNumber": "ABC123",
+          "udid": "00008120-0000000000000001"}]
+        """
+        let devices = try JSONDecoder().decode([SchoolDevice].self, from: Data(json.utf8))
+        let device = try XCTUnwrap(devices.first)
+        XCTAssertEqual(device.id, "00008120-0000000000000001")
+        XCTAssertEqual(device.serialNumber, "ABC123")
+        XCTAssertEqual(device.osVersion, "iOS 26.6.2")
+        XCTAssertEqual(device.managed, true)
+    }
+
+    func testDecodeSchoolNamedItemWithoutID() throws {
+        let json = """
+        [{"uuid": "5D9C1E2A-0000-0000-0000-000000000001", "name": "Year 3"},
+         {"id": 7, "name": "Year 4"},
+         {"name": "Year 5"}]
+        """
+        let items = try JSONDecoder().decode([SchoolNamedItem].self, from: Data(json.utf8))
+        XCTAssertEqual(items.map(\.id), ["5D9C1E2A-0000-0000-0000-000000000001", "7", "Year 5"])
+    }
+
+    /// Real `school users list` shape (jamf-cli 1.35): numeric id, name only as firstName/lastName.
+    func testDecodeSchoolUsers() throws {
+        let json = """
+        [{"deviceCount": 1, "email": "addison@school.edu", "firstName": "Addison",
+          "id": 849, "inTrash": false, "lastName": "Browne", "locationId": 0,
+          "status": "active", "username": "a.browne"}]
+        """
+        let users = try JSONDecoder().decode([SchoolUser].self, from: Data(json.utf8))
+        let user = try XCTUnwrap(users.first)
+        XCTAssertEqual(user.id, "849")
+        XCTAssertEqual(user.name, "Addison Browne")
+        XCTAssertEqual(user.displayName, "Addison Browne")
+        XCTAssertEqual(user.email, "addison@school.edu")
+    }
+
+    /// Real `school dep-devices list` shape (jamf-cli 1.35).
+    func testDecodeSchoolDepDevices() throws {
+        let json = """
+        [{"color": "Space Gray", "deviceName": "iPad", "id": 1, "locationId": 0,
+          "model": "iPad (A16) Wi-Fi", "profileName": "BYOD Profile",
+          "serialNumber": "XYZ789", "status": "Added"}]
+        """
+        let items = try JSONDecoder().decode([SchoolDepDevice].self, from: Data(json.utf8))
+        let item = try XCTUnwrap(items.first)
+        XCTAssertEqual(item.serial, "XYZ789")
+        XCTAssertEqual(item.model, "iPad (A16) Wi-Fi")
+        XCTAssertEqual(item.profileName, "BYOD Profile")
+        XCTAssertEqual(item.status, "Added")
+    }
+
+    /// Real `school profiles list` shape (jamf-cli 1.35): identifier/platform, no scope/enabled.
+    func testDecodeSchoolProfiles() throws {
+        let json = """
+        [{"description": "Restricts Safari", "id": 1, "identifier": "com.school.restrictions",
+          "locationId": 0, "name": "Restrictions", "platform": "iOS"}]
+        """
+        let items = try JSONDecoder().decode([SchoolProfile].self, from: Data(json.utf8))
+        let profile = try XCTUnwrap(items.first)
+        XCTAssertEqual(profile.id, "1")
+        XCTAssertEqual(profile.name, "Restrictions")
+    }
+
     // MARK: - Security
 
     func testDecodeSecurityJSON() throws {

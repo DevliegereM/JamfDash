@@ -16,17 +16,23 @@ struct SchoolDevice: Decodable, Sendable, Hashable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, name, serialNumber, model, osVersion, managed
         case serial, deviceModel, version
+        // jamf-cli 1.35 `school dev list`: no id, keyed by udid
+        case udid, os, isManaged
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        if let s = try? c.decode(String.self, forKey: .id) { id = s }
-        else { id = String(try c.decode(Int.self, forKey: .id)) }
-        name         = try? c.decode(String.self, forKey: .name)
         serialNumber = (try? c.decode(String.self, forKey: .serialNumber)) ?? (try? c.decode(String.self, forKey: .serial))
+        id           = (try? c.decode(String.self, forKey: .id))
+                    ?? (try? c.decode(Int.self, forKey: .id)).map(String.init)
+                    ?? (try? c.decode(String.self, forKey: .udid))
+                    ?? serialNumber
+                    ?? UUID().uuidString
+        name         = try? c.decode(String.self, forKey: .name)
         model        = (try? c.decode(String.self, forKey: .model))        ?? (try? c.decode(String.self, forKey: .deviceModel))
         osVersion    = (try? c.decode(String.self, forKey: .osVersion))    ?? (try? c.decode(String.self, forKey: .version))
-        managed      = try? c.decode(Bool.self, forKey: .managed)
+                    ?? (try? c.decode(String.self, forKey: .os))
+        managed      = (try? c.decode(Bool.self, forKey: .managed))        ?? (try? c.decode(Bool.self, forKey: .isManaged))
     }
 
     var displayName: String { name ?? serialNumber ?? id }
@@ -41,32 +47,45 @@ struct SchoolUser: Decodable, Sendable, Hashable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, name, email, username
         case displayName, userPrincipalName
+        // jamf-cli 1.35 `school users list` has no display name, only firstName/lastName
+        case firstName, lastName
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        if let s = try? c.decode(String.self, forKey: .id) { id = s }
-        else { id = String(try c.decode(Int.self, forKey: .id)) }
-        name     = (try? c.decode(String.self, forKey: .name))     ?? (try? c.decode(String.self, forKey: .displayName))
+        username = (try? c.decode(String.self, forKey: .username)) ?? (try? c.decode(String.self, forKey: .userPrincipalName))
         email    = try? c.decode(String.self, forKey: .email)
-        username = (try? c.decode(String.self, forKey: .username))  ?? (try? c.decode(String.self, forKey: .userPrincipalName))
+        let first = try? c.decode(String.self, forKey: .firstName)
+        let last  = try? c.decode(String.self, forKey: .lastName)
+        let fullName = [first, last].compactMap { $0 }.joined(separator: " ")
+        name     = (try? c.decode(String.self, forKey: .name))
+               ?? (try? c.decode(String.self, forKey: .displayName))
+               ?? (fullName.isEmpty ? nil : fullName)
+        id       = (try? c.decode(String.self, forKey: .id))
+               ?? (try? c.decode(Int.self, forKey: .id)).map(String.init)
+               ?? username
+               ?? email
+               ?? UUID().uuidString
     }
 
     var displayName: String { name ?? username ?? email ?? id }
 }
 
-struct SchoolNamedItem: Codable, Sendable, Hashable, Identifiable {
+struct SchoolNamedItem: Decodable, Sendable, Hashable, Identifiable {
     let id: String
     let name: String
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        if let s = try? c.decode(String.self, forKey: .id) { id = s }
-        else { id = String(try c.decode(Int.self, forKey: .id)) }
         name = try c.decode(String.self, forKey: .name)
+        // jamf-cli 1.35 `school cls list` has no id; classes are keyed by uuid
+        id   = (try? c.decode(String.self, forKey: .id))
+            ?? (try? c.decode(Int.self, forKey: .id)).map(String.init)
+            ?? (try? c.decode(String.self, forKey: .uuid))
+            ?? name
     }
 
-    private enum CodingKeys: String, CodingKey { case id, name }
+    private enum CodingKeys: String, CodingKey { case id, uuid, name }
 }
 
 struct SchoolProfile: Decodable, Sendable, Hashable, Identifiable {
